@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.3
-// @description  Zeta 캡처 모드/캡처 미리보기에서 현재 대화방의 사용자 프로필 이름만 검열 바 형태로 가립니다. Safari/Stay 및 프로필 간섭을 보강했습니다.
+// @version      0.2.4
+// @description  Zeta 캡처 모드/캡처 미리보기에서 현재 대화방에서 지금 선택된 사용자 프로필 이름만 검열 바 형태로 가립니다. 헤더/선택 상태를 우선 사용해 다른 프로필 간섭을 막습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
@@ -17,7 +17,7 @@
   const STYLE_ID = 'zeta-capture-user-mask-style';
   const MASK_COLOR = '#58666E';
   // v0.2.2까지의 캐시는 여러 프로필 이름이 섞여 있을 수 있어 새 키를 사용한다.
-  const CACHE_KEY = 'zeta-capture-user-mask:active-profile:v3';
+  const CACHE_KEY = 'zeta-capture-user-mask:active-profile:v4';
   const MAX_CACHE_ROOMS = 40;
 
   const userNames = new Set();
@@ -195,6 +195,79 @@
     });
   }
 
+  function cleanProfileLabel(value) {
+    let text = normalizeText(value);
+    if (!text) return '';
+    text = text
+      .replace(/^(?:내\s*)?프로필\s*[:：]?\s*/i, '')
+      .replace(/\s*(?:프로필|profile)\s*$/i, '')
+      .trim();
+    return text;
+  }
+
+  function isProfileUiLabel(value) {
+    const text = normalizeText(value).toLowerCase();
+    return !text || [
+      '프로필', '내 프로필', '대화 프로필', '프로필 변경', '프로필 선택',
+      '수정', '편집', '선택', '현재', 'profile', 'chat profile', 'edit'
+    ].includes(text);
+  }
+
+  function nameFromProfileContainer(root) {
+    if (!(root instanceof Element)) return '';
+
+    const preferred = [
+      '.body1',
+      '[class~="body1"]',
+      'h4',
+      'h3',
+      'span'
+    ];
+
+    for (const selector of preferred) {
+      for (const el of root.querySelectorAll(selector)) {
+        if (!isElementVisible(el)) continue;
+        const text = cleanProfileLabel(el.textContent);
+        if (!looksLikeDisplayName(text) || isProfileUiLabel(text)) continue;
+        return text;
+      }
+    }
+
+    const text = cleanProfileLabel(root.textContent);
+    if (looksLikeDisplayName(text) && !isProfileUiLabel(text)) return text;
+    return '';
+  }
+
+  function pickExplicitActiveProfileName() {
+    // 1순위: 채팅 헤더의 현재 프로필 버튼. 과거 메시지 이름과 달리 '지금 선택된 프로필'을 가리킨다.
+    const header = document.querySelector('[data-testid="chat-header-profile"]');
+    if (header && isElementVisible(header)) {
+      const name = nameFromProfileContainer(header);
+      if (name) return name;
+    }
+
+    // 프로필 선택 바텀시트가 열려 있다면 체크된 항목을 현재 프로필로 사용한다.
+    const dialog = document.querySelector('#portal-container [role="dialog"][aria-label="대화 프로필"]');
+    if (dialog) {
+      const items = [...dialog.querySelectorAll('[data-sentry-component="ChatProfileListItem"]')];
+      const selected = items.find(item =>
+        item.matches('[aria-current="true"], [aria-selected="true"]') ||
+        item.querySelector('.kt-profile-hub-selected, [aria-current="true"], [aria-selected="true"], div[class*="bg-primary-400"] svg')
+      );
+      const name = nameFromProfileContainer(selected);
+      if (name) return name;
+    }
+
+    // 프로필 선택 화면의 현재/미리보기 카드.
+    const card = document.querySelector('[data-sentry-component="PlotProfileCard"]');
+    if (card && isElementVisible(card)) {
+      const name = nameFromProfileContainer(card);
+      if (name) return name;
+    }
+
+    return '';
+  }
+
   function pickCurrentUserName() {
     const currentLog = getCurrentChatLog();
     let candidates = getNameElements(currentLog);
@@ -222,9 +295,18 @@
 
   function collectCurrentUserName() {
     loadCachedProfile();
-    const name = pickCurrentUserName();
-    if (!name) return false;
-    return setActiveUserName(name, true);
+
+    // 과거 메시지의 이름보다 현재 프로필 UI를 반드시 우선한다.
+    const explicitName = pickExplicitActiveProfileName();
+    if (explicitName) return setActiveUserName(explicitName, true);
+
+    // 이미 이 방의 현재 프로필을 확정해 둔 상태라면 과거 RightTextContent로 덮어쓰지 않는다.
+    if (activeUserName) return false;
+
+    // 정말 현재 프로필 UI가 전혀 없고 캐시도 비어 있을 때만 최초 1회 메시지 이름을 보조 수단으로 쓴다.
+    const fallbackName = pickCurrentUserName();
+    if (!fallbackName) return false;
+    return setActiveUserName(fallbackName, true);
   }
 
   function escapeRegExp(value) {
