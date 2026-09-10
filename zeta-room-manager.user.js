@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.1.5
+// @version      0.1.7
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 별명/원래 이름으로 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -91,7 +91,7 @@
         background: #252528;
         color: #fff;
         outline: none;
-        padding: 0 38px 0 12px;
+        padding: 0 12px;
         font: inherit;
       }
       #${PANEL_ID} input:focus {
@@ -99,20 +99,6 @@
         background: #2a2a2e;
       }
       #${PANEL_ID} input::placeholder { color: rgba(255,255,255,.45); }
-      #${PANEL_ID} .zrm-clear {
-        position: absolute;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 26px;
-        height: 26px;
-        border: 0;
-        border-radius: 50%;
-        background: transparent;
-        color: rgba(255,255,255,.55);
-        cursor: pointer;
-        font-size: 18px;
-      }
       #${PANEL_ID} .zrm-results {
         display: none;
         margin-top: 8px;
@@ -470,19 +456,18 @@
       panel.innerHTML = `
         <div class="zrm-row">
           <div class="zrm-search-wrap">
-            <input type="search" autocomplete="off" spellcheck="false" placeholder="${type === 'room' ? '대화방' : '플롯'} 이름 또는 별명 검색">
-            <button type="button" class="zrm-clear" aria-label="검색어 지우기">×</button>
+            <input type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="${type === 'room' ? '대화방' : '플롯'} 이름 또는 별명 검색">
           </div>
         </div>
         <div class="zrm-results"></div>
       `;
 
       const input = panel.querySelector('input');
-      input.addEventListener('input', () => applySearch(input.value));
-      panel.querySelector('.zrm-clear').addEventListener('click', () => {
-        input.value = '';
-        applySearch('');
-        input.focus();
+      input.addEventListener('input', () => {
+        applySearch(input.value);
+      });
+      input.addEventListener('search', () => {
+        applySearch(input.value);
       });
 
       if (type === 'room') host.prepend(panel);
