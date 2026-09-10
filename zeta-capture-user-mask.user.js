@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.1
-// @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분까지 검열 바 형태로 가립니다.
+// @version      0.2.2
+// @description  Zeta 캡처 모드/캡처 미리보기에서 사용자 이름을 자동으로 찾아 검열 바 형태로 가립니다. Safari/Stay 렌더 타이밍을 보강했습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
@@ -16,10 +16,14 @@
   const MASK_CLASS = 'zeta-capture-user-mask';
   const STYLE_ID = 'zeta-capture-user-mask-style';
   const MASK_COLOR = '#58666E';
+  const CACHE_KEY = 'zeta-capture-user-mask:names:v2';
+  const MAX_CACHE_ROOMS = 40;
 
   const userNames = new Set();
   let applying = false;
   let scheduled = false;
+  let lastRoomId = '';
+  let delayedTimers = [];
 
   function installStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -49,6 +53,53 @@
     return String(value || '').replace(/\s+/g, ' ').trim();
   }
 
+  function getRoomId() {
+    const match = location.pathname.match(/\/rooms\/([0-9a-f-]{8,})/i);
+    return match?.[1] || '';
+  }
+
+  function readCache() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function loadCachedNames() {
+    const roomId = getRoomId();
+    if (!roomId || roomId === lastRoomId) return;
+
+    lastRoomId = roomId;
+    userNames.clear();
+
+    const cached = readCache()[roomId];
+    if (!cached || !Array.isArray(cached.names)) return;
+    cached.names.forEach(addUserNameAliases);
+  }
+
+  function saveCachedNames() {
+    const roomId = getRoomId();
+    if (!roomId || !userNames.size) return;
+
+    try {
+      const cache = readCache();
+      cache[roomId] = {
+        names: [...userNames].slice(0, 12),
+        updatedAt: Date.now()
+      };
+
+      const ids = Object.keys(cache).sort(
+        (a, b) => Number(cache[b]?.updatedAt || 0) - Number(cache[a]?.updatedAt || 0)
+      );
+      ids.slice(MAX_CACHE_ROOMS).forEach(id => delete cache[id]);
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    } catch {
+      // 저장 실패는 캡처 동작을 막지 않는다.
+    }
+  }
+
   function isCaptureActive() {
     return !!document.querySelector(
       '[data-sentry-component="CaptureModeHeader"], ' +
@@ -58,39 +109,68 @@
     );
   }
 
+  function looksLikeDisplayName(value) {
+    const name = normalizeText(value);
+    if (!name || name.length > 32) return false;
+    if (/\n|\r/.test(value || '')) return false;
+    if (/^\d{1,2}:\d{2}$/.test(name)) return false;
+    if (/^[·•….,!?~\-–—_/\\]+$/.test(name)) return false;
+    return true;
+  }
+
   function addUserNameAliases(name) {
     const normalized = normalizeText(name);
-    if (!normalized) return;
+    if (!looksLikeDisplayName(normalized)) return false;
 
-    // 전체 표시 이름은 항상 가린다.
+    const before = userNames.size;
     userNames.add(normalized);
 
-    // 한국식 3글자 이름(예: 채연우)은 성 1글자를 뺀 이름(연우)도 같이 가린다.
-    // 그래서 '연우야~', '연우는'처럼 본문에서 이름만 불러도 검열된다.
+    // 한국식 3글자 이름은 성 1글자를 뺀 2글자 이름도 함께 가린다.
+    // 예: 김제콩 -> 제콩, 제콩아 / 제콩은 같은 조사 결합도 자연스럽게 잡힌다.
     if (/^[가-힣]{3}$/.test(normalized)) {
       userNames.add(normalized.slice(1));
     }
 
-    // 표시 이름이 공백으로 구성된 경우 마지막 토큰도 이름 후보로 사용한다.
-    // 예: '채 연우' -> '연우'
+    // 공백형 표시 이름은 마지막 토큰도 후보로 저장한다.
+    // 예: 김 제콩 -> 제콩
     const parts = normalized.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
       const last = parts[parts.length - 1];
-      if (last.length >= 2) userNames.add(last);
+      if (last.length >= 2 && last.length <= 12) userNames.add(last);
     }
+
+    return userNames.size !== before;
   }
 
   function collectUserNames() {
-    document
-      .querySelectorAll('[data-sentry-component="RightTextContent"] .caption1')
-      .forEach(el => {
-        if (el.closest(`.${MASK_CLASS}`)) return;
+    loadCachedNames();
+    let changed = false;
 
-        const name = normalizeText(el.textContent);
-        if (!name) return;
+    // Zeta 일반 채팅의 내 이름표. Safari/Stay에서 class 렌더가 달라지는 경우를 대비해
+    // caption1 하나에만 의존하지 않고 RightTextContent 내부의 짧은 이름 후보도 확인한다.
+    const selectors = [
+      '[data-sentry-component="RightTextContent"] .caption1',
+      '[data-sentry-component="RightTextContent"] [class*="caption"]',
+      '[data-sentry-component="RightTextContent"] > div > span:first-child',
+      '[data-sentry-component="RightTextContent"] > span:first-child'
+    ];
 
-        addUserNameAliases(name);
-      });
+    document.querySelectorAll(selectors.join(',')).forEach(el => {
+      if (el.closest(`.${MASK_CLASS}`)) return;
+      const name = normalizeText(el.textContent);
+      if (addUserNameAliases(name)) changed = true;
+    });
+
+    // 이미 이름을 알아낸 상태라면 캡처 복제 DOM의 오른쪽 메타에서도 갱신한다.
+    if (isCaptureActive()) {
+      document
+        .querySelectorAll('[data-sentry-component="CapturePreview"] [data-sentry-component="RightTextContent"] .caption1')
+        .forEach(el => {
+          if (addUserNameAliases(el.textContent)) changed = true;
+        });
+    }
+
+    if (changed) saveCachedNames();
   }
 
   function escapeRegExp(value) {
@@ -215,8 +295,7 @@
     if (applying) return;
 
     installStyle();
-
-    // 캡처 전에 평소 채팅의 오른쪽 이름표를 읽어서 현재 {{user}} 값을 기억한다.
+    loadCachedNames();
     collectUserNames();
 
     if (!isCaptureActive()) {
@@ -240,8 +319,39 @@
     requestAnimationFrame(apply);
   }
 
+  function clearDelayedApplies() {
+    delayedTimers.forEach(clearTimeout);
+    delayedTimers = [];
+  }
+
+  function burstApply() {
+    // Safari/Stay는 캡처 UI 복제/렌더가 Chromium보다 늦게 끝나는 경우가 있어
+    // 짧은 구간 동안 몇 번 더 확인한다. 이름을 못 찾은 첫 프레임만 보고 포기하지 않는다.
+    clearDelayedApplies();
+    apply();
+    [40, 120, 280, 600, 1100].forEach(delay => {
+      delayedTimers.push(setTimeout(apply, delay));
+    });
+  }
+
+  function isCaptureRelatedTarget(target) {
+    if (!(target instanceof Element)) return false;
+
+    if (target.closest(
+      '[data-sentry-component="CaptureModeHeader"], ' +
+      '[data-sentry-component="CaptureModeBottom"], ' +
+      '[data-sentry-component="CapturePreview"], ' +
+      '[data-sentry-component="ChatMessageCaptureSelector"], ' +
+      '[data-testid="snapshot-action-button"]'
+    )) return true;
+
+    const text = normalizeText(target.closest('button')?.textContent || target.textContent);
+    return /캡처|스냅샷|capture|snapshot/i.test(text);
+  }
+
   function start() {
     installStyle();
+    loadCachedNames();
     collectUserNames();
     apply();
 
@@ -252,27 +362,30 @@
       characterData: true
     });
 
-    window.addEventListener('pageshow', scheduleApply, true);
-    document.addEventListener('visibilitychange', scheduleApply, true);
+    window.addEventListener('pageshow', burstApply, true);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) burstApply();
+    }, true);
 
-    // 캡처 관련 버튼 클릭 직전에 한 번 더 적용해서 복제/렌더 타이밍에서 이름이 새는 걸 줄인다.
-    document.addEventListener(
-      'click',
-      event => {
+    // Safari에서 click보다 먼저 이름을 확보하도록 pointer/touch 단계에서도 수집한다.
+    ['pointerdown', 'touchstart', 'click'].forEach(type => {
+      document.addEventListener(type, event => {
         const target = event.target instanceof Element ? event.target : null;
         if (!target) return;
 
-        const captureUi = target.closest(
-          '[data-sentry-component="CaptureModeHeader"], ' +
-          '[data-sentry-component="CaptureModeBottom"], ' +
-          '[data-sentry-component="CapturePreview"], ' +
-          '[data-sentry-component="ChatMessageCaptureSelector"]'
-        );
+        collectUserNames();
+        if (isCaptureRelatedTarget(target) || isCaptureActive()) burstApply();
+      }, true);
+    });
 
-        if (captureUi || isCaptureActive()) apply();
-      },
-      true
-    );
+    // SPA로 다른 방에 이동했을 때 이전 방 이름이 섞이지 않게 방 ID 변화를 감시한다.
+    setInterval(() => {
+      const roomId = getRoomId();
+      if (roomId !== lastRoomId) {
+        loadCachedNames();
+        burstApply();
+      }
+    }, 700);
   }
 
   if (document.readyState === 'loading') {
