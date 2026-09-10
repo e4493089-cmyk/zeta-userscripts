@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.1
-// @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분까지 검열 바 형태로 가립니다.
+// @version      0.2.5
+// @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분까지 검열 바 형태로 가립니다. (v0.2.1 동작으로 롤백)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
@@ -62,17 +62,12 @@
     const normalized = normalizeText(name);
     if (!normalized) return;
 
-    // 전체 표시 이름은 항상 가린다.
     userNames.add(normalized);
 
-    // 한국식 3글자 이름(예: 채연우)은 성 1글자를 뺀 이름(연우)도 같이 가린다.
-    // 그래서 '연우야~', '연우는'처럼 본문에서 이름만 불러도 검열된다.
     if (/^[가-힣]{3}$/.test(normalized)) {
       userNames.add(normalized.slice(1));
     }
 
-    // 표시 이름이 공백으로 구성된 경우 마지막 토큰도 이름 후보로 사용한다.
-    // 예: '채 연우' -> '연우'
     const parts = normalized.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
       const last = parts[parts.length - 1];
@@ -215,8 +210,6 @@
     if (applying) return;
 
     installStyle();
-
-    // 캡처 전에 평소 채팅의 오른쪽 이름표를 읽어서 현재 {{user}} 값을 기억한다.
     collectUserNames();
 
     if (!isCaptureActive()) {
@@ -255,7 +248,6 @@
     window.addEventListener('pageshow', scheduleApply, true);
     document.addEventListener('visibilitychange', scheduleApply, true);
 
-    // 캡처 관련 버튼 클릭 직전에 한 번 더 적용해서 복제/렌더 타이밍에서 이름이 새는 걸 줄인다.
     document.addEventListener(
       'click',
       event => {
