@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.48.5
+// @version      3.48.6
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7128,23 +7128,78 @@
     ========================================================= */
 
     /* 선택 화면 상단바 */
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] {
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"],
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] > header,
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] nav {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
+      border-color: var(--kt-line) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] {
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
+    /* Zeta 원본 헤더가 text-white를 쓰므로 제목/선택 해제까지 전부 밝은 헤더용 색으로 고정 */
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] h1,
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] h2,
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] h3,
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] h4,
     html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] button,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] svg {
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] span,
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] svg,
+    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] [class*="text-white"] {
       color: #26343C !important;
     }
 
-    /* 선택된 메시지 범위 */
+    /*
+       모든 메시지 위에 CaptureSelector 버튼이 하나씩 덮여 있다.
+       기본 상태에 노란 배경을 주면 캡처 모드에 들어간 순간 화면 전체가 노랗게 보이므로
+       평상시 선택 레이어는 완전 투명하게 둔다.
+    */
     html.${ACTIVE} [data-sentry-component="ChatMessageCaptureSelector"] {
+      background: transparent !important;
+      border-color: transparent !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    /* 마우스를 올린 후보만 아주 약하게 표시 */
+    html.${ACTIVE} [data-sentry-component="ChatMessageCaptureSelector"]:hover {
+      background: rgba(254,229,0,.055) !important;
+    }
+
+    /*
+       선택 상태는 Zeta가 붙이는 상태값/primary 클래스를 따라가서 그때만 카카오 노랑으로 표시.
+       (상태 구현이 바뀌어도 흔한 aria/data-state/class 형태를 모두 대응)
+    */
+    html.${ACTIVE} [data-sentry-component="ChatMessageCaptureSelector"][aria-pressed="true"],
+    html.${ACTIVE} [data-sentry-component="ChatMessageCaptureSelector"][aria-selected="true"],
+    html.${ACTIVE} [data-sentry-component="ChatMessageCaptureSelector"][data-state="selected"],
+    html.${ACTIVE} [data-sentry-component="ChatMessageCaptureSelector"][data-selected="true"],
+    html.${ACTIVE} [data-sentry-component="ChatMessageCaptureSelector"][class*="bg-primary-"],
+    html.${ACTIVE} [data-sentry-component="ChatMessageCaptureSelector"][class*="border-primary-"] {
+      background: rgba(254,229,0,.10) !important;
       border-color: #D9C300 !important;
-      background: rgba(254,229,0,.08) !important;
-      box-shadow: inset 0 0 0 1px rgba(217,195,0,.18) !important;
+      box-shadow: inset 0 0 0 1px rgba(217,195,0,.24) !important;
+    }
+
+    /* 선택 상태가 버튼의 부모(메시지 컨테이너)에 붙는 버전도 대응 */
+    html.${ACTIVE} [data-sentry-component="BodyView"]:has(
+      [data-sentry-component="ChatMessageCaptureSelector"][aria-pressed="true"]
+    ),
+    html.${ACTIVE} [data-sentry-component="BodyView"]:has(
+      [data-sentry-component="ChatMessageCaptureSelector"][aria-selected="true"]
+    ),
+    html.${ACTIVE} [data-sentry-component="BodyView"]:has(
+      [data-sentry-component="ChatMessageCaptureSelector"][data-state="selected"]
+    ),
+    html.${ACTIVE} [data-sentry-component="BodyView"]:has(
+      [data-sentry-component="ChatMessageCaptureSelector"][data-selected="true"]
+    ) {
+      box-shadow: inset 0 0 0 1px rgba(217,195,0,.24) !important;
+      background: rgba(254,229,0,.06) !important;
     }
 
     /* 선택 완료 하단바 */
