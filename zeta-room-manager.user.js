@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.1.1
+// @version      0.1.2
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 별명/원래 이름으로 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -111,12 +111,6 @@
         color: rgba(255,255,255,.55);
         cursor: pointer;
         font-size: 18px;
-      }
-      #${PANEL_ID} .zrm-count {
-        flex: 0 0 auto;
-        color: rgba(255,255,255,.52);
-        font-size: 12px;
-        white-space: nowrap;
       }
       #${PANEL_ID} .zrm-results {
         display: none;
@@ -438,7 +432,6 @@
             <input type="search" autocomplete="off" spellcheck="false" placeholder="${type === 'room' ? '대화방' : '플롯'} 이름 또는 별명 검색">
             <button type="button" class="zrm-clear" aria-label="검색어 지우기">×</button>
           </div>
-          <span class="zrm-count"></span>
         </div>
         <div class="zrm-results"></div>
       `;
@@ -522,10 +515,6 @@
       record.item.classList.toggle('zrm-filter-hidden', !yes);
       if (yes) shown++;
     }
-
-    const panel = document.getElementById(PANEL_ID);
-    const count = panel?.querySelector('.zrm-count');
-    if (count) count.textContent = q ? `${shown}/${records.length}` : `${records.length}개`;
 
     renderQuickResults(type, q);
   }
