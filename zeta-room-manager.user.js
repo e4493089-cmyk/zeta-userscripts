@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.1.2
+// @version      0.1.5
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 별명/원래 이름으로 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -21,6 +21,7 @@
   const state = loadState();
   let observer = null;
   let rafPending = false;
+  let lastRoomContextRecord = null;
 
   function loadState() {
     try {
@@ -139,26 +140,11 @@
       #${PANEL_ID} .zrm-result-title { font-size: 14px; font-weight: 600; }
       #${PANEL_ID} .zrm-result-sub { margin-top: 2px; color: rgba(255,255,255,.48); font-size: 11px; }
 
-      .zrm-room-item { position: relative !important; }
-      .zrm-room-item > a[href*="/rooms/"] { padding-right: 58px !important; }
-      .zrm-room-rename {
-        position: absolute;
-        right: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 5;
-        width: 34px;
-        height: 30px;
-        border: 0;
-        border-radius: 8px;
-        background: rgba(255,255,255,.07);
-        color: rgba(255,255,255,.70);
-        cursor: pointer;
-        font-size: 12px;
-        line-height: 30px;
-        text-align: center;
-      }
-      .zrm-room-rename:hover { background: rgba(255,255,255,.12); color: #fff; }
+      /* 대화방 목록에는 별명 버튼을 상시 표시하지 않음.
+         별명 편집은 제타의 길게 누르기 메뉴에 주입한다. */
+      .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
+      .zrm-room-rename { display: none !important; }
+      .zrm-context-rename svg { flex: 0 0 auto; }
       .zrm-plot-rename {
         height: 30px;
         padding: 0 8px;
@@ -171,18 +157,6 @@
         white-space: nowrap;
       }
       .zrm-plot-rename:hover { background: rgba(255,255,255,.12); color: #fff; }
-      .zrm-has-alias::after {
-        content: '별명';
-        display: inline-block;
-        margin-left: 5px;
-        padding: 1px 4px;
-        border-radius: 4px;
-        background: rgba(124,103,255,.18);
-        color: #a89bff;
-        font-size: 9px;
-        font-weight: 600;
-        vertical-align: 1px;
-      }
       .zrm-filter-hidden { display: none !important; }
 
       #${MODAL_ID} {
@@ -318,6 +292,12 @@
   }
 
   function makeRenameButton(record) {
+    if (record.type === 'room') {
+      record.item.querySelector('.zrm-room-rename')?.remove();
+      record.item.classList.add('zrm-room-item');
+      return;
+    }
+
     if (record.item.querySelector(`.zrm-${record.type}-rename`)) return;
 
     const btn = document.createElement('button');
@@ -332,15 +312,76 @@
       openRenameModal(record);
     }, true);
 
-    if (record.type === 'room') {
-      record.item.classList.add('zrm-room-item');
-      const actions = Array.from(record.item.children).find(el => el !== record.link && el.matches?.('div'));
-      record.item.insertBefore(btn, actions || null);
-    } else {
-      const row = record.link.parentElement;
-      const actions = row?.lastElementChild;
-      if (actions && actions !== record.link) actions.insertBefore(btn, actions.firstChild);
-      else record.item.appendChild(btn);
+    const row = record.link.parentElement;
+    const actions = row?.lastElementChild;
+    if (actions && actions !== record.link) actions.insertBefore(btn, actions.firstChild);
+    else record.item.appendChild(btn);
+  }
+
+  function snapshotRecord(record) {
+    if (!record) return null;
+    return {
+      key: record.key,
+      type: record.type,
+      id: record.id,
+      item: record.item,
+      link: record.link,
+      titleEl: record.titleEl,
+      original: record.original,
+      alias: normalizeText(state.aliases[record.key])
+    };
+  }
+
+  function rememberRoomContextTarget(event) {
+    const target = event.target?.closest?.('[data-sentry-component="SwipeableRoomListItem"]');
+    if (!target) return;
+    const record = parseItem(target, 'room');
+    if (record) lastRoomContextRecord = snapshotRecord(record);
+  }
+
+  function closeNativeRoomContextMenu(menu) {
+    const layer = menu?.closest?.('[data-sentry-component="KeyboardAvoidingView"]');
+    const backdrop = layer?.querySelector?.('[role="presentation"]');
+    if (backdrop) {
+      try { backdrop.click(); } catch (_) {}
+    }
+  }
+
+  function injectRoomContextMenu() {
+    const menus = document.querySelectorAll('[data-sentry-source-file="RoomListItemContextMenu.tsx"]');
+    for (const menu of menus) {
+      if (menu.querySelector('.zrm-context-rename')) continue;
+      if (!lastRoomContextRecord) continue;
+
+      const nativeButtons = Array.from(menu.querySelectorAll(':scope > button'));
+      const template = nativeButtons[0];
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = template?.className
+        || 'group flex flex-row gap-2.5 bg-gray-sub2 p-[18px] active:bg-gray-900 disabled:bg-gray-900 rounded-t-lg rounded-b-lg';
+      button.classList.add('zrm-context-rename');
+      button.setAttribute('aria-label', '별명 변경');
+      button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             class="size-4 text-white group-disabled:text-white/20" aria-hidden="true">
+          <path fill="currentColor"
+                d="M21.675 7.905c.433-.433.433-1.155 0-1.566l-4.014-4.014c-.41-.433-1.133-.433-1.566 0L14.05 4.358l5.58 5.58M2.293 16.127a1 1 0 0 0-.293.707V21a1 1 0 0 0 1 1h4.166a1 1 0 0 0 .707-.293l10.58-10.591-5.58-5.58z"/>
+        </svg>
+        <span class="body14 font-medium text-white group-disabled:text-white/20">별명 변경</span>
+      `;
+
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const record = lastRoomContextRecord;
+        if (!record) return;
+        closeNativeRoomContextMenu(menu);
+        setTimeout(() => openRenameModal(record), 30);
+      }, true);
+
+      const leaveButton = nativeButtons.find(btn => normalizeText(btn.textContent) === '나가기');
+      menu.insertBefore(button, leaveButton || null);
     }
   }
 
@@ -529,6 +570,7 @@
       makeRenameButton(record);
     }
 
+    injectRoomContextMenu();
     saveState();
 
     const input = panel?.querySelector('input');
@@ -546,6 +588,11 @@
 
   function start() {
     injectStyle();
+
+    document.addEventListener('pointerdown', rememberRoomContextTarget, true);
+    document.addEventListener('contextmenu', rememberRoomContextTarget, true);
+    document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
+
     refresh();
 
     observer = new MutationObserver(scheduleRefresh);
