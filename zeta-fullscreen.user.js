@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.1
-// @description  제타를 한 번의 탭으로 전체화면 전환합니다. (브라우저가 허용하는 범위에서 주소창/하단 UI 숨김)
+// @version      0.1.2
+// @description  제타를 한 번의 탭으로 전체화면 전환합니다. 모바일 키보드 호출 시 화면 깜빡임을 완화합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -75,6 +75,68 @@
   const toast = root.querySelector('.toast');
   let toastTimer = 0;
 
+  // 모바일 Edge의 Fullscreen + 소프트키보드 조합은 viewport를 여러 번 재계산한다.
+  // 그 순간 루트 배경이 비거나 플로팅 버튼이 잠깐 다시 나타나는 현상을 최대한 줄인다.
+  let keyboardFocus = false;
+  let keyboardSettleTimer = 0;
+  const keyboardStyle = document.createElement('style');
+  keyboardStyle.id = 'zeta-fullscreen-keyboard-stabilizer';
+  document.documentElement.appendChild(keyboardStyle);
+
+  const isEditableTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+    return !!target.closest('textarea, input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), [contenteditable=true]');
+  };
+
+  const pickPageBackground = () => {
+    const candidates = [
+      document.querySelector('main#contents'),
+      document.body,
+      document.documentElement
+    ].filter(Boolean);
+
+    for (const el of candidates) {
+      const color = getComputedStyle(el).backgroundColor;
+      if (color && color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
+    }
+    return '#151516';
+  };
+
+  const beginKeyboardStabilizer = () => {
+    clearTimeout(keyboardSettleTimer);
+    keyboardFocus = true;
+
+    if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
+
+    // 키보드 애니메이션 중 브라우저가 fullscreen 상태를 순간 재평가해도
+    // 버튼이 중간 프레임에 튀어나오지 않게 한다.
+    host.style.display = 'none';
+
+    const bg = pickPageBackground();
+    keyboardStyle.textContent = `
+      html.zfs-keyboard-active,
+      html.zfs-keyboard-active body {
+        background: ${bg} !important;
+      }
+      html.zfs-keyboard-active {
+        scroll-behavior: auto !important;
+        overscroll-behavior: none !important;
+      }
+    `;
+    document.documentElement.classList.add('zfs-keyboard-active');
+  };
+
+  const endKeyboardStabilizer = () => {
+    clearTimeout(keyboardSettleTimer);
+    // Android 키보드 닫힘 애니메이션/visualViewport 복구가 끝날 시간을 조금 준다.
+    keyboardSettleTimer = setTimeout(() => {
+      keyboardFocus = false;
+      document.documentElement.classList.remove('zfs-keyboard-active');
+      keyboardStyle.textContent = '';
+      updateState();
+    }, 420);
+  };
+
   const showToast = (message) => {
     toast.textContent = message;
     toast.classList.add('show');
@@ -120,15 +182,31 @@
     else await enterFullscreen();
   }, true);
 
-  const updateState = () => {
+  function updateState() {
     const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
 
     // 전체화면에 들어가면 플로팅 버튼을 완전히 숨김.
-    // 브라우저/시스템 동작으로 전체화면이 풀리면 다시 나타남.
-    host.style.display = active ? 'none' : 'block';
+    // 키보드가 열려 있는 동안에는 fullscreen 상태가 순간 흔들려도 버튼을 계속 숨긴다.
+    host.style.display = (active || keyboardFocus) ? 'none' : 'block';
     button.setAttribute('aria-label', '전체화면 전환');
     button.setAttribute('title', '전체화면 전환');
-  };
+  }
+
+  document.addEventListener('focusin', (event) => {
+    if (isEditableTarget(event.target)) beginKeyboardStabilizer();
+  }, true);
+
+  document.addEventListener('focusout', (event) => {
+    if (isEditableTarget(event.target)) endKeyboardStabilizer();
+  }, true);
+
+  // visualViewport resize 자체에는 레이아웃 값을 쓰지 않는다.
+  // 읽기/쓰기 반복으로 키보드 애니메이션 중 추가 reflow를 만드는 것을 피한다.
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (keyboardFocus) host.style.display = 'none';
+    }, { passive: true });
+  }
 
   document.addEventListener('fullscreenchange', updateState);
   document.addEventListener('webkitfullscreenchange', updateState);
