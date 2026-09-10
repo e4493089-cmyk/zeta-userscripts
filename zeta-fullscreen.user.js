@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.0
+// @version      0.1.1
 // @description  제타를 한 번의 탭으로 전체화면 전환합니다. (브라우저가 허용하는 범위에서 주소창/하단 UI 숨김)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -122,8 +122,12 @@
 
   const updateState = () => {
     const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    button.setAttribute('aria-label', active ? '전체화면 종료' : '전체화면 전환');
-    button.setAttribute('title', active ? '전체화면 종료' : '전체화면 전환');
+
+    // 전체화면에 들어가면 플로팅 버튼을 완전히 숨김.
+    // 브라우저/시스템 동작으로 전체화면이 풀리면 다시 나타남.
+    host.style.display = active ? 'none' : 'block';
+    button.setAttribute('aria-label', '전체화면 전환');
+    button.setAttribute('title', '전체화면 전환');
   };
 
   document.addEventListener('fullscreenchange', updateState);
