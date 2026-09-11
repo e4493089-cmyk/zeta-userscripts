@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.0
+// @version      3.50.1
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.0
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.0
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.1
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.1
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -1971,14 +1971,18 @@
       box-shadow: none !important;
     }
 
-    /* 선택한 삭제 범위는 의미색으로 또렷하게 표시한다. */
+    /* 커스텀 테마 배경색과 무관하게 보이는 무채색 이중 대비 표시. */
     html.${ACTIVE}.kt-delete-mode-screen
       [data-sentry-component="ChatMessageDeleteSelector"][class*="border-primary-"],
     html.${ACTIVE} .kt-delete-mode-screen
       [data-sentry-component="ChatMessageDeleteSelector"][class*="border-primary-"] {
-      background: rgba(230,74,104,.14) !important;
-      border-color: #E64A68 !important;
-      box-shadow: inset 3px 0 0 #E64A68, inset -3px 0 0 #E64A68 !important;
+      background: rgba(255,255,255,.18) !important;
+      border-color: rgba(35,45,52,.78) !important;
+      box-shadow:
+        inset 2px 0 0 rgba(255,255,255,.96),
+        inset 4px 0 0 rgba(35,45,52,.78),
+        inset -2px 0 0 rgba(255,255,255,.96),
+        inset -4px 0 0 rgba(35,45,52,.78) !important;
     }
 
     html.${ACTIVE}.kt-delete-mode-screen
@@ -1991,9 +1995,10 @@
       right: 10px;
       padding: 4px 8px;
       border-radius: 999px;
-      background: #E64A68;
+      background: rgba(35,45,52,.92);
       color: #FFFFFF;
-      box-shadow: 0 2px 6px rgba(124,31,51,.24);
+      border: 1px solid rgba(255,255,255,.82);
+      box-shadow: 0 2px 6px rgba(20,28,33,.22);
       font-size: 11px;
       font-weight: 700;
       line-height: 1.2;
