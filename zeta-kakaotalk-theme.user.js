@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.49.2
+// @version      3.50.0
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.49.2
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.49.2
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.0
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.0
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -1958,6 +1958,46 @@
     html.${ACTIVE} .kt-delete-notice *,
     html.${ACTIVE} [data-sentry-component="DeleteStartNotice"] * {
       color: inherit !important;
+    }
+
+    /* 삭제 모드에서는 bg-gray-main 일괄 보정이 나레이터까지 흰 카드로
+       만들지 않도록, 원래의 투명한 나레이터 표현을 마지막에 복구한다. */
+    html.${ACTIVE}.kt-delete-mode-screen
+      [data-sentry-component="NarratorBubble"] > div,
+    html.${ACTIVE} .kt-delete-mode-screen
+      [data-sentry-component="NarratorBubble"] > div {
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    /* 선택한 삭제 범위는 의미색으로 또렷하게 표시한다. */
+    html.${ACTIVE}.kt-delete-mode-screen
+      [data-sentry-component="ChatMessageDeleteSelector"][class*="border-primary-"],
+    html.${ACTIVE} .kt-delete-mode-screen
+      [data-sentry-component="ChatMessageDeleteSelector"][class*="border-primary-"] {
+      background: rgba(230,74,104,.14) !important;
+      border-color: #E64A68 !important;
+      box-shadow: inset 3px 0 0 #E64A68, inset -3px 0 0 #E64A68 !important;
+    }
+
+    html.${ACTIVE}.kt-delete-mode-screen
+      [data-sentry-component="ChatMessageDeleteSelector"][class*="border-t"]::after,
+    html.${ACTIVE} .kt-delete-mode-screen
+      [data-sentry-component="ChatMessageDeleteSelector"][class*="border-t"]::after {
+      content: '여기부터 삭제';
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #E64A68;
+      color: #FFFFFF;
+      box-shadow: 0 2px 6px rgba(124,31,51,.24);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.2;
+      pointer-events: none;
     }
 
     html.${ACTIVE} .kt-theme-dialog input[type="checkbox"] {
