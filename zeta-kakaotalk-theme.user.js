@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.49.1
+// @version      3.49.2
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.49.1
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.49.1
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.49.2
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.49.2
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -6952,7 +6952,8 @@
 
     html.kt-profile-edit-active
       [data-sentry-component="ChatProfileForm"]
-      [data-sentry-source-file="ChatProfileSetDefaultField.tsx"] {
+      [data-sentry-component="EditFormSectionContainer"]
+      > div[data-sentry-source-file="ChatProfileSetDefaultField.tsx"] {
       background: #F5F7F8 !important;
       color: #26343C !important;
       border: 1px solid #E3E8EB !important;
