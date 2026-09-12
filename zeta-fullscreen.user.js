@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.19
-// @description  스냅샷 액션 유무와 관계없이 채팅 하단 왼쪽 위에 전체화면 버튼을 표시합니다.
+// @version      0.1.20
+// @description  스냅샷 버튼이 있으면 바로 위에, 없으면 원래 액션 버튼 자리에 전체화면 버튼을 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -21,6 +21,7 @@
   let retryTimer = 0;
   let anchorObserver = null;
   let observedParent = null;
+  let panelSeenInRoom = false;
 
   const fullscreenIcon = `
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" class="size-4" style="color:inherit">
@@ -93,23 +94,23 @@
     return true;
   }
 
-  function mountOnComposer(composer) {
-    if (!composer) return false;
+  function mountInEmptyPanelSlot(composer) {
+    const stage = composer?.parentElement;
+    if (!stage) return false;
 
     const existing = document.getElementById(BUTTON_ID);
-    if (existing && composer.contains(existing)) return true;
+    if (existing && existing.parentElement === stage && existing.dataset.zetaFullscreenMount === 'empty-panel-slot') {
+      return true;
+    }
     existing?.remove();
 
-    if (getComputedStyle(composer).position === 'static') {
-      composer.style.position = 'relative';
-    }
-
     const button = createButton();
-    button.dataset.zetaFullscreenMount = 'composer';
+    button.dataset.zetaFullscreenMount = 'empty-panel-slot';
     button.style.left = '8px';
     button.style.top = 'auto';
-    button.style.bottom = 'calc(100% + 6px)';
-    composer.appendChild(button);
+    button.style.bottom = '12px';
+    button.style.zIndex = '10';
+    stage.appendChild(button);
     return true;
   }
 
@@ -117,13 +118,23 @@
     if (!isChatRoom()) return false;
 
     const panel = document.querySelector(PANEL_SELECTOR);
-    if (panel && mountOnPanel(panel)) {
-      watchAnchorParent(panel.parentElement);
-      return true;
+    if (panel) {
+      panelSeenInRoom = true;
+      if (mountOnPanel(panel)) {
+        watchAnchorParent(panel.parentElement);
+        return true;
+      }
+    }
+
+    // 이 방에서 실제 액션 패널을 한 번이라도 본 적이 있으면,
+    // 생성 중 잠깐 사라진 것으로 보고 fallback 버튼을 띄우지 않는다.
+    if (panelSeenInRoom) {
+      document.getElementById(BUTTON_ID)?.remove();
+      return false;
     }
 
     const composer = document.querySelector(COMPOSER_SELECTOR);
-    if (composer && mountOnComposer(composer)) {
+    if (composer && mountInEmptyPanelSlot(composer)) {
       watchAnchorParent(composer.parentElement);
       return true;
     }
@@ -143,7 +154,7 @@
     });
 
     // 문서 전체/하위 트리는 보지 않는다.
-    // 현재 액션/입력 영역의 직계 자식 교체만 감지한다.
+    // 액션 패널이 실제로 생기거나 사라지는 현재 채팅 영역의 직계 자식만 감지한다.
     anchorObserver.observe(parent, { childList: true });
   }
 
@@ -154,7 +165,7 @@
     const mounted = mountBestAvailable();
 
     // 스냅샷 액션이 늦게 생기는 방은 잠깐 더 확인해서
-    // composer fallback에서 기본 액션 패널 쪽으로 옮긴다.
+    // 빈 액션 자리 fallback에서 실제 액션 패널 위쪽으로 옮긴다.
     if (attempt < 19 && (!mounted || !document.querySelector(PANEL_SELECTOR))) {
       retryTimer = setTimeout(() => setupWhenReady(attempt + 1), 150);
     }
@@ -165,6 +176,7 @@
     anchorObserver?.disconnect();
     anchorObserver = null;
     observedParent = null;
+    panelSeenInRoom = false;
     document.getElementById(BUTTON_ID)?.remove();
 
     if (isChatRoom()) setupWhenReady();
