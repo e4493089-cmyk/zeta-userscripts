@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.5
+// @version      0.1.6
 // @description  제타를 한 번의 탭으로 전체화면 전환합니다. 모바일 키보드 호출 시 화면 깜빡임을 완화합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -29,19 +29,19 @@
         width: 30px;
         height: 30px;
         padding: 0;
-        border: 1px solid #DFC900;
+        border: 1px solid var(--zfs-border, rgba(255,255,255,.16));
         border-radius: 999px;
-        background: #FEE500;
-        color: #4B451E;
-        box-shadow: 0 1px 3px rgba(91,82,16,.15);
+        background: var(--zfs-background, #27272a);
+        color: var(--zfs-color, rgba(255,255,255,.88));
+        box-shadow: var(--zfs-shadow, 0 1px 3px rgba(0,0,0,.16));
         display: grid;
         place-items: center;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
       }
-      button:hover { background: #F5DC00; border-color: #CDB900; }
-      button:active { transform: scale(.94); background: #EED600; }
+      button:hover { filter: brightness(.96); }
+      button:active { transform: scale(.94); filter: brightness(.90); }
       svg { width: 17px; height: 17px; display:block; }
       .toast {
         position: absolute;
@@ -86,6 +86,11 @@
       host.style.right = 'auto';
       host.style.bottom = 'auto';
       host.style.zIndex = '2';
+      const modelStyle = getComputedStyle(modelButton);
+      host.style.setProperty('--zfs-background', modelStyle.backgroundColor);
+      host.style.setProperty('--zfs-border', `${modelStyle.borderTopWidth} ${modelStyle.borderTopStyle} ${modelStyle.borderTopColor}`);
+      host.style.setProperty('--zfs-color', modelStyle.color);
+      host.style.setProperty('--zfs-shadow', modelStyle.boxShadow === 'none' ? '0 1px 3px rgba(0,0,0,.16)' : modelStyle.boxShadow);
       return;
     }
     if (host.parentElement !== document.documentElement) document.documentElement.appendChild(host);
@@ -235,6 +240,7 @@
     clearTimeout(placementTimer);
     placementTimer = setTimeout(placeBesideModelButton, 80);
   }).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(placeBesideModelButton).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
   placeBesideModelButton();
   updateState();
 })();
