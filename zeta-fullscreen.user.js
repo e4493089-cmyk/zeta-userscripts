@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.2
+// @version      0.1.3
 // @description  제타를 한 번의 탭으로 전체화면 전환합니다. 모바일 키보드 호출 시 화면 깜빡임을 완화합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -18,7 +18,7 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'position:fixed;right:12px;bottom:82px;z-index:2147483647;';
+  host.style.cssText = 'position:fixed;right:12px;bottom:82px;z-index:2147483647;display:inline-flex;align-items:center;flex:0 0 auto;margin-right:6px;';
   document.documentElement.appendChild(host);
 
   const root = host.attachShadow({ mode: 'open' });
@@ -26,8 +26,8 @@
     <style>
       :host { all: initial; }
       button {
-        width: 34px;
-        height: 34px;
+        width: 30px;
+        height: 30px;
         padding: 0;
         border: 1px solid rgba(255,255,255,.16);
         border-radius: 10px;
@@ -46,8 +46,8 @@
       svg { width: 17px; height: 17px; display:block; }
       .toast {
         position: absolute;
-        right: 0;
-        bottom: 42px;
+        left: 0;
+        top: 38px;
         width: max-content;
         max-width: 220px;
         padding: 8px 10px;
@@ -74,6 +74,25 @@
   const button = root.querySelector('button');
   const toast = root.querySelector('.toast');
   let toastTimer = 0;
+
+  const placeBesideModelButton = () => {
+    const modelButton = document.querySelector('[data-testid="chat-header-model"], button[aria-label="Select AI model"]');
+    if (modelButton?.parentElement) {
+      if (host.parentElement !== modelButton.parentElement || host.nextElementSibling !== modelButton) {
+        modelButton.parentElement.insertBefore(host, modelButton);
+      }
+      host.style.position = 'relative';
+      host.style.right = 'auto';
+      host.style.bottom = 'auto';
+      host.style.zIndex = '2';
+      return;
+    }
+    if (host.parentElement !== document.documentElement) document.documentElement.appendChild(host);
+    host.style.position = 'fixed';
+    host.style.right = '12px';
+    host.style.bottom = '82px';
+    host.style.zIndex = '2147483647';
+  };
 
   // 모바일 Edge의 Fullscreen + 소프트키보드 조합은 viewport를 여러 번 재계산한다.
   // 그 순간 루트 배경이 비거나 플로팅 버튼이 잠깐 다시 나타나는 현상을 최대한 줄인다.
@@ -187,7 +206,7 @@
 
     // 전체화면에 들어가면 플로팅 버튼을 완전히 숨김.
     // 키보드가 열려 있는 동안에는 fullscreen 상태가 순간 흔들려도 버튼을 계속 숨긴다.
-    host.style.display = (active || keyboardFocus) ? 'none' : 'block';
+    host.style.display = (active || keyboardFocus) ? 'none' : 'inline-flex';
     button.setAttribute('aria-label', '전체화면 전환');
     button.setAttribute('title', '전체화면 전환');
   }
@@ -210,5 +229,11 @@
 
   document.addEventListener('fullscreenchange', updateState);
   document.addEventListener('webkitfullscreenchange', updateState);
+  let placementTimer = 0;
+  new MutationObserver(() => {
+    clearTimeout(placementTimer);
+    placementTimer = setTimeout(placeBesideModelButton, 80);
+  }).observe(document.documentElement, { childList: true, subtree: true });
+  placeBesideModelButton();
   updateState();
 })();
