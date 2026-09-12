@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.3.0
+// @version      0.3.1
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 제타 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -134,35 +134,21 @@
       #${PANEL_ID} .zrm-result-go { flex: 0 0 auto; color: #9e91ff; font-size: 12px; font-weight: 700; }
       #${NATIVE_RESULTS_ID} {
         flex: 0 0 auto;
-        border-bottom: 1px solid rgba(255,255,255,.07);
-        background: #151516;
       }
       #${NATIVE_RESULTS_ID}:empty { display: none; }
-      #${NATIVE_RESULTS_ID} .zrm-native-heading {
-        padding: 12px 16px 5px;
-        color: rgba(255,255,255,.5);
-        font-size: 11px;
-        font-weight: 600;
+      #${NATIVE_RESULTS_ID} .zrm-native-avatar {
+        width: 42px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 7px;
+        background: #2a2a2e;
       }
-      #${NATIVE_RESULTS_ID} .zrm-native-result {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        min-height: 58px;
-        padding: 9px 16px;
-        color: #fff;
-        text-decoration: none;
-        box-sizing: border-box;
+      #${NATIVE_RESULTS_ID} .zrm-native-avatar-placeholder {
+        width: 42px;
+        height: 56px;
+        border-radius: 7px;
+        background: #2a2a2e;
       }
-      #${NATIVE_RESULTS_ID} .zrm-native-result:hover { background: rgba(255,255,255,.05); }
-      #${NATIVE_RESULTS_ID} .zrm-native-title { font-size: 14px; font-weight: 600; }
-      #${NATIVE_RESULTS_ID} .zrm-native-original {
-        margin-top: 3px;
-        color: rgba(255,255,255,.48);
-        font-size: 11px;
-      }
-      #${NATIVE_RESULTS_ID} .zrm-native-go { color: #9e91ff; font-size: 12px; font-weight: 700; }
 
       /* 대화방 목록에는 별명 버튼을 상시 표시하지 않음.
          별명 편집은 제타의 길게 누르기 메뉴에 주입한다. */
@@ -255,6 +241,7 @@
   }
 
   function parseItem(item, type) {
+    if (item.closest?.(`#${NATIVE_RESULTS_ID}`)) return null;
     const link = type === 'room'
       ? item.querySelector('a[href*="/rooms/"]')
       : item.querySelector('a[href*="/plots/"][href*="/profile"]');
@@ -281,7 +268,8 @@
       id,
       href: link.href,
       original,
-      alias
+      alias,
+      image: link.querySelector('img')?.src || state.index[key]?.image || ''
     };
 
     return { key, type, id, item, link, titleEl, original, alias };
@@ -319,7 +307,8 @@
       id: record.id,
       href: record.link.href,
       original: record.original,
-      alias
+      alias,
+      image: record.link.querySelector('img')?.src || indexed.image || ''
     };
   }
 
@@ -674,30 +663,55 @@
     }
     box.textContent = '';
 
-    const heading = document.createElement('div');
-    heading.className = 'zrm-native-heading';
-    heading.textContent = `별명 검색 결과 ${matches.length}개`;
-    box.appendChild(heading);
-
     for (const entry of matches) {
+      const row = document.createElement('div');
+      row.className = 'flex w-full min-w-0 flex-col';
+      row.dataset.zrmAliasResult = entry.id;
+
+      const item = document.createElement('div');
+      item.className = 'relative flex flex-col';
+
       const link = document.createElement('a');
-      link.className = 'zrm-native-result';
+      link.className = 'group flex min-w-[215px] flex-row items-center justify-between gap-3 px-4 py-2.5';
       link.href = entry.href;
+      link.setAttribute('testid', `room-list-item-${entry.id}`);
+
+      const content = document.createElement('div');
+      content.className = 'flex flex-1 flex-row items-center gap-3';
+
+      const avatarWrap = document.createElement('div');
+      avatarWrap.className = 'relative shrink-0';
+      if (entry.image) {
+        const image = document.createElement('img');
+        image.className = 'zrm-native-avatar';
+        image.src = entry.image;
+        image.alt = '';
+        image.width = 42;
+        image.height = 56;
+        image.loading = 'lazy';
+        avatarWrap.appendChild(image);
+      } else {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'zrm-native-avatar-placeholder';
+        avatarWrap.appendChild(placeholder);
+      }
 
       const text = document.createElement('div');
+      text.className = 'flex min-w-0 flex-1 flex-col';
       const title = document.createElement('div');
-      title.className = 'zrm-native-title';
+      title.className = 'body1 font-medium text-white line-clamp-1';
       title.textContent = entry.alias;
       const original = document.createElement('div');
-      original.className = 'zrm-native-original';
-      original.textContent = `원래 이름: ${entry.original || '(이름 없음)'}`;
+      original.className = 'body12 text-white/50 line-clamp-1';
+      original.textContent = entry.original && entry.original !== entry.alias
+        ? entry.original
+        : '별명으로 찾은 대화방';
       text.append(title, original);
-
-      const go = document.createElement('span');
-      go.className = 'zrm-native-go';
-      go.textContent = '열기 ›';
-      link.append(text, go);
-      box.appendChild(link);
+      content.append(avatarWrap, text);
+      link.appendChild(content);
+      item.appendChild(link);
+      row.appendChild(item);
+      box.appendChild(row);
     }
 
     if (box.parentElement !== host) host.prepend(box);
