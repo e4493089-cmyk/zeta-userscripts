@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.1
+// @version      3.50.2
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.1
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.1
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.2
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.2
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -1985,25 +1985,6 @@
         inset -4px 0 0 rgba(35,45,52,.78) !important;
     }
 
-    html.${ACTIVE}.kt-delete-mode-screen
-      [data-sentry-component="ChatMessageDeleteSelector"][class*="border-t"]::after,
-    html.${ACTIVE} .kt-delete-mode-screen
-      [data-sentry-component="ChatMessageDeleteSelector"][class*="border-t"]::after {
-      content: '여기부터 삭제';
-      position: absolute;
-      top: 6px;
-      right: 10px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: rgba(35,45,52,.92);
-      color: #FFFFFF;
-      border: 1px solid rgba(255,255,255,.82);
-      box-shadow: 0 2px 6px rgba(20,28,33,.22);
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1.2;
-      pointer-events: none;
-    }
 
     html.${ACTIVE} .kt-theme-dialog input[type="checkbox"] {
       accent-color: #FEE500 !important;
@@ -7299,6 +7280,105 @@
       background: var(--kt-chat) !important;
     }
 
+
+
+    /* =========================================================
+       v3.50.2 - 대화 삭제 선택 UI를 대화 캡처 선택 UI와 통일
+    ========================================================= */
+
+    /* 삭제 선택 상단바 = 캡처 선택 상단바 */
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"],
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] > header,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] nav {
+      background: #FFFFFF !important;
+      color: var(--kt-text) !important;
+      border-color: var(--kt-line) !important;
+      backdrop-filter: none !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] {
+      border-bottom: 1px solid var(--kt-line) !important;
+      box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h1,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h2,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h3,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h4,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] button,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] span,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] svg,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] [class*="text-white"] {
+      color: #26343C !important;
+    }
+
+    /* 기본 삭제 선택 레이어 = 캡처처럼 완전 투명 */
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"] {
+      background: transparent !important;
+      border-color: transparent !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    /* hover도 캡처와 동일 */
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"]:hover,
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"]:hover {
+      background: rgba(254,229,0,.055) !important;
+    }
+
+    /* 선택 상태 = 캡처 선택 상태와 동일 */
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][aria-pressed="true"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][aria-pressed="true"],
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][aria-selected="true"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][aria-selected="true"],
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][data-state="selected"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][data-state="selected"],
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][data-selected="true"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][data-selected="true"],
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][class*="bg-primary-"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][class*="bg-primary-"],
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][class*="border-primary-"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"][class*="border-primary-"] {
+      background: rgba(254,229,0,.10) !important;
+      border-color: #D9C300 !important;
+      outline: none !important;
+      box-shadow: inset 0 0 0 1px rgba(217,195,0,.24) !important;
+    }
+
+    /* 선택선/아이콘 내부에 남는 Zeta 기본 보라색도 캡처 톤으로 제거 */
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"] [class*="border-primary-"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"] [class*="border-primary-"] {
+      border-color: #D9C300 !important;
+    }
+
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"] [class*="ring-primary-"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"] [class*="ring-primary-"],
+    html.${ACTIVE}.kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"] [class*="outline-primary-"],
+    html.${ACTIVE} .kt-delete-mode-screen [data-sentry-component="ChatMessageDeleteSelector"] [class*="outline-primary-"] {
+      --tw-ring-color: rgba(217,195,0,.24) !important;
+      outline-color: #D9C300 !important;
+      box-shadow: none !important;
+    }
+
+    /* 삭제 실행 하단바 = 캡처 완료 하단바 */
+    html.${ACTIVE} .kt-delete-mode-button-row {
+      background: rgba(255,255,255,.97) !important;
+      border-top: 1px solid var(--kt-line) !important;
+      box-shadow: 0 -4px 12px rgba(45,61,71,.08) !important;
+      backdrop-filter: none !important;
+    }
+
+    html.${ACTIVE} .kt-delete-mode-button {
+      background: var(--kt-yellow) !important;
+      color: #191919 !important;
+      border: 1px solid #DFC900 !important;
+      box-shadow: none !important;
+    }
+
+    html.${ACTIVE} .kt-delete-mode-button:hover {
+      background: var(--kt-yellow-hover) !important;
+    }
 
     /* =========================================================
        v3.48.2 - 마지막 메시지 컨트롤 4버튼 + 메시지 액션 바텀시트
