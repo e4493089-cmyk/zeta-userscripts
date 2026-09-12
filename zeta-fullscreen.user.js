@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.16
-// @description  채팅 하단 기본 액션 버튼과 같은 위치/표시 흐름으로 전체화면 버튼을 추가합니다.
+// @version      0.1.17
+// @description  채팅 하단 기본 액션 버튼과 같은 위치/표시 흐름으로 전체화면 버튼을 추가하고 연한 회색 배경의 액션 아이콘 스타일을 맞춥니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -22,7 +22,7 @@
   let observedParent = null;
 
   const fullscreenIcon = `
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" class="size-4 text-gray-200">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" class="size-4" style="color:inherit">
       <path d="M8 4H5a1 1 0 0 0-1 1v3M16 4h3a1 1 0 0 1 1 1v3M8 20H5a1 1 0 0 1-1-1v-3M16 20h3a1 1 0 0 0 1-1v-3"
         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
@@ -59,6 +59,10 @@
     button.style.left = 'calc(100% + 6px)';
     button.style.top = '0';
     button.style.margin = '0';
+    button.style.background = '#EEF1F3';
+    button.style.color = '#53636C';
+    button.style.border = '1px solid #E0E6E9';
+    button.style.boxShadow = '0 1px 3px rgba(45,61,71,.08)';
     button.innerHTML = fullscreenIcon;
 
     button.addEventListener('click', (event) => {
