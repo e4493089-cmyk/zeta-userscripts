@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.5
-// @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분까지 검열 바 형태로 가립니다. (v0.2.1 동작으로 롤백)
+// @version      0.2.6
+// @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분을 글자 수만큼 ■로 가립니다. 네모 색은 원래 글자색을 따릅니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
@@ -15,7 +15,6 @@
 
   const MASK_CLASS = 'zeta-capture-user-mask';
   const STYLE_ID = 'zeta-capture-user-mask-style';
-  const MASK_COLOR = '#58666E';
 
   const userNames = new Set();
   let applying = false;
@@ -28,15 +27,13 @@
     style.id = STYLE_ID;
     style.textContent = `
       .${MASK_CLASS} {
-        color: transparent !important;
-        -webkit-text-fill-color: transparent !important;
-        background: ${MASK_COLOR} !important;
-        border-radius: 3px !important;
+        color: inherit !important;
+        -webkit-text-fill-color: currentColor !important;
+        background: none !important;
+        border-radius: 0 !important;
         box-shadow: none !important;
         text-shadow: none !important;
         text-decoration: none !important;
-        -webkit-box-decoration-break: clone !important;
-        box-decoration-break: clone !important;
         user-select: none !important;
         -webkit-user-select: none !important;
       }
@@ -98,6 +95,12 @@
       .sort((a, b) => b.length - a.length);
   }
 
+  function toSquares(text) {
+    return Array.from(text)
+      .map(ch => /\s/.test(ch) ? ch : '■')
+      .join('');
+  }
+
   function textNodeShouldBeIgnored(node) {
     const parent = node.parentElement;
     if (!parent) return true;
@@ -156,7 +159,7 @@
         const mask = document.createElement('span');
         mask.className = MASK_CLASS;
         mask.dataset.zetaCaptureOriginal = matched;
-        mask.textContent = matched;
+        mask.textContent = toSquares(matched);
         frag.appendChild(mask);
 
         lastIndex = match.index + matched.length;
@@ -197,7 +200,7 @@
     applying = true;
     try {
       masks.forEach(mask => {
-        const text = mask.dataset.zetaCaptureOriginal ?? mask.textContent ?? '';
+        const text = mask.dataset.zetaCaptureOriginal ?? '';
         mask.replaceWith(document.createTextNode(text));
       });
     } finally {
