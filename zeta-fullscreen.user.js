@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.3
+// @version      0.1.4
 // @description  제타를 한 번의 탭으로 전체화면 전환합니다. 모바일 키보드 호출 시 화면 깜빡임을 완화합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -18,7 +18,7 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'position:fixed;right:12px;bottom:82px;z-index:2147483647;display:inline-flex;align-items:center;flex:0 0 auto;margin-right:6px;';
+  host.style.cssText = 'position:fixed;right:12px;bottom:82px;z-index:2147483647;display:inline-flex;align-items:center;flex:0 0 auto;';
   document.documentElement.appendChild(host);
 
   const root = host.attachShadow({ mode: 'open' });
@@ -77,9 +77,11 @@
 
   const placeBesideModelButton = () => {
     const modelButton = document.querySelector('[data-testid="chat-header-model"], button[aria-label="Select AI model"]');
-    if (modelButton?.parentElement) {
-      if (host.parentElement !== modelButton.parentElement || host.nextElementSibling !== modelButton) {
-        modelButton.parentElement.insertBefore(host, modelButton);
+    const modelWrapper = modelButton?.parentElement;
+    const actionRow = modelWrapper?.parentElement;
+    if (actionRow) {
+      if (host.parentElement !== actionRow || host.nextElementSibling !== modelWrapper) {
+        actionRow.insertBefore(host, modelWrapper);
       }
       host.style.position = 'relative';
       host.style.right = 'auto';
