@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.7
-// @description  제타 채팅방에서만 전체화면 전환 버튼을 표시합니다. 모바일 키보드 호출 시 화면 깜빡임을 완화합니다.
+// @version      0.1.8
+// @description  제타 채팅방에서만 전체화면 전환 버튼을 표시합니다. 모바일 경로와 키보드 호출을 안정적으로 처리합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -14,7 +14,8 @@
   'use strict';
 
   const HOST_ID = 'zeta-fullscreen-toggle-host';
-  const isChatRoom = () => /^\/ko\/rooms\/[^/]+\/?$/.test(location.pathname);
+  // locale 유무, trailing slash, 채팅방 하위 경로를 모두 허용하되 /rooms/<id>가 없는 화면에서는 숨긴다.
+  const isChatRoom = () => /(?:^|\/)rooms\/[^/?#]+(?:\/|$)/.test(location.pathname);
   if (document.getElementById(HOST_ID)) return;
 
   const host = document.createElement('div');
@@ -106,8 +107,6 @@
     host.style.zIndex = '2147483647';
   };
 
-  // 모바일 Edge의 Fullscreen + 소프트키보드 조합은 viewport를 여러 번 재계산한다.
-  // 그 순간 루트 배경이 비거나 플로팅 버튼이 잠깐 다시 나타나는 현상을 최대한 줄인다.
   let keyboardFocus = false;
   let keyboardSettleTimer = 0;
   const keyboardStyle = document.createElement('style');
@@ -174,7 +173,6 @@
   };
 
   async function enterFullscreen() {
-    if (!isChatRoom()) return;
     const el = document.documentElement;
     const fn = el.requestFullscreen || el.webkitRequestFullscreen;
     if (!fn) {
@@ -206,7 +204,6 @@
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!isChatRoom()) return;
 
     const active = document.fullscreenElement || document.webkitFullscreenElement;
     if (active) await exitFullscreen();
