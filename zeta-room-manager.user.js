@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.3.1
+// @version      0.3.2
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 제타 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -623,7 +623,9 @@
   function nativeRoomListHost() {
     const roomList = document.querySelector('[data-sentry-component="RoomList"]');
     if (!roomList) return null;
-    return roomList.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]')
+    const input = nativeRoomSearchInput();
+    return input?.closest('.flex.flex-col.grow')
+      || roomList.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]')
       || roomList.querySelector('.overflow-y-auto')
       || null;
   }
@@ -714,7 +716,16 @@
       box.appendChild(row);
     }
 
-    if (box.parentElement !== host) host.prepend(box);
+    const input = nativeRoomSearchInput();
+    const searchRow = input?.closest('.p-4');
+    const searchBlock = searchRow?.parentElement;
+    if (searchBlock?.parentElement === host) {
+      if (box.parentElement !== host || box.previousElementSibling !== searchBlock) {
+        searchBlock.after(box);
+      }
+    } else if (box.parentElement !== host) {
+      host.prepend(box);
+    }
   }
 
   function bindNativeRoomSearch() {
