@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.4
+// @version      0.1.5
 // @description  제타를 한 번의 탭으로 전체화면 전환합니다. 모바일 키보드 호출 시 화면 깜빡임을 완화합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -29,20 +29,19 @@
         width: 30px;
         height: 30px;
         padding: 0;
-        border: 1px solid rgba(255,255,255,.16);
-        border-radius: 10px;
-        background: rgba(24,24,26,.66);
-        color: rgba(255,255,255,.88);
-        box-shadow: 0 2px 10px rgba(0,0,0,.20);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid #DFC900;
+        border-radius: 999px;
+        background: #FEE500;
+        color: #4B451E;
+        box-shadow: 0 1px 3px rgba(91,82,16,.15);
         display: grid;
         place-items: center;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
       }
-      button:active { transform: scale(.94); }
+      button:hover { background: #F5DC00; border-color: #CDB900; }
+      button:active { transform: scale(.94); background: #EED600; }
       svg { width: 17px; height: 17px; display:block; }
       .toast {
         position: absolute;
