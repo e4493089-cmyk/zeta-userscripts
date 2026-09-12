@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.12
-// @description  가벼운 기존 전체화면 로직을 유지하고 하단 액션 버튼 오른쪽에 표시합니다. React DOM에는 삽입하지 않습니다.
+// @version      0.1.13
+// @description  채팅방에서만 하단 액션 버튼 오른쪽에 전체화면 버튼을 표시합니다. React DOM에는 삽입하지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -14,6 +14,7 @@
   'use strict';
 
   const HOST_ID = 'zeta-fullscreen-toggle-host';
+  const isChatRoom = () => /(?:^|\/)rooms\/[^/?#]+(?:\/|$)/.test(location.pathname);
   if (document.getElementById(HOST_ID)) return;
 
   const host = document.createElement('div');
@@ -78,17 +79,25 @@
   let keyboardSettleTimer = 0;
   let placed = false;
   let placementAttempts = 0;
+  let lastPath = location.pathname;
 
   const keyboardStyle = document.createElement('style');
   keyboardStyle.id = 'zeta-fullscreen-keyboard-stabilizer';
   document.documentElement.appendChild(keyboardStyle);
 
   const getActionButton = () => {
+    if (!isChatRoom()) return null;
     const wrap = document.querySelector('[data-sentry-component="ActionPanelButton"]');
-    return wrap?.querySelector('button') || document.querySelector('[data-testid="snapshot-action-button"]');
+    return wrap?.querySelector('button') || null;
   };
 
   const positionNextToActionButton = () => {
+    if (!isChatRoom()) {
+      placed = false;
+      host.style.display = 'none';
+      return false;
+    }
+
     const anchor = getActionButton();
     if (!anchor) return false;
 
@@ -112,6 +121,11 @@
   };
 
   const tryPlacement = () => {
+    if (!isChatRoom()) {
+      placed = false;
+      updateState();
+      return;
+    }
     if (positionNextToActionButton()) {
       updateState();
       return;
@@ -140,6 +154,7 @@
   };
 
   const beginKeyboardStabilizer = () => {
+    if (!isChatRoom()) return;
     clearTimeout(keyboardSettleTimer);
     keyboardFocus = true;
 
@@ -167,7 +182,7 @@
       keyboardFocus = false;
       document.documentElement.classList.remove('zfs-keyboard-active');
       keyboardStyle.textContent = '';
-      positionNextToActionButton();
+      if (isChatRoom()) positionNextToActionButton();
       updateState();
     }, 420);
   };
@@ -180,6 +195,7 @@
   };
 
   async function enterFullscreen() {
+    if (!isChatRoom()) return;
     const el = document.documentElement;
     const fn = el.requestFullscreen || el.webkitRequestFullscreen;
     if (!fn) {
@@ -211,6 +227,7 @@
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (!isChatRoom()) return;
 
     const active = document.fullscreenElement || document.webkitFullscreenElement;
     if (active) await exitFullscreen();
@@ -219,11 +236,11 @@
 
   function updateState() {
     const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    host.style.display = (placed && !active && !keyboardFocus) ? 'inline-flex' : 'none';
+    host.style.display = (isChatRoom() && placed && !active && !keyboardFocus) ? 'inline-flex' : 'none';
   }
 
   document.addEventListener('focusin', (event) => {
-    if (isEditableTarget(event.target)) beginKeyboardStabilizer();
+    if (isChatRoom() && isEditableTarget(event.target)) beginKeyboardStabilizer();
   }, true);
 
   document.addEventListener('focusout', (event) => {
@@ -231,7 +248,8 @@
   }, true);
 
   const reposition = () => {
-    if (placed && !keyboardFocus) positionNextToActionButton();
+    if (isChatRoom() && placed && !keyboardFocus) positionNextToActionButton();
+    else if (!isChatRoom()) updateState();
   };
 
   window.addEventListener('resize', reposition, { passive: true });
@@ -243,13 +261,28 @@
   }
 
   document.addEventListener('fullscreenchange', () => {
-    positionNextToActionButton();
+    if (isChatRoom()) positionNextToActionButton();
     updateState();
   });
   document.addEventListener('webkitfullscreenchange', () => {
-    positionNextToActionButton();
+    if (isChatRoom()) positionNextToActionButton();
     updateState();
   });
 
-  setTimeout(tryPlacement, 300);
+  // DOM 감시 없이 URL 경로만 아주 가볍게 확인한다.
+  setInterval(() => {
+    if (location.pathname === lastPath) return;
+    lastPath = location.pathname;
+
+    placed = false;
+    placementAttempts = 0;
+    keyboardFocus = false;
+    document.documentElement.classList.remove('zfs-keyboard-active');
+    keyboardStyle.textContent = '';
+    updateState();
+
+    if (isChatRoom()) setTimeout(tryPlacement, 150);
+  }, 800);
+
+  if (isChatRoom()) setTimeout(tryPlacement, 300);
 })();
