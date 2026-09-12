@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.17
-// @description  채팅 하단 기본 액션 버튼과 같은 위치/표시 흐름으로 전체화면 버튼을 추가하고 연한 회색 배경의 액션 아이콘 스타일을 맞춥니다.
+// @version      0.1.18
+// @description  채팅 하단 기본 액션 버튼 바로 위에 전체화면 버튼을 추가하고 같은 표시 흐름을 따릅니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -56,8 +56,9 @@
     button.setAttribute('aria-label', '전체화면 전환');
     button.setAttribute('title', '전체화면 전환');
     button.style.position = 'absolute';
-    button.style.left = 'calc(100% + 6px)';
-    button.style.top = '0';
+    button.style.left = '0';
+    button.style.top = 'auto';
+    button.style.bottom = 'calc(100% + 6px)';
     button.style.margin = '0';
     button.style.background = '#EEF1F3';
     button.style.color = '#53636C';
