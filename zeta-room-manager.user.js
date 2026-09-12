@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.2.1
-// @description  제타 대화방/플롯에 로컬 별명을 붙이고 별명/원래 이름으로 검색합니다.
+// @version      0.3.0
+// @description  제타 대화방/플롯에 로컬 별명을 붙이고 제타 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -17,6 +17,7 @@
   const STYLE_ID = 'zeta-room-manager-style';
   const PANEL_ID = 'zeta-room-manager-panel';
   const MODAL_ID = 'zeta-room-manager-modal';
+  const NATIVE_RESULTS_ID = 'zeta-room-manager-native-results';
 
   const state = loadState();
   let observer = null;
@@ -131,7 +132,37 @@
       #${PANEL_ID} .zrm-result-title { font-size: 14px; font-weight: 600; }
       #${PANEL_ID} .zrm-result-sub { margin-top: 2px; color: rgba(255,255,255,.48); font-size: 11px; }
       #${PANEL_ID} .zrm-result-go { flex: 0 0 auto; color: #9e91ff; font-size: 12px; font-weight: 700; }
-      body.zrm-searching [data-sentry-component="SwipeableRoomListItem"] { display: none !important; }
+      #${NATIVE_RESULTS_ID} {
+        flex: 0 0 auto;
+        border-bottom: 1px solid rgba(255,255,255,.07);
+        background: #151516;
+      }
+      #${NATIVE_RESULTS_ID}:empty { display: none; }
+      #${NATIVE_RESULTS_ID} .zrm-native-heading {
+        padding: 12px 16px 5px;
+        color: rgba(255,255,255,.5);
+        font-size: 11px;
+        font-weight: 600;
+      }
+      #${NATIVE_RESULTS_ID} .zrm-native-result {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 58px;
+        padding: 9px 16px;
+        color: #fff;
+        text-decoration: none;
+        box-sizing: border-box;
+      }
+      #${NATIVE_RESULTS_ID} .zrm-native-result:hover { background: rgba(255,255,255,.05); }
+      #${NATIVE_RESULTS_ID} .zrm-native-title { font-size: 14px; font-weight: 600; }
+      #${NATIVE_RESULTS_ID} .zrm-native-original {
+        margin-top: 3px;
+        color: rgba(255,255,255,.48);
+        font-size: 11px;
+      }
+      #${NATIVE_RESULTS_ID} .zrm-native-go { color: #9e91ff; font-size: 12px; font-weight: 700; }
 
       /* 대화방 목록에는 별명 버튼을 상시 표시하지 않음.
          별명 편집은 제타의 길게 누르기 메뉴에 주입한다. */
@@ -461,6 +492,12 @@
       return null;
     }
 
+    // 대화방은 제타 기본 검색창 하나만 사용한다.
+    if (type === 'room') {
+      document.getElementById(PANEL_ID)?.remove();
+      return null;
+    }
+
     const host = panelHost(type);
     if (!host) return null;
 
@@ -558,9 +595,13 @@
     const type = currentSection();
     if (!type) return;
 
+    if (type === 'room') {
+      renderNativeAliasResults(query);
+      return;
+    }
+
     const q = normalizeText(query).toLocaleLowerCase('ko-KR');
     const records = renderedItems().filter(x => x.type === type);
-    document.body.classList.toggle('zrm-searching', Boolean(q) && type === 'room');
     let shown = 0;
 
     for (const record of records) {
@@ -574,6 +615,102 @@
     const indexedShown = q ? Object.values(state.index).filter(entry => entry?.type === type && entry.href && matchRecord(entry, q)).length : 0;
     const status = document.querySelector(`#${PANEL_ID} .zrm-search-status`);
     if (status) status.textContent = q ? `${indexedShown}개 ${type === 'room' ? '대화방' : '플롯'} 검색됨` : '';
+  }
+
+  function nativeRoomSearchInput() {
+    return document.querySelector('input[name="room-list-search-input"]');
+  }
+
+  function nativeRoomQuery() {
+    const input = nativeRoomSearchInput();
+    if (input) return input.value;
+    try {
+      return new URL(location.href).searchParams.get('query') || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function nativeRoomListHost() {
+    const roomList = document.querySelector('[data-sentry-component="RoomList"]');
+    if (!roomList) return null;
+    return roomList.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]')
+      || roomList.querySelector('.overflow-y-auto')
+      || null;
+  }
+
+  function renderNativeAliasResults(query) {
+    const q = normalizeText(query).toLocaleLowerCase('ko-KR');
+    let box = document.getElementById(NATIVE_RESULTS_ID);
+
+    if (!q || currentSection() !== 'room') {
+      box?.remove();
+      return;
+    }
+
+    const nativeIds = new Set(
+      Array.from(document.querySelectorAll('a[href*="/rooms/"]'))
+        .filter(link => !link.closest(`#${NATIVE_RESULTS_ID}`))
+        .map(link => extractId(link.href, 'room'))
+        .filter(Boolean)
+    );
+    const matches = Object.values(state.index)
+      .filter(entry => entry?.type === 'room' && entry.href && normalizeText(entry.alias))
+      .filter(entry => normalizeText(entry.alias).toLocaleLowerCase('ko-KR').includes(q))
+      .filter(entry => !nativeIds.has(entry.id))
+      .slice(0, 20);
+
+    if (!matches.length) {
+      box?.remove();
+      return;
+    }
+
+    const host = nativeRoomListHost();
+    if (!host) return;
+
+    if (!box) {
+      box = document.createElement('div');
+      box.id = NATIVE_RESULTS_ID;
+    }
+    box.textContent = '';
+
+    const heading = document.createElement('div');
+    heading.className = 'zrm-native-heading';
+    heading.textContent = `별명 검색 결과 ${matches.length}개`;
+    box.appendChild(heading);
+
+    for (const entry of matches) {
+      const link = document.createElement('a');
+      link.className = 'zrm-native-result';
+      link.href = entry.href;
+
+      const text = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'zrm-native-title';
+      title.textContent = entry.alias;
+      const original = document.createElement('div');
+      original.className = 'zrm-native-original';
+      original.textContent = `원래 이름: ${entry.original || '(이름 없음)'}`;
+      text.append(title, original);
+
+      const go = document.createElement('span');
+      go.className = 'zrm-native-go';
+      go.textContent = '열기 ›';
+      link.append(text, go);
+      box.appendChild(link);
+    }
+
+    if (box.parentElement !== host) host.prepend(box);
+  }
+
+  function bindNativeRoomSearch() {
+    const input = nativeRoomSearchInput();
+    if (!input || input.dataset.zrmAliasSearchBound === '1') return;
+    input.dataset.zrmAliasSearchBound = '1';
+    const update = () => scheduleRefresh();
+    input.addEventListener('input', update);
+    input.addEventListener('search', update);
+    input.addEventListener('change', update);
   }
 
   function refresh() {
@@ -590,8 +727,13 @@
     injectRoomContextMenu();
     saveState();
 
-    const input = panel?.querySelector('input');
-    applySearch(input?.value || '');
+    if (currentSection() === 'room') {
+      bindNativeRoomSearch();
+      renderNativeAliasResults(nativeRoomQuery());
+    } else {
+      const input = panel?.querySelector('input');
+      applySearch(input?.value || '');
+    }
     observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
 
