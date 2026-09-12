@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.1.7
+// @version      0.2.0
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 별명/원래 이름으로 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -52,8 +52,8 @@
   function extractId(href, type) {
     if (!href) return null;
     const re = type === 'room'
-      ? /\/rooms\/([0-9a-f-]{20,})/i
-      : /\/plots\/([0-9a-f-]{20,})(?:\/|$)/i;
+      ? /\/rooms\/([^/?#]+)/i
+      : /\/plots\/([^/?#]+)(?:\/|$)/i;
     return href.match(re)?.[1] || null;
   }
 
@@ -99,6 +99,8 @@
         background: #2a2a2e;
       }
       #${PANEL_ID} input::placeholder { color: rgba(255,255,255,.45); }
+      #${PANEL_ID} .zrm-search-status { min-height: 0; padding-top: 0; color: rgba(255,255,255,.48); font-size: 11px; }
+      #${PANEL_ID} .zrm-search-status:not(:empty) { padding-top: 7px; }
       #${PANEL_ID} .zrm-results {
         display: none;
         margin-top: 8px;
@@ -204,6 +206,8 @@
   function titleElementForRoom(item, link) {
     return link?.querySelector('span.body1.font-medium')
       || link?.querySelector('.body1.font-medium')
+      || link?.querySelector('[class*="line-clamp"]')
+      || Array.from(link?.querySelectorAll('span, div') || []).find(el => !el.children.length && normalizeText(el.textContent))
       || null;
   }
 
@@ -249,7 +253,12 @@
 
   function renderedItems() {
     const out = [];
-    document.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]').forEach(el => {
+    const roomItems = new Set(document.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]'));
+    document.querySelectorAll('a[href*="/rooms/"]').forEach(link => {
+      const item = link.closest('[data-sentry-component="SwipeableRoomListItem"], li, [role="listitem"]') || link.parentElement?.parentElement;
+      if (item) roomItems.add(item);
+    });
+    roomItems.forEach(el => {
       const x = parseItem(el, 'room');
       if (x) out.push(x);
     });
@@ -263,7 +272,8 @@
   function applyAlias(record) {
     const alias = normalizeText(state.aliases[record.key]);
     record.alias = alias;
-    record.titleEl.textContent = alias || record.original;
+    const nextTitle = alias || record.original;
+    if (normalizeText(record.titleEl.textContent) !== nextTitle) record.titleEl.textContent = nextTitle;
     record.titleEl.classList.toggle('zrm-has-alias', !!alias);
 
     const indexed = state.index[record.key] || {};
@@ -319,7 +329,8 @@
   }
 
   function rememberRoomContextTarget(event) {
-    const target = event.target?.closest?.('[data-sentry-component="SwipeableRoomListItem"]');
+    const link = event.target?.closest?.('a[href*="/rooms/"]');
+    const target = event.target?.closest?.('[data-sentry-component="SwipeableRoomListItem"], li, [role="listitem"]') || link?.parentElement?.parentElement;
     if (!target) return;
     const record = parseItem(target, 'room');
     if (record) lastRoomContextRecord = snapshotRecord(record);
@@ -334,7 +345,10 @@
   }
 
   function injectRoomContextMenu() {
-    const menus = document.querySelectorAll('[data-sentry-source-file="RoomListItemContextMenu.tsx"]');
+    const menus = new Set(document.querySelectorAll('[data-sentry-source-file="RoomListItemContextMenu.tsx"]'));
+    document.querySelectorAll('[role="dialog"], [role="menu"]').forEach(menu => {
+      if (Array.from(menu.querySelectorAll('button')).some(btn => normalizeText(btn.textContent) === '나가기')) menus.add(menu);
+    });
     for (const menu of menus) {
       if (menu.querySelector('.zrm-context-rename')) continue;
       if (!lastRoomContextRecord) continue;
@@ -419,14 +433,16 @@
   }
 
   function currentSection() {
-    if (location.pathname === '/ko/rooms' || location.pathname.startsWith('/ko/rooms?')) return 'room';
-    if (location.pathname.startsWith('/ko/creator-center')) return 'plot';
+    if (/^\/(?:[^/]+\/)?rooms\/?$/i.test(location.pathname)) return 'room';
+    if (/^\/(?:[^/]+\/)?creator-center(?:\/|$)/i.test(location.pathname)) return 'plot';
     return null;
   }
 
   function panelHost(type) {
     if (type === 'room') {
-      return document.querySelector('[data-sentry-component="RoomList"]');
+      return document.querySelector('[data-sentry-component="RoomList"]')
+        || document.querySelector('a[href*="/rooms/"]')?.closest('main, [role="main"]')
+        || null;
     }
 
     const header = document.querySelector('[data-sentry-component="CreatorCenterMyPlotListHeader"]');
@@ -459,7 +475,7 @@
             <input type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="${type === 'room' ? '대화방' : '플롯'} 이름 또는 별명 검색">
           </div>
         </div>
-        <div class="zrm-results"></div>
+        <div class="zrm-search-status" aria-live="polite"></div>
       `;
 
       const input = panel.querySelector('input');
@@ -542,10 +558,12 @@
       if (yes) shown++;
     }
 
-    renderQuickResults(type, q);
+    const status = document.querySelector(`#${PANEL_ID} .zrm-search-status`);
+    if (status) status.textContent = q ? `${shown}개 ${type === 'room' ? '대화방' : '플롯'} 표시` : '';
   }
 
   function refresh() {
+    observer?.disconnect();
     injectStyle();
     const panel = ensurePanel();
     const records = renderedItems();
@@ -560,6 +578,7 @@
 
     const input = panel?.querySelector('input');
     applySearch(input?.value || '');
+    observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function scheduleRefresh() {
@@ -601,3 +620,4 @@
     start();
   }
 })();
+
