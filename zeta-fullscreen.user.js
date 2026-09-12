@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.10
-// @description  제타 채팅방 상단에만 전체화면 전환 버튼을 표시합니다. 하단 fallback 없이 헤더가 준비된 뒤 표시합니다.
+// @version      0.1.11
+// @description  가벼운 기존 전체화면 버전을 유지하고 버튼 위치만 채팅 상단 모델 선택 옆으로 옮깁니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -14,40 +14,39 @@
   'use strict';
 
   const HOST_ID = 'zeta-fullscreen-toggle-host';
-  const isChatRoom = () => /(?:^|\/)rooms\/[^/?#]+(?:\/|$)/.test(location.pathname);
   if (document.getElementById(HOST_ID)) return;
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'display:none;align-items:center;flex:0 0 auto;';
-  document.documentElement.appendChild(host);
+  host.style.cssText = 'position:relative;z-index:2;display:none;align-items:center;flex:0 0 auto;margin-right:6px;';
 
   const root = host.attachShadow({ mode: 'open' });
   root.innerHTML = `
     <style>
       :host { all: initial; }
       button {
-        width: 30px;
-        height: 30px;
+        width: 34px;
+        height: 34px;
         padding: 0;
-        border: 1px solid var(--zfs-border, rgba(255,255,255,.16));
-        border-radius: 999px;
-        background: var(--zfs-background, #27272a);
-        color: var(--zfs-color, rgba(255,255,255,.88));
-        box-shadow: var(--zfs-shadow, 0 1px 3px rgba(0,0,0,.16));
+        border: 1px solid rgba(255,255,255,.16);
+        border-radius: 10px;
+        background: rgba(24,24,26,.66);
+        color: rgba(255,255,255,.88);
+        box-shadow: 0 2px 10px rgba(0,0,0,.20);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         display: grid;
         place-items: center;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
       }
-      button:hover { filter: brightness(.96); }
-      button:active { transform: scale(.94); filter: brightness(.90); }
+      button:active { transform: scale(.94); }
       svg { width: 17px; height: 17px; display:block; }
       .toast {
         position: absolute;
         left: 0;
-        top: 38px;
+        top: 42px;
         width: max-content;
         max-width: 220px;
         padding: 8px 10px;
@@ -74,11 +73,31 @@
   const button = root.querySelector('button');
   const toast = root.querySelector('.toast');
   let toastTimer = 0;
+
+  // 0.1.2의 가벼운 구조는 그대로 두고, 위치만 상단 모델 선택 버튼 옆으로 옮긴다.
+  // 문서 전체 MutationObserver/주기적 감시는 사용하지 않는다.
+  let placementAttempt = 0;
+  const placeInHeader = () => {
+    const modelButton = document.querySelector('[data-testid="chat-header-model"], button[aria-label="Select AI model"]');
+    const modelWrapper = modelButton?.parentElement;
+    const actionRow = modelWrapper?.parentElement;
+
+    if (actionRow) {
+      if (host.parentElement !== actionRow || host.nextElementSibling !== modelWrapper) {
+        actionRow.insertBefore(host, modelWrapper);
+      }
+      updateState();
+      return;
+    }
+
+    placementAttempt += 1;
+    if (placementAttempt < 20) setTimeout(placeInHeader, 250);
+  };
+
+  // 모바일 Edge의 Fullscreen + 소프트키보드 조합은 viewport를 여러 번 재계산한다.
+  // 그 순간 루트 배경이 비거나 플로팅 버튼이 잠깐 다시 나타나는 현상을 최대한 줄인다.
   let keyboardFocus = false;
   let keyboardSettleTimer = 0;
-  let placementTimer = 0;
-  let placedInHeader = false;
-
   const keyboardStyle = document.createElement('style');
   keyboardStyle.id = 'zeta-fullscreen-keyboard-stabilizer';
   document.documentElement.appendChild(keyboardStyle);
@@ -89,7 +108,12 @@
   };
 
   const pickPageBackground = () => {
-    const candidates = [document.querySelector('main#contents'), document.body, document.documentElement].filter(Boolean);
+    const candidates = [
+      document.querySelector('main#contents'),
+      document.body,
+      document.documentElement
+    ].filter(Boolean);
+
     for (const el of candidates) {
       const color = getComputedStyle(el).backgroundColor;
       if (color && color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
@@ -97,48 +121,20 @@
     return '#151516';
   };
 
-  const placeBesideModelButton = () => {
-    placedInHeader = false;
-    host.style.display = 'none';
-
-    if (!isChatRoom()) return false;
-
-    const modelButton = document.querySelector('[data-testid="chat-header-model"], button[aria-label="Select AI model"]');
-    const modelWrapper = modelButton?.parentElement;
-    const actionRow = modelWrapper?.parentElement;
-
-    if (!actionRow) {
-      if (!host.isConnected) document.documentElement.appendChild(host);
-      return false;
-    }
-
-    if (host.parentElement !== actionRow || host.nextElementSibling !== modelWrapper) {
-      actionRow.insertBefore(host, modelWrapper);
-    }
-    host.style.position = 'relative';
-    host.style.right = 'auto';
-    host.style.bottom = 'auto';
-    host.style.zIndex = '2';
-    const modelStyle = getComputedStyle(modelButton);
-    host.style.setProperty('--zfs-background', modelStyle.backgroundColor);
-    host.style.setProperty('--zfs-border', `${modelStyle.borderTopWidth} ${modelStyle.borderTopStyle} ${modelStyle.borderTopColor}`);
-    host.style.setProperty('--zfs-color', modelStyle.color);
-    host.style.setProperty('--zfs-shadow', modelStyle.boxShadow === 'none' ? '0 1px 3px rgba(0,0,0,.16)' : modelStyle.boxShadow);
-    placedInHeader = true;
-    return true;
-  };
-
   const beginKeyboardStabilizer = () => {
-    if (!isChatRoom()) return;
     clearTimeout(keyboardSettleTimer);
     keyboardFocus = true;
+
     if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
 
     host.style.display = 'none';
+
     const bg = pickPageBackground();
     keyboardStyle.textContent = `
       html.zfs-keyboard-active,
-      html.zfs-keyboard-active body { background: ${bg} !important; }
+      html.zfs-keyboard-active body {
+        background: ${bg} !important;
+      }
       html.zfs-keyboard-active {
         scroll-behavior: auto !important;
         overscroll-behavior: none !important;
@@ -196,6 +192,7 @@
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
+
     const active = document.fullscreenElement || document.webkitFullscreenElement;
     if (active) await exitFullscreen();
     else await enterFullscreen();
@@ -203,26 +200,13 @@
 
   function updateState() {
     const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    host.style.display = (isChatRoom() && placedInHeader && !active && !keyboardFocus) ? 'inline-flex' : 'none';
+    host.style.display = (host.isConnected && !active && !keyboardFocus) ? 'inline-flex' : 'none';
     button.setAttribute('aria-label', '전체화면 전환');
     button.setAttribute('title', '전체화면 전환');
   }
 
-  function refreshPlacement() {
-    if (!isChatRoom()) {
-      placedInHeader = false;
-      keyboardFocus = false;
-      document.documentElement.classList.remove('zfs-keyboard-active');
-      keyboardStyle.textContent = '';
-      host.style.display = 'none';
-      return;
-    }
-    placeBesideModelButton();
-    updateState();
-  }
-
   document.addEventListener('focusin', (event) => {
-    if (isChatRoom() && isEditableTarget(event.target)) beginKeyboardStabilizer();
+    if (isEditableTarget(event.target)) beginKeyboardStabilizer();
   }, true);
 
   document.addEventListener('focusout', (event) => {
@@ -237,13 +221,6 @@
 
   document.addEventListener('fullscreenchange', updateState);
   document.addEventListener('webkitfullscreenchange', updateState);
-  window.addEventListener('popstate', refreshPlacement);
-  window.addEventListener('hashchange', refreshPlacement);
 
-  new MutationObserver(() => {
-    clearTimeout(placementTimer);
-    placementTimer = setTimeout(refreshPlacement, 120);
-  }).observe(document.documentElement, { childList: true, subtree: true });
-
-  refreshPlacement();
+  placeInHeader();
 })();
