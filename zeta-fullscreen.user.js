@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.11
-// @description  가벼운 기존 전체화면 버전을 유지하고 버튼 위치만 채팅 상단 모델 선택 옆으로 옮깁니다.
+// @version      0.1.12
+// @description  가벼운 기존 전체화면 로직을 유지하고 하단 액션 버튼 오른쪽에 표시합니다. React DOM에는 삽입하지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -18,23 +18,24 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'position:relative;z-index:2;display:none;align-items:center;flex:0 0 auto;margin-right:6px;';
+  host.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483000;display:none;align-items:center;pointer-events:auto;';
+  document.documentElement.appendChild(host);
 
   const root = host.attachShadow({ mode: 'open' });
   root.innerHTML = `
     <style>
       :host { all: initial; }
       button {
-        width: 34px;
-        height: 34px;
+        width: var(--zfs-size, 32px);
+        height: var(--zfs-size, 32px);
         padding: 0;
-        border: 1px solid rgba(255,255,255,.16);
-        border-radius: 10px;
-        background: rgba(24,24,26,.66);
-        color: rgba(255,255,255,.88);
-        box-shadow: 0 2px 10px rgba(0,0,0,.20);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
+        border: var(--zfs-border, 1px solid rgba(255,255,255,.08));
+        border-radius: var(--zfs-radius, 999px);
+        background: var(--zfs-background, rgba(40,40,41,.80));
+        color: var(--zfs-color, rgba(255,255,255,.88));
+        box-shadow: var(--zfs-shadow, none);
+        backdrop-filter: var(--zfs-backdrop, none);
+        -webkit-backdrop-filter: var(--zfs-backdrop, none);
         display: grid;
         place-items: center;
         cursor: pointer;
@@ -42,11 +43,11 @@
         touch-action: manipulation;
       }
       button:active { transform: scale(.94); }
-      svg { width: 17px; height: 17px; display:block; }
+      svg { width: 16px; height: 16px; display:block; }
       .toast {
         position: absolute;
         left: 0;
-        top: 42px;
+        bottom: 40px;
         width: max-content;
         max-width: 220px;
         padding: 8px 10px;
@@ -73,34 +74,51 @@
   const button = root.querySelector('button');
   const toast = root.querySelector('.toast');
   let toastTimer = 0;
-
-  // 0.1.2의 가벼운 구조는 그대로 두고, 위치만 상단 모델 선택 버튼 옆으로 옮긴다.
-  // 문서 전체 MutationObserver/주기적 감시는 사용하지 않는다.
-  let placementAttempt = 0;
-  const placeInHeader = () => {
-    const modelButton = document.querySelector('[data-testid="chat-header-model"], button[aria-label="Select AI model"]');
-    const modelWrapper = modelButton?.parentElement;
-    const actionRow = modelWrapper?.parentElement;
-
-    if (actionRow) {
-      if (host.parentElement !== actionRow || host.nextElementSibling !== modelWrapper) {
-        actionRow.insertBefore(host, modelWrapper);
-      }
-      updateState();
-      return;
-    }
-
-    placementAttempt += 1;
-    if (placementAttempt < 20) setTimeout(placeInHeader, 250);
-  };
-
-  // 모바일 Edge의 Fullscreen + 소프트키보드 조합은 viewport를 여러 번 재계산한다.
-  // 그 순간 루트 배경이 비거나 플로팅 버튼이 잠깐 다시 나타나는 현상을 최대한 줄인다.
   let keyboardFocus = false;
   let keyboardSettleTimer = 0;
+  let placed = false;
+  let placementAttempts = 0;
+
   const keyboardStyle = document.createElement('style');
   keyboardStyle.id = 'zeta-fullscreen-keyboard-stabilizer';
   document.documentElement.appendChild(keyboardStyle);
+
+  const getActionButton = () => {
+    const wrap = document.querySelector('[data-sentry-component="ActionPanelButton"]');
+    return wrap?.querySelector('button') || document.querySelector('[data-testid="snapshot-action-button"]');
+  };
+
+  const positionNextToActionButton = () => {
+    const anchor = getActionButton();
+    if (!anchor) return false;
+
+    const rect = anchor.getBoundingClientRect();
+    if (!rect.width || !rect.height) return false;
+
+    const style = getComputedStyle(anchor);
+    const size = Math.round(Math.min(rect.width, rect.height));
+
+    host.style.left = `${Math.round(rect.right + 6)}px`;
+    host.style.top = `${Math.round(rect.top)}px`;
+    host.style.setProperty('--zfs-size', `${size}px`);
+    host.style.setProperty('--zfs-background', style.backgroundColor || 'rgba(40,40,41,.80)');
+    host.style.setProperty('--zfs-color', style.color || 'rgba(255,255,255,.88)');
+    host.style.setProperty('--zfs-border', `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`);
+    host.style.setProperty('--zfs-radius', style.borderRadius || '999px');
+    host.style.setProperty('--zfs-shadow', style.boxShadow === 'none' ? 'none' : style.boxShadow);
+    host.style.setProperty('--zfs-backdrop', style.backdropFilter || style.webkitBackdropFilter || 'none');
+    placed = true;
+    return true;
+  };
+
+  const tryPlacement = () => {
+    if (positionNextToActionButton()) {
+      updateState();
+      return;
+    }
+    placementAttempts += 1;
+    if (placementAttempts < 15) setTimeout(tryPlacement, 200);
+  };
 
   const isEditableTarget = (target) => {
     if (!(target instanceof Element)) return false;
@@ -149,6 +167,7 @@
       keyboardFocus = false;
       document.documentElement.classList.remove('zfs-keyboard-active');
       keyboardStyle.textContent = '';
+      positionNextToActionButton();
       updateState();
     }, 420);
   };
@@ -200,9 +219,7 @@
 
   function updateState() {
     const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    host.style.display = (host.isConnected && !active && !keyboardFocus) ? 'inline-flex' : 'none';
-    button.setAttribute('aria-label', '전체화면 전환');
-    button.setAttribute('title', '전체화면 전환');
+    host.style.display = (placed && !active && !keyboardFocus) ? 'inline-flex' : 'none';
   }
 
   document.addEventListener('focusin', (event) => {
@@ -213,14 +230,26 @@
     if (isEditableTarget(event.target)) endKeyboardStabilizer();
   }, true);
 
+  const reposition = () => {
+    if (placed && !keyboardFocus) positionNextToActionButton();
+  };
+
+  window.addEventListener('resize', reposition, { passive: true });
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
       if (keyboardFocus) host.style.display = 'none';
+      else reposition();
     }, { passive: true });
   }
 
-  document.addEventListener('fullscreenchange', updateState);
-  document.addEventListener('webkitfullscreenchange', updateState);
+  document.addEventListener('fullscreenchange', () => {
+    positionNextToActionButton();
+    updateState();
+  });
+  document.addEventListener('webkitfullscreenchange', () => {
+    positionNextToActionButton();
+    updateState();
+  });
 
-  placeInHeader();
+  setTimeout(tryPlacement, 300);
 })();
