@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.13
-// @description  채팅방에서만 하단 액션 버튼 오른쪽에 전체화면 버튼을 표시합니다. React DOM에는 삽입하지 않습니다.
+// @version      0.1.14
+// @description  채팅방에서만 하단 액션 버튼 오른쪽에 전체화면 버튼을 고정 표시합니다. 전체화면 전환 후 위치 밀림과 주기적 경로 폴링을 제거합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -19,7 +19,7 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483000;display:none;align-items:center;pointer-events:auto;';
+  host.style.cssText = 'position:fixed;left:0;bottom:0;top:auto;z-index:2147483000;display:none;align-items:center;pointer-events:auto;';
   document.documentElement.appendChild(host);
 
   const root = host.attachShadow({ mode: 'open' });
@@ -77,6 +77,9 @@
   let toastTimer = 0;
   let keyboardFocus = false;
   let keyboardSettleTimer = 0;
+  let placementTimer = 0;
+  let stablePositionTimer = 0;
+  let resizeTimer = 0;
   let placed = false;
   let placementAttempts = 0;
   let lastPath = location.pathname;
@@ -106,9 +109,14 @@
 
     const style = getComputedStyle(anchor);
     const size = Math.round(Math.min(rect.width, rect.height));
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    const bottom = Math.max(0, Math.round(viewportHeight - rect.bottom));
 
+    // 하단 액션 버튼과 같은 세로 기준을 사용한다. top 좌표를 저장하지 않아
+    // fullscreen 진입/해제 중 viewport 높이가 바뀌어도 입력창 쪽으로 밀리지 않는다.
     host.style.left = `${Math.round(rect.right + 6)}px`;
-    host.style.top = `${Math.round(rect.top)}px`;
+    host.style.bottom = `${bottom}px`;
+    host.style.top = 'auto';
     host.style.setProperty('--zfs-size', `${size}px`);
     host.style.setProperty('--zfs-background', style.backgroundColor || 'rgba(40,40,41,.80)');
     host.style.setProperty('--zfs-color', style.color || 'rgba(255,255,255,.88)');
@@ -121,6 +129,7 @@
   };
 
   const tryPlacement = () => {
+    clearTimeout(placementTimer);
     if (!isChatRoom()) {
       placed = false;
       updateState();
@@ -131,7 +140,20 @@
       return;
     }
     placementAttempts += 1;
-    if (placementAttempts < 15) setTimeout(tryPlacement, 200);
+    if (placementAttempts < 15) placementTimer = setTimeout(tryPlacement, 200);
+  };
+
+  const scheduleStablePosition = (delay = 500) => {
+    clearTimeout(stablePositionTimer);
+    stablePositionTimer = setTimeout(() => {
+      if (!isChatRoom() || keyboardFocus || document.fullscreenElement || document.webkitFullscreenElement) return;
+      if (!positionNextToActionButton()) {
+        placementAttempts = 0;
+        tryPlacement();
+        return;
+      }
+      updateState();
+    }, delay);
   };
 
   const isEditableTarget = (target) => {
@@ -182,7 +204,7 @@
       keyboardFocus = false;
       document.documentElement.classList.remove('zfs-keyboard-active');
       keyboardStyle.textContent = '';
-      if (isChatRoom()) positionNextToActionButton();
+      scheduleStablePosition(80);
       updateState();
     }, 420);
   };
@@ -247,33 +269,33 @@
     if (isEditableTarget(event.target)) endKeyboardStabilizer();
   }, true);
 
-  const reposition = () => {
-    if (isChatRoom() && placed && !keyboardFocus) positionNextToActionButton();
-    else if (!isChatRoom()) updateState();
+  const onViewportResize = () => {
+    if (keyboardFocus || document.fullscreenElement || document.webkitFullscreenElement) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => scheduleStablePosition(80), 180);
   };
 
-  window.addEventListener('resize', reposition, { passive: true });
+  window.addEventListener('resize', onViewportResize, { passive: true });
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      if (keyboardFocus) host.style.display = 'none';
-      else reposition();
-    }, { passive: true });
+    window.visualViewport.addEventListener('resize', onViewportResize, { passive: true });
   }
 
-  document.addEventListener('fullscreenchange', () => {
-    if (isChatRoom()) positionNextToActionButton();
+  const onFullscreenChange = () => {
+    const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
     updateState();
-  });
-  document.addEventListener('webkitfullscreenchange', () => {
-    if (isChatRoom()) positionNextToActionButton();
-    updateState();
-  });
+    // 해제 직후의 중간 viewport 좌표를 잡지 않는다. 브라우저 UI 복구가 끝난 뒤 딱 한 번 재배치한다.
+    if (!active) scheduleStablePosition(550);
+  };
 
-  // DOM 감시 없이 URL 경로만 아주 가볍게 확인한다.
-  setInterval(() => {
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+  const syncRouteState = () => {
     if (location.pathname === lastPath) return;
     lastPath = location.pathname;
 
+    clearTimeout(placementTimer);
+    clearTimeout(stablePositionTimer);
     placed = false;
     placementAttempts = 0;
     keyboardFocus = false;
@@ -281,8 +303,24 @@
     keyboardStyle.textContent = '';
     updateState();
 
-    if (isChatRoom()) setTimeout(tryPlacement, 150);
-  }, 800);
+    if (isChatRoom()) placementTimer = setTimeout(tryPlacement, 150);
+  };
 
-  if (isChatRoom()) setTimeout(tryPlacement, 300);
+  // 0.8초 setInterval 대신 SPA의 History API 변경을 직접 감지한다.
+  const wrapHistoryMethod = (name) => {
+    const original = history[name];
+    if (typeof original !== 'function') return;
+    history[name] = function (...args) {
+      const result = original.apply(this, args);
+      queueMicrotask(syncRouteState);
+      return result;
+    };
+  };
+
+  wrapHistoryMethod('pushState');
+  wrapHistoryMethod('replaceState');
+  window.addEventListener('popstate', syncRouteState);
+  window.addEventListener('hashchange', syncRouteState);
+
+  if (isChatRoom()) placementTimer = setTimeout(tryPlacement, 300);
 })();
