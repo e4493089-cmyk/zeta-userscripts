@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.6
-// @description  제타를 한 번의 탭으로 전체화면 전환합니다. 모바일 키보드 호출 시 화면 깜빡임을 완화합니다.
+// @version      0.1.7
+// @description  제타 채팅방에서만 전체화면 전환 버튼을 표시합니다. 모바일 키보드 호출 시 화면 깜빡임을 완화합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -14,11 +14,12 @@
   'use strict';
 
   const HOST_ID = 'zeta-fullscreen-toggle-host';
+  const isChatRoom = () => /^\/ko\/rooms\/[^/]+\/?$/.test(location.pathname);
   if (document.getElementById(HOST_ID)) return;
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'position:fixed;right:12px;bottom:82px;z-index:2147483647;display:inline-flex;align-items:center;flex:0 0 auto;';
+  host.style.cssText = 'position:fixed;right:12px;bottom:82px;z-index:2147483647;display:none;align-items:center;flex:0 0 auto;';
   document.documentElement.appendChild(host);
 
   const root = host.attachShadow({ mode: 'open' });
@@ -75,6 +76,11 @@
   let toastTimer = 0;
 
   const placeBesideModelButton = () => {
+    if (!isChatRoom()) {
+      host.style.display = 'none';
+      return;
+    }
+
     const modelButton = document.querySelector('[data-testid="chat-header-model"], button[aria-label="Select AI model"]');
     const modelWrapper = modelButton?.parentElement;
     const actionRow = modelWrapper?.parentElement;
@@ -128,13 +134,12 @@
   };
 
   const beginKeyboardStabilizer = () => {
+    if (!isChatRoom()) return;
     clearTimeout(keyboardSettleTimer);
     keyboardFocus = true;
 
     if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
 
-    // 키보드 애니메이션 중 브라우저가 fullscreen 상태를 순간 재평가해도
-    // 버튼이 중간 프레임에 튀어나오지 않게 한다.
     host.style.display = 'none';
 
     const bg = pickPageBackground();
@@ -153,7 +158,6 @@
 
   const endKeyboardStabilizer = () => {
     clearTimeout(keyboardSettleTimer);
-    // Android 키보드 닫힘 애니메이션/visualViewport 복구가 끝날 시간을 조금 준다.
     keyboardSettleTimer = setTimeout(() => {
       keyboardFocus = false;
       document.documentElement.classList.remove('zfs-keyboard-active');
@@ -170,6 +174,7 @@
   };
 
   async function enterFullscreen() {
+    if (!isChatRoom()) return;
     const el = document.documentElement;
     const fn = el.requestFullscreen || el.webkitRequestFullscreen;
     if (!fn) {
@@ -201,6 +206,7 @@
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (!isChatRoom()) return;
 
     const active = document.fullscreenElement || document.webkitFullscreenElement;
     if (active) await exitFullscreen();
@@ -209,24 +215,31 @@
 
   function updateState() {
     const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
-
-    // 전체화면에 들어가면 플로팅 버튼을 완전히 숨김.
-    // 키보드가 열려 있는 동안에는 fullscreen 상태가 순간 흔들려도 버튼을 계속 숨긴다.
-    host.style.display = (active || keyboardFocus) ? 'none' : 'inline-flex';
+    host.style.display = (isChatRoom() && !active && !keyboardFocus) ? 'inline-flex' : 'none';
     button.setAttribute('aria-label', '전체화면 전환');
     button.setAttribute('title', '전체화면 전환');
   }
 
+  function syncRouteState() {
+    if (!isChatRoom()) {
+      keyboardFocus = false;
+      document.documentElement.classList.remove('zfs-keyboard-active');
+      keyboardStyle.textContent = '';
+      host.style.display = 'none';
+      return;
+    }
+    placeBesideModelButton();
+    updateState();
+  }
+
   document.addEventListener('focusin', (event) => {
-    if (isEditableTarget(event.target)) beginKeyboardStabilizer();
+    if (isChatRoom() && isEditableTarget(event.target)) beginKeyboardStabilizer();
   }, true);
 
   document.addEventListener('focusout', (event) => {
     if (isEditableTarget(event.target)) endKeyboardStabilizer();
   }, true);
 
-  // visualViewport resize 자체에는 레이아웃 값을 쓰지 않는다.
-  // 읽기/쓰기 반복으로 키보드 애니메이션 중 추가 reflow를 만드는 것을 피한다.
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
       if (keyboardFocus) host.style.display = 'none';
@@ -235,12 +248,22 @@
 
   document.addEventListener('fullscreenchange', updateState);
   document.addEventListener('webkitfullscreenchange', updateState);
+  window.addEventListener('popstate', syncRouteState);
+  window.addEventListener('hashchange', syncRouteState);
+
   let placementTimer = 0;
   new MutationObserver(() => {
     clearTimeout(placementTimer);
-    placementTimer = setTimeout(placeBesideModelButton, 80);
+    placementTimer = setTimeout(syncRouteState, 80);
   }).observe(document.documentElement, { childList: true, subtree: true });
-  new MutationObserver(placeBesideModelButton).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-  placeBesideModelButton();
-  updateState();
+  new MutationObserver(syncRouteState).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+  let lastPath = location.pathname;
+  setInterval(() => {
+    if (location.pathname === lastPath) return;
+    lastPath = location.pathname;
+    syncRouteState();
+  }, 400);
+
+  syncRouteState();
 })();
