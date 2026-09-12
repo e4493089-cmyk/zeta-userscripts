@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.9
-// @description  제타 채팅방에서만 전체화면 전환 버튼을 표시합니다. SPA 감시를 최소화해 모바일 진입 문제를 방지합니다.
+// @version      0.1.10
+// @description  제타 채팅방 상단에만 전체화면 전환 버튼을 표시합니다. 하단 fallback 없이 헤더가 준비된 뒤 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -19,7 +19,7 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'position:fixed;right:12px;bottom:82px;z-index:2147483647;display:none;align-items:center;flex:0 0 auto;';
+  host.style.cssText = 'display:none;align-items:center;flex:0 0 auto;';
   document.documentElement.appendChild(host);
 
   const root = host.attachShadow({ mode: 'open' });
@@ -77,6 +77,7 @@
   let keyboardFocus = false;
   let keyboardSettleTimer = 0;
   let placementTimer = 0;
+  let placedInHeader = false;
 
   const keyboardStyle = document.createElement('style');
   keyboardStyle.id = 'zeta-fullscreen-keyboard-stabilizer';
@@ -97,36 +98,34 @@
   };
 
   const placeBesideModelButton = () => {
-    if (!isChatRoom()) {
-      host.style.display = 'none';
-      return;
-    }
+    placedInHeader = false;
+    host.style.display = 'none';
+
+    if (!isChatRoom()) return false;
 
     const modelButton = document.querySelector('[data-testid="chat-header-model"], button[aria-label="Select AI model"]');
     const modelWrapper = modelButton?.parentElement;
     const actionRow = modelWrapper?.parentElement;
 
-    if (actionRow) {
-      if (host.parentElement !== actionRow || host.nextElementSibling !== modelWrapper) {
-        actionRow.insertBefore(host, modelWrapper);
-      }
-      host.style.position = 'relative';
-      host.style.right = 'auto';
-      host.style.bottom = 'auto';
-      host.style.zIndex = '2';
-      const modelStyle = getComputedStyle(modelButton);
-      host.style.setProperty('--zfs-background', modelStyle.backgroundColor);
-      host.style.setProperty('--zfs-border', `${modelStyle.borderTopWidth} ${modelStyle.borderTopStyle} ${modelStyle.borderTopColor}`);
-      host.style.setProperty('--zfs-color', modelStyle.color);
-      host.style.setProperty('--zfs-shadow', modelStyle.boxShadow === 'none' ? '0 1px 3px rgba(0,0,0,.16)' : modelStyle.boxShadow);
-      return;
+    if (!actionRow) {
+      if (!host.isConnected) document.documentElement.appendChild(host);
+      return false;
     }
 
-    if (host.parentElement !== document.documentElement) document.documentElement.appendChild(host);
-    host.style.position = 'fixed';
-    host.style.right = '12px';
-    host.style.bottom = '82px';
-    host.style.zIndex = '2147483647';
+    if (host.parentElement !== actionRow || host.nextElementSibling !== modelWrapper) {
+      actionRow.insertBefore(host, modelWrapper);
+    }
+    host.style.position = 'relative';
+    host.style.right = 'auto';
+    host.style.bottom = 'auto';
+    host.style.zIndex = '2';
+    const modelStyle = getComputedStyle(modelButton);
+    host.style.setProperty('--zfs-background', modelStyle.backgroundColor);
+    host.style.setProperty('--zfs-border', `${modelStyle.borderTopWidth} ${modelStyle.borderTopStyle} ${modelStyle.borderTopColor}`);
+    host.style.setProperty('--zfs-color', modelStyle.color);
+    host.style.setProperty('--zfs-shadow', modelStyle.boxShadow === 'none' ? '0 1px 3px rgba(0,0,0,.16)' : modelStyle.boxShadow);
+    placedInHeader = true;
+    return true;
   };
 
   const beginKeyboardStabilizer = () => {
@@ -204,13 +203,14 @@
 
   function updateState() {
     const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    host.style.display = (isChatRoom() && !active && !keyboardFocus) ? 'inline-flex' : 'none';
+    host.style.display = (isChatRoom() && placedInHeader && !active && !keyboardFocus) ? 'inline-flex' : 'none';
     button.setAttribute('aria-label', '전체화면 전환');
     button.setAttribute('title', '전체화면 전환');
   }
 
   function refreshPlacement() {
     if (!isChatRoom()) {
+      placedInHeader = false;
       keyboardFocus = false;
       document.documentElement.classList.remove('zfs-keyboard-active');
       keyboardStyle.textContent = '';
