@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.20
-// @description  스냅샷 버튼이 있으면 바로 위에, 없으면 원래 액션 버튼 자리에 전체화면 버튼을 표시합니다.
+// @version      0.1.21
+// @description  스냅샷 버튼이 있으면 바로 위에, 없으면 실제 액션 버튼 자리와 같은 채팅 영역 왼쪽 아래에 전체화면 버튼을 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -94,12 +94,18 @@
     return true;
   }
 
+  function getNativePanelSlot(composer) {
+    const slot = composer?.previousElementSibling;
+    if (!(slot instanceof HTMLElement)) return null;
+    return slot;
+  }
+
   function mountInEmptyPanelSlot(composer) {
-    const stage = composer?.parentElement;
-    if (!stage) return false;
+    const slot = getNativePanelSlot(composer);
+    if (!slot) return false;
 
     const existing = document.getElementById(BUTTON_ID);
-    if (existing && existing.parentElement === stage && existing.dataset.zetaFullscreenMount === 'empty-panel-slot') {
+    if (existing && existing.parentElement === slot && existing.dataset.zetaFullscreenMount === 'empty-panel-slot') {
       return true;
     }
     existing?.remove();
@@ -110,7 +116,7 @@
     button.style.top = 'auto';
     button.style.bottom = '12px';
     button.style.zIndex = '10';
-    stage.appendChild(button);
+    slot.appendChild(button);
     return true;
   }
 
@@ -135,7 +141,7 @@
 
     const composer = document.querySelector(COMPOSER_SELECTOR);
     if (composer && mountInEmptyPanelSlot(composer)) {
-      watchAnchorParent(composer.parentElement);
+      watchAnchorParent(getNativePanelSlot(composer));
       return true;
     }
 
@@ -154,7 +160,7 @@
     });
 
     // 문서 전체/하위 트리는 보지 않는다.
-    // 액션 패널이 실제로 생기거나 사라지는 현재 채팅 영역의 직계 자식만 감지한다.
+    // 실제 ActionPanelButton이 들어가는 채팅 영역의 직계 자식 변화만 감지한다.
     anchorObserver.observe(parent, { childList: true });
   }
 
