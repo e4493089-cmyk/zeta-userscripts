@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.8
-// @description  제타 채팅방에서만 전체화면 전환 버튼을 표시합니다. 모바일 경로와 키보드 호출을 안정적으로 처리합니다.
+// @version      0.1.9
+// @description  제타 채팅방에서만 전체화면 전환 버튼을 표시합니다. SPA 감시를 최소화해 모바일 진입 문제를 방지합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -14,7 +14,6 @@
   'use strict';
 
   const HOST_ID = 'zeta-fullscreen-toggle-host';
-  // locale 유무, trailing slash, 채팅방 하위 경로를 모두 허용하되 /rooms/<id>가 없는 화면에서는 숨긴다.
   const isChatRoom = () => /(?:^|\/)rooms\/[^/?#]+(?:\/|$)/.test(location.pathname);
   if (document.getElementById(HOST_ID)) return;
 
@@ -75,6 +74,27 @@
   const button = root.querySelector('button');
   const toast = root.querySelector('.toast');
   let toastTimer = 0;
+  let keyboardFocus = false;
+  let keyboardSettleTimer = 0;
+  let placementTimer = 0;
+
+  const keyboardStyle = document.createElement('style');
+  keyboardStyle.id = 'zeta-fullscreen-keyboard-stabilizer';
+  document.documentElement.appendChild(keyboardStyle);
+
+  const isEditableTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+    return !!target.closest('textarea, input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), [contenteditable=true]');
+  };
+
+  const pickPageBackground = () => {
+    const candidates = [document.querySelector('main#contents'), document.body, document.documentElement].filter(Boolean);
+    for (const el of candidates) {
+      const color = getComputedStyle(el).backgroundColor;
+      if (color && color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
+    }
+    return '#151516';
+  };
 
   const placeBesideModelButton = () => {
     if (!isChatRoom()) {
@@ -85,6 +105,7 @@
     const modelButton = document.querySelector('[data-testid="chat-header-model"], button[aria-label="Select AI model"]');
     const modelWrapper = modelButton?.parentElement;
     const actionRow = modelWrapper?.parentElement;
+
     if (actionRow) {
       if (host.parentElement !== actionRow || host.nextElementSibling !== modelWrapper) {
         actionRow.insertBefore(host, modelWrapper);
@@ -100,6 +121,7 @@
       host.style.setProperty('--zfs-shadow', modelStyle.boxShadow === 'none' ? '0 1px 3px rgba(0,0,0,.16)' : modelStyle.boxShadow);
       return;
     }
+
     if (host.parentElement !== document.documentElement) document.documentElement.appendChild(host);
     host.style.position = 'fixed';
     host.style.right = '12px';
@@ -107,46 +129,17 @@
     host.style.zIndex = '2147483647';
   };
 
-  let keyboardFocus = false;
-  let keyboardSettleTimer = 0;
-  const keyboardStyle = document.createElement('style');
-  keyboardStyle.id = 'zeta-fullscreen-keyboard-stabilizer';
-  document.documentElement.appendChild(keyboardStyle);
-
-  const isEditableTarget = (target) => {
-    if (!(target instanceof Element)) return false;
-    return !!target.closest('textarea, input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), [contenteditable=true]');
-  };
-
-  const pickPageBackground = () => {
-    const candidates = [
-      document.querySelector('main#contents'),
-      document.body,
-      document.documentElement
-    ].filter(Boolean);
-
-    for (const el of candidates) {
-      const color = getComputedStyle(el).backgroundColor;
-      if (color && color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
-    }
-    return '#151516';
-  };
-
   const beginKeyboardStabilizer = () => {
     if (!isChatRoom()) return;
     clearTimeout(keyboardSettleTimer);
     keyboardFocus = true;
-
     if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
 
     host.style.display = 'none';
-
     const bg = pickPageBackground();
     keyboardStyle.textContent = `
       html.zfs-keyboard-active,
-      html.zfs-keyboard-active body {
-        background: ${bg} !important;
-      }
+      html.zfs-keyboard-active body { background: ${bg} !important; }
       html.zfs-keyboard-active {
         scroll-behavior: auto !important;
         overscroll-behavior: none !important;
@@ -204,7 +197,6 @@
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-
     const active = document.fullscreenElement || document.webkitFullscreenElement;
     if (active) await exitFullscreen();
     else await enterFullscreen();
@@ -217,7 +209,7 @@
     button.setAttribute('title', '전체화면 전환');
   }
 
-  function syncRouteState() {
+  function refreshPlacement() {
     if (!isChatRoom()) {
       keyboardFocus = false;
       document.documentElement.classList.remove('zfs-keyboard-active');
@@ -245,22 +237,13 @@
 
   document.addEventListener('fullscreenchange', updateState);
   document.addEventListener('webkitfullscreenchange', updateState);
-  window.addEventListener('popstate', syncRouteState);
-  window.addEventListener('hashchange', syncRouteState);
+  window.addEventListener('popstate', refreshPlacement);
+  window.addEventListener('hashchange', refreshPlacement);
 
-  let placementTimer = 0;
   new MutationObserver(() => {
     clearTimeout(placementTimer);
-    placementTimer = setTimeout(syncRouteState, 80);
+    placementTimer = setTimeout(refreshPlacement, 120);
   }).observe(document.documentElement, { childList: true, subtree: true });
-  new MutationObserver(syncRouteState).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
-  let lastPath = location.pathname;
-  setInterval(() => {
-    if (location.pathname === lastPath) return;
-    lastPath = location.pathname;
-    syncRouteState();
-  }, 400);
-
-  syncRouteState();
+  refreshPlacement();
 })();
