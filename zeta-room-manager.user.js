@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.2.0
+// @version      0.2.1
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 별명/원래 이름으로 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -104,7 +104,7 @@
       #${PANEL_ID} .zrm-results {
         display: none;
         margin-top: 8px;
-        max-height: 220px;
+        max-height: min(62vh, 520px);
         overflow: auto;
         border: 1px solid rgba(255,255,255,.08);
         border-radius: 10px;
@@ -112,10 +112,13 @@
       }
       #${PANEL_ID} .zrm-results.zrm-open { display: block; }
       #${PANEL_ID} .zrm-result {
-        display: block;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
         width: 100%;
         box-sizing: border-box;
-        padding: 10px 12px;
+        padding: 13px 14px;
         border: 0;
         border-bottom: 1px solid rgba(255,255,255,.06);
         background: transparent;
@@ -127,6 +130,8 @@
       #${PANEL_ID} .zrm-result:hover { background: rgba(255,255,255,.05); }
       #${PANEL_ID} .zrm-result-title { font-size: 14px; font-weight: 600; }
       #${PANEL_ID} .zrm-result-sub { margin-top: 2px; color: rgba(255,255,255,.48); font-size: 11px; }
+      #${PANEL_ID} .zrm-result-go { flex: 0 0 auto; color: #9e91ff; font-size: 12px; font-weight: 700; }
+      body.zrm-searching [data-sentry-component="SwipeableRoomListItem"] { display: none !important; }
 
       /* 대화방 목록에는 별명 버튼을 상시 표시하지 않음.
          별명 편집은 제타의 길게 누르기 메뉴에 주입한다. */
@@ -476,6 +481,7 @@
           </div>
         </div>
         <div class="zrm-search-status" aria-live="polite"></div>
+        <div class="zrm-results"></div>
       `;
 
       const input = panel.querySelector('input');
@@ -535,7 +541,12 @@
         ? `원래 이름: ${entry.original}`
         : (entry.type === 'room' ? '대화방' : '플롯');
 
-      button.append(title, sub);
+      const text = document.createElement('div');
+      text.append(title, sub);
+      const go = document.createElement('span');
+      go.className = 'zrm-result-go';
+      go.textContent = '열기 ›';
+      button.append(text, go);
       button.addEventListener('click', () => { location.href = entry.href; });
       box.appendChild(button);
     }
@@ -549,17 +560,20 @@
 
     const q = normalizeText(query).toLocaleLowerCase('ko-KR');
     const records = renderedItems().filter(x => x.type === type);
+    document.body.classList.toggle('zrm-searching', Boolean(q) && type === 'room');
     let shown = 0;
 
     for (const record of records) {
       const entry = state.index[record.key] || record;
       const yes = !q || matchRecord(entry, q);
-      record.item.classList.toggle('zrm-filter-hidden', !yes);
+      record.item.classList.toggle('zrm-filter-hidden', Boolean(q));
       if (yes) shown++;
     }
 
+    renderQuickResults(type, q);
+    const indexedShown = q ? Object.values(state.index).filter(entry => entry?.type === type && entry.href && matchRecord(entry, q)).length : 0;
     const status = document.querySelector(`#${PANEL_ID} .zrm-search-status`);
-    if (status) status.textContent = q ? `${shown}개 ${type === 'room' ? '대화방' : '플롯'} 표시` : '';
+    if (status) status.textContent = q ? `${indexedShown}개 ${type === 'room' ? '대화방' : '플롯'} 검색됨` : '';
   }
 
   function refresh() {
