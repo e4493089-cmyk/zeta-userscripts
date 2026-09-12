@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.18
-// @description  채팅 하단 기본 액션 버튼 바로 위에 전체화면 버튼을 추가하고 같은 표시 흐름을 따릅니다.
+// @version      0.1.19
+// @description  스냅샷 액션 유무와 관계없이 채팅 하단 왼쪽 위에 전체화면 버튼을 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -15,10 +15,11 @@
 
   const BUTTON_ID = 'zeta-fullscreen-native-button';
   const PANEL_SELECTOR = '[data-sentry-component="ActionPanelButton"]';
+  const COMPOSER_SELECTOR = '[data-sentry-component="ChatComposer"]';
   const isChatRoom = () => /(?:^|\/)rooms\/[^/?#]+(?:\/|$)/.test(location.pathname);
 
   let retryTimer = 0;
-  let panelParentObserver = null;
+  let anchorObserver = null;
   let observedParent = null;
 
   const fullscreenIcon = `
@@ -43,27 +44,25 @@
     }
   }
 
-  function mountButton(panel) {
-    if (!panel || panel.querySelector(`#${BUTTON_ID}`)) return;
-
-    const nativeButton = panel.querySelector('button');
-    if (!nativeButton) return;
-
+  function createButton(className = '') {
     const button = document.createElement('button');
     button.id = BUTTON_ID;
     button.type = 'button';
-    button.className = nativeButton.className;
+    button.className = className || 'relative flex size-8 shrink-0 flex-row items-center justify-center rounded-full outline-hidden';
     button.setAttribute('aria-label', '전체화면 전환');
     button.setAttribute('title', '전체화면 전환');
     button.style.position = 'absolute';
-    button.style.left = '0';
-    button.style.top = 'auto';
-    button.style.bottom = 'calc(100% + 6px)';
     button.style.margin = '0';
+    button.style.width = '32px';
+    button.style.height = '32px';
+    button.style.minWidth = '32px';
+    button.style.minHeight = '32px';
+    button.style.borderRadius = '999px';
     button.style.background = '#EEF1F3';
     button.style.color = '#53636C';
     button.style.border = '1px solid #E0E6E9';
     button.style.boxShadow = '0 1px 3px rgba(45,61,71,.08)';
+    button.style.zIndex = '20';
     button.innerHTML = fullscreenIcon;
 
     button.addEventListener('click', (event) => {
@@ -72,48 +71,101 @@
       toggleFullscreen();
     }, true);
 
-    panel.appendChild(button);
+    return button;
   }
 
-  function watchPanelParent(panel) {
-    const parent = panel?.parentElement;
+  function mountOnPanel(panel) {
+    if (!panel) return false;
+
+    const existing = document.getElementById(BUTTON_ID);
+    if (existing && panel.contains(existing)) return true;
+    existing?.remove();
+
+    const nativeButton = panel.querySelector('button');
+    if (!nativeButton) return false;
+
+    const button = createButton(nativeButton.className);
+    button.dataset.zetaFullscreenMount = 'panel';
+    button.style.left = '0';
+    button.style.top = 'auto';
+    button.style.bottom = 'calc(100% + 6px)';
+    panel.appendChild(button);
+    return true;
+  }
+
+  function mountOnComposer(composer) {
+    if (!composer) return false;
+
+    const existing = document.getElementById(BUTTON_ID);
+    if (existing && composer.contains(existing)) return true;
+    existing?.remove();
+
+    if (getComputedStyle(composer).position === 'static') {
+      composer.style.position = 'relative';
+    }
+
+    const button = createButton();
+    button.dataset.zetaFullscreenMount = 'composer';
+    button.style.left = '8px';
+    button.style.top = 'auto';
+    button.style.bottom = 'calc(100% + 6px)';
+    composer.appendChild(button);
+    return true;
+  }
+
+  function mountBestAvailable() {
+    if (!isChatRoom()) return false;
+
+    const panel = document.querySelector(PANEL_SELECTOR);
+    if (panel && mountOnPanel(panel)) {
+      watchAnchorParent(panel.parentElement);
+      return true;
+    }
+
+    const composer = document.querySelector(COMPOSER_SELECTOR);
+    if (composer && mountOnComposer(composer)) {
+      watchAnchorParent(composer.parentElement);
+      return true;
+    }
+
+    return false;
+  }
+
+  function watchAnchorParent(parent) {
     if (!parent || parent === observedParent) return;
 
-    panelParentObserver?.disconnect();
+    anchorObserver?.disconnect();
     observedParent = parent;
 
-    panelParentObserver = new MutationObserver(() => {
+    anchorObserver = new MutationObserver(() => {
       if (!isChatRoom()) return;
-      const currentPanel = document.querySelector(PANEL_SELECTOR);
-      if (currentPanel) mountButton(currentPanel);
+      mountBestAvailable();
     });
 
     // 문서 전체/하위 트리는 보지 않는다.
-    // ActionPanelButton이 직계 자식으로 없어졌다 다시 생기는지만 감지한다.
-    panelParentObserver.observe(parent, { childList: true });
+    // 현재 액션/입력 영역의 직계 자식 교체만 감지한다.
+    anchorObserver.observe(parent, { childList: true });
   }
 
   function setupWhenReady(attempt = 0) {
     clearTimeout(retryTimer);
     if (!isChatRoom()) return;
 
-    const panel = document.querySelector(PANEL_SELECTOR);
-    if (panel) {
-      mountButton(panel);
-      watchPanelParent(panel);
-      return;
-    }
+    const mounted = mountBestAvailable();
 
-    if (attempt < 19) {
+    // 스냅샷 액션이 늦게 생기는 방은 잠깐 더 확인해서
+    // composer fallback에서 기본 액션 패널 쪽으로 옮긴다.
+    if (attempt < 19 && (!mounted || !document.querySelector(PANEL_SELECTOR))) {
       retryTimer = setTimeout(() => setupWhenReady(attempt + 1), 150);
     }
   }
 
   function syncRoute() {
     clearTimeout(retryTimer);
-    panelParentObserver?.disconnect();
-    panelParentObserver = null;
+    anchorObserver?.disconnect();
+    anchorObserver = null;
     observedParent = null;
+    document.getElementById(BUTTON_ID)?.remove();
 
     if (isChatRoom()) setupWhenReady();
   }
