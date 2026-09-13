@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.3
+// @version      3.50.4
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.3
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.3
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.4
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.4
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -7383,8 +7383,7 @@
     /* =========================================================
        v3.50.3 - 삭제 시작 안내 문구 제거
     ========================================================= */
-    html.${ACTIVE} [data-sentry-component="DeleteStartNotice"],
-    html.${ACTIVE} .kt-delete-notice {
+    html.${ACTIVE} [data-sentry-component="DeleteStartNotice"] {
       display: none !important;
     }
 
@@ -8367,12 +8366,6 @@
     if (!isDeleteMode) return;
 
     main.classList.add('kt-delete-mode-screen');
-
-    const notice = Array.from(main.querySelectorAll('div, p, span')).find(el => {
-      const txt = normalizeText(el.textContent);
-      return txt.includes('삭제 시작점을 선택해주세요') || txt.includes('선택해주세요');
-    });
-    notice?.parentElement?.classList.add('kt-delete-notice');
 
     Array.from(document.querySelectorAll('main#contents button')).forEach(btn => {
       const txt = normalizeText(btn.textContent);
