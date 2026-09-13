@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Unlimited Badge Restorer
 // @namespace    zeta-unlimited-badge
-// @version      0.2.0
+// @version      0.2.1
 // @description  제타 서버가 언리밋으로 판정한 플롯의 프로필에 언리밋 마크를 다시 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-unlimited-badge.user.js
@@ -16,9 +16,27 @@
 
   const BADGE_ID = 'zub-unlimited-badge';
   const STYLE_ID = 'zub-unlimited-style';
+  const DEBUG_ID = 'zub-unlimited-debug';
   const cache = new Map();
   let lastUrl = location.href;
   let scanTimer = 0;
+
+  function showDiagnostic(message, tone = 'normal') {
+    if (!currentPlotId() || !document.body) return;
+    let node = document.getElementById(DEBUG_ID);
+    if (!node) {
+      node = document.createElement('div');
+      node.id = DEBUG_ID;
+      Object.assign(node.style, {
+        position: 'fixed', right: '12px', bottom: '76px', zIndex: '2147483647',
+        padding: '9px 11px', borderRadius: '9px', color: '#fff', fontSize: '12px',
+        fontWeight: '700', boxShadow: '0 4px 18px rgba(0,0,0,.35)'
+      });
+      document.body.appendChild(node);
+    }
+    node.textContent = `언리밋 확인: ${message}`;
+    node.style.background = tone === 'good' ? '#6546d7' : tone === 'bad' ? '#8b3535' : '#3b3b40';
+  }
 
   function currentPlotId() {
     return location.pathname.match(/\/plots\/([0-9a-f-]+)(?:\/profile)?\/?$/i)?.[1] || null;
@@ -27,6 +45,9 @@
   function remember(plotId, allowed, source) {
     if (!plotId || typeof allowed !== 'boolean') return;
     cache.set(plotId, { allowed, source, at: Date.now() });
+    if (plotId === currentPlotId()) {
+      showDiagnostic(allowed ? 'TRUE' : 'FALSE', allowed ? 'good' : 'bad');
+    }
     if (plotId === currentPlotId()) scheduleRender();
   }
 
@@ -112,6 +133,7 @@
   function probeCurrentPlotWithGM() {
     const plotId = currentPlotId();
     if (!plotId || typeof GM_xmlhttpRequest !== 'function') return;
+    showDiagnostic('요청 중');
     GM_xmlhttpRequest({
       method: 'GET',
       url: `https://api.zeta-ai.io/v1/plots/${plotId}`,
@@ -129,8 +151,18 @@
           if ((plot?.id === plotId || plot?.plotId === plotId)
             && typeof plot?.unlimitedAllowed === 'boolean') {
             remember(plotId, plot.unlimitedAllowed, 'plot-api-gm-direct');
+          } else if (!cache.has(plotId)) {
+            showDiagnostic(`값 없음 (HTTP ${response.status})`, 'bad');
           }
-        } catch (_) {}
+        } catch (_) {
+          showDiagnostic(`응답 해석 실패 (HTTP ${response.status})`, 'bad');
+        }
+      },
+      onerror() {
+        showDiagnostic('API 오류', 'bad');
+      },
+      ontimeout() {
+        showDiagnostic('API 시간 초과', 'bad');
       }
     });
   }
