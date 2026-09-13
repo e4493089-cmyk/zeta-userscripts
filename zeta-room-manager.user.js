@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.3.2
+// @version      0.4.0
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 제타 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -56,6 +56,16 @@
       ? /\/rooms\/([^/?#]+)/i
       : /\/plots\/([^/?#]+)(?:\/|$)/i;
     return href.match(re)?.[1] || null;
+  }
+
+  function stableLocalId(value) {
+    let hash = 2166136261;
+    const text = String(value || '');
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `local-${(hash >>> 0).toString(36)}`;
   }
 
   function injectStyle() {
@@ -244,15 +254,12 @@
     if (item.closest?.(`#${NATIVE_RESULTS_ID}`)) return null;
     const link = type === 'room'
       ? item.querySelector('a[href*="/rooms/"]')
-      : item.querySelector('a[href*="/plots/"][href*="/profile"]');
-    if (!link) return null;
-
-    const id = extractId(link.href, type);
-    if (!id) return null;
+      : item.querySelector('a[href*="/plots/"]');
+    if (type === 'room' && !link) return null;
 
     const titleEl = type === 'room'
       ? titleElementForRoom(item, link)
-      : titleElementForPlot(item, link);
+      : titleElementForPlot(item, link || item);
     if (!titleEl) return null;
 
     if (!titleEl.dataset.zrmOriginalTitle) {
@@ -260,16 +267,22 @@
     }
 
     const original = titleEl.dataset.zrmOriginalTitle;
+    const image = (link || item).querySelector('img')?.src || '';
+    const id = extractId(link?.href, type)
+      || item.getAttribute('data-plot-id')
+      || stableLocalId(`${original}\n${image.split('?')[0]}`);
+    if (!id) return null;
+
     const key = keyOf(type, id);
     const alias = normalizeText(state.aliases[key]);
 
     state.index[key] = {
       type,
       id,
-      href: link.href,
+      href: link?.href || state.index[key]?.href || '',
       original,
       alias,
-      image: link.querySelector('img')?.src || state.index[key]?.image || ''
+      image: image || state.index[key]?.image || ''
     };
 
     return { key, type, id, item, link, titleEl, original, alias };
@@ -305,10 +318,10 @@
       ...indexed,
       type: record.type,
       id: record.id,
-      href: record.link.href,
+      href: record.link?.href || indexed.href || '',
       original: record.original,
       alias,
-      image: record.link.querySelector('img')?.src || indexed.image || ''
+      image: (record.link || record.item).querySelector('img')?.src || indexed.image || ''
     };
   }
 
@@ -333,9 +346,11 @@
       openRenameModal(record);
     }, true);
 
-    const row = record.link.parentElement;
+    const row = record.link?.parentElement
+      || record.item.querySelector(':scope > div.flex.flex-row.items-center')
+      || record.item.firstElementChild;
     const actions = row?.lastElementChild;
-    if (actions && actions !== record.link) actions.insertBefore(btn, actions.firstChild);
+    if (actions && actions !== record.link && actions !== row) actions.insertBefore(btn, actions.firstChild);
     else record.item.appendChild(btn);
   }
 
@@ -596,7 +611,7 @@
     for (const record of records) {
       const entry = state.index[record.key] || record;
       const yes = !q || matchRecord(entry, q);
-      record.item.classList.toggle('zrm-filter-hidden', Boolean(q));
+      record.item.classList.toggle('zrm-filter-hidden', Boolean(q) && !yes);
       if (yes) shown++;
     }
 
