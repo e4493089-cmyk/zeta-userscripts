@@ -24,3 +24,5 @@ jobs:
           git add zeta-kakaotalk-theme.user.js
           git commit -m "fix: hide delete start notice"
           git push
+
+# trigger
