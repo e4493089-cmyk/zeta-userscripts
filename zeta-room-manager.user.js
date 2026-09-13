@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.4.0
+// @version      0.4.1
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 제타 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -496,12 +496,12 @@
       return null;
     }
 
-    // 대화방은 제타 기본 검색창 하나만 사용한다.
-    if (type === 'room') {
-      document.getElementById(PANEL_ID)?.remove();
-      return null;
-    }
+    // 제타 화면에 없는 별도 검색창은 만들지 않는다.
+    document.getElementById(PANEL_ID)?.remove();
+    return null;
 
+    /* 이전 버전의 플롯 전용 검색 패널 코드. 실행되지 않으며
+       기존 설치 화면에서 남은 패널은 위에서 제거한다. */
     const host = panelHost(type);
     if (!host) return null;
 
