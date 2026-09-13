@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Unlimited Badge Restorer
 // @namespace    zeta-unlimited-badge
-// @version      0.2.1
+// @version      0.3.0
 // @description  제타 서버가 언리밋으로 판정한 플롯의 프로필에 언리밋 마크를 다시 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-unlimited-badge.user.js
@@ -167,6 +167,53 @@
     });
   }
 
+  function probeAlternativePathsWithGM() {
+    const plotId = currentPlotId();
+    if (!plotId || typeof GM_xmlhttpRequest !== 'function') return;
+    const urls = [
+      `https://api.zeta-ai.io/v1/plots/${plotId}/viewer`,
+      `https://api.zeta-ai.io/v1/plots?plotId=${plotId}&limit=1`
+    ];
+    let completed = 0;
+    let lastStatus = 0;
+
+    for (const url of urls) {
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url,
+        headers: {
+          Accept: 'application/json',
+          'Accept-Language': 'ko-KR,ko;q=0.9'
+        },
+        anonymous: false,
+        timeout: 15000,
+        onload(response) {
+          completed++;
+          lastStatus = response.status;
+          try {
+            const data = JSON.parse(response.responseText || '{}');
+            inspectPayload(data, `plot-api-alternative-${url}`);
+            if (!cache.has(plotId)
+              && /"unlimitedAllowed"\s*:\s*true/i.test(response.responseText || '')) {
+              remember(plotId, true, 'plot-api-alternative-text');
+            }
+          } catch (_) {}
+          if (completed === urls.length && !cache.has(plotId)) {
+            showDiagnostic(`3개 응답 모두 값 없음 (HTTP ${lastStatus})`, 'bad');
+          }
+        },
+        onerror() {
+          completed++;
+          if (completed === urls.length && !cache.has(plotId)) showDiagnostic('대체 API 오류', 'bad');
+        },
+        ontimeout() {
+          completed++;
+          if (completed === urls.length && !cache.has(plotId)) showDiagnostic('대체 API 시간 초과', 'bad');
+        }
+      });
+    }
+  }
+
   const originalFetch = window.fetch;
   if (typeof originalFetch === 'function') {
     window.fetch = async function (...args) {
@@ -267,6 +314,7 @@
     scheduleRender();
     probeCurrentPlot();
     probeCurrentPlotWithGM();
+    probeAlternativePathsWithGM();
     new MutationObserver(scheduleRender).observe(document.documentElement, {
       childList: true,
       subtree: true
@@ -278,6 +326,7 @@
         scheduleRender();
         probeCurrentPlot();
         probeCurrentPlotWithGM();
+        probeAlternativePathsWithGM();
       }
     }, 500);
   }
