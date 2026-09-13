@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.5.0
+// @version      0.5.1
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 제타 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -87,75 +87,6 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${PANEL_ID} {
-        position: sticky;
-        top: 0;
-        z-index: 30;
-        padding: 10px 12px;
-        background: rgba(21,21,22,.96);
-        backdrop-filter: blur(10px);
-        border-bottom: 1px solid rgba(255,255,255,.07);
-        box-sizing: border-box;
-      }
-      #${PANEL_ID} .zrm-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      #${PANEL_ID} .zrm-search-wrap {
-        position: relative;
-        flex: 1;
-        min-width: 0;
-      }
-      #${PANEL_ID} input {
-        width: 100%;
-        height: 38px;
-        box-sizing: border-box;
-        border: 1px solid rgba(255,255,255,.10);
-        border-radius: 10px;
-        background: #252528;
-        color: #fff;
-        outline: none;
-        padding: 0 12px;
-        font: inherit;
-      }
-      #${PANEL_ID} input:focus {
-        border-color: #7c67ff;
-        background: #2a2a2e;
-      }
-      #${PANEL_ID} input::placeholder { color: rgba(255,255,255,.45); }
-      #${PANEL_ID} .zrm-search-status { min-height: 0; padding-top: 0; color: rgba(255,255,255,.48); font-size: 11px; }
-      #${PANEL_ID} .zrm-search-status:not(:empty) { padding-top: 7px; }
-      #${PANEL_ID} .zrm-results {
-        display: none;
-        margin-top: 8px;
-        max-height: min(62vh, 520px);
-        overflow: auto;
-        border: 1px solid rgba(255,255,255,.08);
-        border-radius: 10px;
-        background: #202023;
-      }
-      #${PANEL_ID} .zrm-results.zrm-open { display: block; }
-      #${PANEL_ID} .zrm-result {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        width: 100%;
-        box-sizing: border-box;
-        padding: 13px 14px;
-        border: 0;
-        border-bottom: 1px solid rgba(255,255,255,.06);
-        background: transparent;
-        color: #fff;
-        text-align: left;
-        cursor: pointer;
-      }
-      #${PANEL_ID} .zrm-result:last-child { border-bottom: 0; }
-      #${PANEL_ID} .zrm-result:hover { background: rgba(255,255,255,.05); }
-      #${PANEL_ID} .zrm-result-title { font-size: 14px; font-weight: 600; }
-      #${PANEL_ID} .zrm-result-sub { margin-top: 2px; color: rgba(255,255,255,.48); font-size: 11px; }
-      #${PANEL_ID} .zrm-result-go { flex: 0 0 auto; color: #9e91ff; font-size: 12px; font-weight: 700; }
       #${NATIVE_RESULTS_ID} {
         flex: 0 0 auto;
       }
@@ -202,7 +133,6 @@
         white-space: nowrap;
       }
       .zrm-plot-rename:hover { background: rgba(255,255,255,.12); color: #fff; }
-      .zrm-filter-hidden { display: none !important; }
 
       #${MODAL_ID} {
         position: fixed;
@@ -506,147 +436,9 @@
     return null;
   }
 
-  function panelHost(type) {
-    if (type === 'room') {
-      return document.querySelector('[data-sentry-component="RoomList"]')
-        || document.querySelector('a[href*="/rooms/"]')?.closest('main, [role="main"]')
-        || null;
-    }
-
-    const header = document.querySelector('[data-sentry-component="CreatorCenterMyPlotListHeader"]');
-    return header?.parentElement || null;
-  }
-
-  function ensurePanel() {
-    const type = currentSection();
-    if (!type) {
-      document.getElementById(PANEL_ID)?.remove();
-      return null;
-    }
-
-    // 제타 화면에 없는 별도 검색창은 만들지 않는다.
+  function removeLegacyPanel() {
+    // 이전 버전에서 삽입했던 별도 검색 패널이 남아 있으면 제거한다.
     document.getElementById(PANEL_ID)?.remove();
-    return null;
-
-    /* 이전 버전의 플롯 전용 검색 패널 코드. 실행되지 않으며
-       기존 설치 화면에서 남은 패널은 위에서 제거한다. */
-    const host = panelHost(type);
-    if (!host) return null;
-
-    let panel = document.getElementById(PANEL_ID);
-    if (panel && panel.dataset.zrmType !== type) {
-      panel.remove();
-      panel = null;
-    }
-
-    if (!panel) {
-      panel = document.createElement('div');
-      panel.id = PANEL_ID;
-      panel.dataset.zrmType = type;
-      panel.innerHTML = `
-        <div class="zrm-row">
-          <div class="zrm-search-wrap">
-            <input type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="${type === 'room' ? '대화방' : '플롯'} 이름 또는 별명 검색">
-          </div>
-        </div>
-        <div class="zrm-search-status" aria-live="polite"></div>
-        <div class="zrm-results"></div>
-      `;
-
-      const input = panel.querySelector('input');
-      input.addEventListener('input', () => {
-        applySearch(input.value);
-      });
-      input.addEventListener('search', () => {
-        applySearch(input.value);
-      });
-
-      if (type === 'room') host.prepend(panel);
-      else host.insertBefore(panel, host.firstChild);
-    }
-
-    return panel;
-  }
-
-  function matchRecord(entry, q) {
-    const hay = `${entry.alias || ''}\n${entry.original || ''}`.toLocaleLowerCase('ko-KR');
-    return hay.includes(q);
-  }
-
-  function renderQuickResults(type, query) {
-    const panel = document.getElementById(PANEL_ID);
-    const box = panel?.querySelector('.zrm-results');
-    if (!box) return;
-
-    const q = normalizeText(query).toLocaleLowerCase('ko-KR');
-    box.textContent = '';
-
-    if (!q) {
-      box.classList.remove('zrm-open');
-      return;
-    }
-
-    const results = Object.values(state.index)
-      .filter(entry => entry?.type === type && entry.href && matchRecord(entry, q))
-      .slice(0, 20);
-
-    if (!results.length) {
-      box.classList.remove('zrm-open');
-      return;
-    }
-
-    for (const entry of results) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'zrm-result';
-
-      const title = document.createElement('div');
-      title.className = 'zrm-result-title';
-      title.textContent = entry.alias || entry.original || '(이름 없음)';
-
-      const sub = document.createElement('div');
-      sub.className = 'zrm-result-sub';
-      sub.textContent = entry.alias && entry.original !== entry.alias
-        ? `원래 이름: ${entry.original}`
-        : (entry.type === 'room' ? '대화방' : '플롯');
-
-      const text = document.createElement('div');
-      text.append(title, sub);
-      const go = document.createElement('span');
-      go.className = 'zrm-result-go';
-      go.textContent = '열기 ›';
-      button.append(text, go);
-      button.addEventListener('click', () => { location.href = entry.href; });
-      box.appendChild(button);
-    }
-
-    box.classList.add('zrm-open');
-  }
-
-  function applySearch(query) {
-    const type = currentSection();
-    if (!type) return;
-
-    if (type === 'room') {
-      renderNativeAliasResults(query);
-      return;
-    }
-
-    const q = normalizeText(query).toLocaleLowerCase('ko-KR');
-    const records = renderedItems().filter(x => x.type === type);
-    let shown = 0;
-
-    for (const record of records) {
-      const entry = state.index[record.key] || record;
-      const yes = !q || matchRecord(entry, q);
-      record.item.classList.toggle('zrm-filter-hidden', Boolean(q) && !yes);
-      if (yes) shown++;
-    }
-
-    renderQuickResults(type, q);
-    const indexedShown = q ? Object.values(state.index).filter(entry => entry?.type === type && entry.href && matchRecord(entry, q)).length : 0;
-    const status = document.querySelector(`#${PANEL_ID} .zrm-search-status`);
-    if (status) status.textContent = q ? `${indexedShown}개 ${type === 'room' ? '대화방' : '플롯'} 검색됨` : '';
   }
 
   function nativeRoomSearchInput() {
@@ -877,8 +669,16 @@
 
   function refresh() {
     observer?.disconnect();
+    const section = currentSection();
+    removeLegacyPanel();
+
+    if (!section) {
+      document.getElementById(NATIVE_RESULTS_ID)?.remove();
+      document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
+      return;
+    }
+
     injectStyle();
-    const panel = ensurePanel();
     const records = renderedItems();
 
     for (const record of records) {
@@ -889,15 +689,12 @@
     injectRoomContextMenu();
     saveState();
 
-    if (currentSection() === 'room') {
+    if (section === 'room') {
       bindNativeRoomSearch();
       renderNativeAliasResults(nativeRoomQuery());
-    } else if (currentSection() === 'plot-search') {
+    } else if (section === 'plot-search') {
       bindNativePlotSearch();
       renderNativePlotAliasResults(nativePlotSearchInput()?.value || '');
-    } else {
-      const input = panel?.querySelector('input');
-      applySearch(input?.value || '');
     }
     observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
@@ -918,13 +715,8 @@
     document.addEventListener('contextmenu', rememberRoomContextTarget, true);
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
 
-    refresh();
-
     observer = new MutationObserver(scheduleRefresh);
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true
-    });
+    refresh();
 
     let lastUrl = location.href;
     setInterval(() => {
