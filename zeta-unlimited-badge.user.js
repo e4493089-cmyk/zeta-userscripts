@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Unlimited Badge Restorer
 // @namespace    zeta-unlimited-badge
-// @version      0.1.0
+// @version      0.1.1
 // @description  제타 서버가 언리밋으로 판정한 플롯의 프로필에 언리밋 마크를 다시 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-unlimited-badge.user.js
@@ -90,6 +90,21 @@
         inspectPayload(data, url);
         if (/infinite-plots|unlimited/i.test(url)) inspectInfinitePayload(data, url);
       }).catch(() => {});
+    } catch (_) {}
+  }
+
+  async function probeCurrentPlot() {
+    const plotId = currentPlotId();
+    if (!plotId) return;
+    try {
+      const response = await window.fetch(`https://api.zeta-ai.io/v1/plots/${plotId}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) return;
+      const data = await response.clone().json();
+      inspectPayload(data, 'plot-api');
     } catch (_) {}
   }
 
@@ -191,6 +206,7 @@
 
   function start() {
     scheduleRender();
+    probeCurrentPlot();
     new MutationObserver(scheduleRender).observe(document.documentElement, {
       childList: true,
       subtree: true
@@ -200,6 +216,7 @@
         lastUrl = location.href;
         document.getElementById(BADGE_ID)?.remove();
         scheduleRender();
+        probeCurrentPlot();
       }
     }, 500);
   }
