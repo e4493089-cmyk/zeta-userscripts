@@ -24,18 +24,21 @@ jobs:
               if not s.endswith('\n'):
                   p.write_text(s + '\n', encoding='utf-8')
 
-          Path('README.txt').write_text('''Zeta Userscripts - GitHub automatic update package
-
-Current public userscripts in this repository:
-1. zeta-kakaotalk-theme.user.js
-2. zeta-capture-user-mask.user.js
-3. zeta-capture-ooc-hide.user.js
-4. zeta-room-manager.user.js
-5. zeta-fullscreen.user.js
-
-Keep these filenames unchanged. Each userscript contains its own Tampermonkey update/download URL.
-Increase @version only when releasing an actual script update.
-''', encoding='utf-8')
+          readme = '\n'.join([
+              'Zeta Userscripts - GitHub automatic update package',
+              '',
+              'Current public userscripts in this repository:',
+              '1. zeta-kakaotalk-theme.user.js',
+              '2. zeta-capture-user-mask.user.js',
+              '3. zeta-capture-ooc-hide.user.js',
+              '4. zeta-room-manager.user.js',
+              '5. zeta-fullscreen.user.js',
+              '',
+              'Keep these filenames unchanged. Each userscript contains its own Tampermonkey update/download URL.',
+              'Increase @version only when releasing an actual script update.',
+              ''
+          ])
+          Path('README.txt').write_text(readme, encoding='utf-8')
           PY
       - name: Verify syntax and whitespace
         run: |
