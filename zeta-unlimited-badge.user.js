@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         Zeta Unlimited Badge Restorer
 // @namespace    zeta-unlimited-badge
-// @version      0.1.1
+// @version      0.2.0
 // @description  제타 서버가 언리밋으로 판정한 플롯의 프로필에 언리밋 마크를 다시 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-unlimited-badge.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-unlimited-badge.user.js
 // @run-at       document-start
-// @grant        none
+// @connect      api.zeta-ai.io
+// @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
 (() => {
@@ -106,6 +107,32 @@
       const data = await response.clone().json();
       inspectPayload(data, 'plot-api');
     } catch (_) {}
+  }
+
+  function probeCurrentPlotWithGM() {
+    const plotId = currentPlotId();
+    if (!plotId || typeof GM_xmlhttpRequest !== 'function') return;
+    GM_xmlhttpRequest({
+      method: 'GET',
+      url: `https://api.zeta-ai.io/v1/plots/${plotId}`,
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': 'ko-KR,ko;q=0.9'
+      },
+      anonymous: false,
+      timeout: 15000,
+      onload(response) {
+        try {
+          const data = JSON.parse(response.responseText || '{}');
+          inspectPayload(data, 'plot-api-gm');
+          const plot = data?.plot || data?.data || data;
+          if ((plot?.id === plotId || plot?.plotId === plotId)
+            && typeof plot?.unlimitedAllowed === 'boolean') {
+            remember(plotId, plot.unlimitedAllowed, 'plot-api-gm-direct');
+          }
+        } catch (_) {}
+      }
+    });
   }
 
   const originalFetch = window.fetch;
@@ -207,6 +234,7 @@
   function start() {
     scheduleRender();
     probeCurrentPlot();
+    probeCurrentPlotWithGM();
     new MutationObserver(scheduleRender).observe(document.documentElement, {
       childList: true,
       subtree: true
@@ -217,6 +245,7 @@
         document.getElementById(BADGE_ID)?.remove();
         scheduleRender();
         probeCurrentPlot();
+        probeCurrentPlotWithGM();
       }
     }, 500);
   }
