@@ -1,0 +1,26 @@
+name: Patch hide delete notice
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-hide-delete-notice.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hide delete start notice
+        run: |
+          echo 'CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aApwPVBhdGgoInpldGEta2FrYW90YWxrLXRoZW1lLnVzZXIuanMiKQpzPXAucmVhZF90ZXh0KGVuY29kaW5nPSJ1dGYtOCIpCnM9cy5yZXBsYWNlKCIvLyBAdmVyc2lvbiAgICAgIDMuNTAuMiIsIi8vIEB2ZXJzaW9uICAgICAgMy41MC4zIiwxKQpzPXMucmVwbGFjZSgiemV0YS1rYWthb3RhbGstdGhlbWUudXNlci5qcz92PTMuNTAuMiIsInpldGEta2FrYW90YWxrLXRoZW1lLnVzZXIuanM/dj0zLjUwLjMiKQptYXJrZXI9IiIiICAgIC8qID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQogICAgICAgdjMuNDguMiAtIOuniOyngOuniSDrqZTsi5zsp4Ag7Luo7Yq466GkIDTrsoTtirwgKyDrqZTsi5zsp4Ag7JWh7IWYIOuwlO2FgOyLnO2KuAoiIiIKYmxvY2s9IiIiICAgIC8qID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQogICAgICAgdjMuNTAuMyAtIOyCreygnCDsi5zsnpEg7JWI64K0IOusuOq1rCDsoJzqsbAKICAgID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PSAqLwogICAgaHRtbC4ke0FDVElWRX0gW2RhdGEtc2VudHJ5LWNvbXBvbmVudD0iRGVsZXRlU3RhcnROb3RpY2UiXSwKICAgIGh0bWwuJHtBQ1RJVkV9IC5rdC1kZWxldGUtbm90aWNlIHsKICAgICAgZGlzcGxheTogbm9uZSAhaW1wb3J0YW50OwogICAgfQoKIiIiCmlmIGJsb2NrIG5vdCBpbiBzOgogICAgaWYgbWFya2VyIG5vdCBpbiBzOgogICAgICAgIHJhaXNlIFN5c3RlbUV4aXQoIm1hcmtlciBub3QgZm91bmQiKQogICAgcz1zLnJlcGxhY2UobWFya2VyLGJsb2NrK21hcmtlciwxKQpwLndyaXRlX3RleHQocyxlbmNvZGluZz0idXRmLTgiKQo=' | base64 -d > /tmp/patch.py
+          python /tmp/patch.py
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add zeta-kakaotalk-theme.user.js
+          git commit -m "fix: hide delete start notice"
+          git push
