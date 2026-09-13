@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager
 // @namespace    zeta-room-manager
-// @version      0.4.1
+// @version      0.5.0
 // @description  제타 대화방/플롯에 로컬 별명을 붙이고 제타 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -18,6 +18,7 @@
   const PANEL_ID = 'zeta-room-manager-panel';
   const MODAL_ID = 'zeta-room-manager-modal';
   const NATIVE_RESULTS_ID = 'zeta-room-manager-native-results';
+  const PLOT_NATIVE_RESULTS_ID = 'zeta-room-manager-plot-native-results';
 
   const state = loadState();
   let observer = null;
@@ -66,6 +67,19 @@
       hash = Math.imul(hash, 16777619);
     }
     return `local-${(hash >>> 0).toString(36)}`;
+  }
+
+  function reactPlotId(item) {
+    const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber$'));
+    let fiber = fiberKey ? item[fiberKey] : null;
+    const uuid = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i;
+    for (let depth = 0; fiber && depth < 18; depth++, fiber = fiber.return) {
+      const props = fiber.memoizedProps || fiber.pendingProps;
+      for (const candidate of [props?.plotId, props?.plot_id, props?.id, props?.plot?.id, props?.plot?.plotId]) {
+        if (typeof candidate === 'string' && uuid.test(candidate)) return candidate;
+      }
+    }
+    return null;
   }
 
   function injectStyle() {
@@ -157,6 +171,17 @@
         width: 42px;
         height: 56px;
         border-radius: 7px;
+        background: #2a2a2e;
+      }
+      #${PLOT_NATIVE_RESULTS_ID} { flex: 0 0 auto; padding: 0 16px; }
+      #${PLOT_NATIVE_RESULTS_ID}:empty { display: none; }
+      #${PLOT_NATIVE_RESULTS_ID} .zrm-plot-avatar,
+      #${PLOT_NATIVE_RESULTS_ID} .zrm-plot-avatar-placeholder {
+        width: 39px;
+        height: 52px;
+        flex: 0 0 auto;
+        border-radius: 6px;
+        object-fit: cover;
         background: #2a2a2e;
       }
 
@@ -251,7 +276,7 @@
   }
 
   function parseItem(item, type) {
-    if (item.closest?.(`#${NATIVE_RESULTS_ID}`)) return null;
+    if (item.closest?.(`#${NATIVE_RESULTS_ID}, #${PLOT_NATIVE_RESULTS_ID}`)) return null;
     const link = type === 'room'
       ? item.querySelector('a[href*="/rooms/"]')
       : item.querySelector('a[href*="/plots/"]');
@@ -270,6 +295,7 @@
     const image = (link || item).querySelector('img')?.src || '';
     const id = extractId(link?.href, type)
       || item.getAttribute('data-plot-id')
+      || (type === 'plot' ? reactPlotId(item) : null)
       || stableLocalId(`${original}\n${image.split('?')[0]}`);
     if (!id) return null;
 
@@ -279,7 +305,8 @@
     state.index[key] = {
       type,
       id,
-      href: link?.href || state.index[key]?.href || '',
+      href: link?.href || state.index[key]?.href
+        || (type === 'plot' && !id.startsWith('local-') ? `/ko/plots/${id}/edit` : ''),
       original,
       alias,
       image: image || state.index[key]?.image || ''
@@ -474,6 +501,7 @@
 
   function currentSection() {
     if (/^\/(?:[^/]+\/)?rooms\/?$/i.test(location.pathname)) return 'room';
+    if (/^\/(?:[^/]+\/)?creator-center\/search\/?$/i.test(location.pathname)) return 'plot-search';
     if (/^\/(?:[^/]+\/)?creator-center(?:\/|$)/i.test(location.pathname)) return 'plot';
     return null;
   }
@@ -753,6 +781,100 @@
     input.addEventListener('change', update);
   }
 
+  function nativePlotSearchInput() {
+    if (currentSection() !== 'plot-search') return null;
+    return document.querySelector('input[type="search"], input[placeholder*="검색"], input');
+  }
+
+  function nativePlotResultsHost() {
+    const main = document.querySelector('main#contents, main, [role="main"]');
+    return main?.querySelector('[data-sentry-element="FlatList"], .overflow-y-auto') || main;
+  }
+
+  function renderNativePlotAliasResults(query) {
+    const q = normalizeText(query).toLocaleLowerCase('ko-KR');
+    let box = document.getElementById(PLOT_NATIVE_RESULTS_ID);
+    if (!q || currentSection() !== 'plot-search') {
+      box?.remove();
+      return;
+    }
+
+    const nativeIds = new Set(
+      Array.from(document.querySelectorAll('a[href*="/plots/"]'))
+        .filter(link => !link.closest(`#${PLOT_NATIVE_RESULTS_ID}`))
+        .map(link => extractId(link.href, 'plot'))
+        .filter(Boolean)
+    );
+    const matches = Object.values(state.index)
+      .filter(entry => entry?.type === 'plot' && entry.href && normalizeText(entry.alias))
+      .filter(entry => normalizeText(entry.alias).toLocaleLowerCase('ko-KR').includes(q))
+      .filter(entry => !nativeIds.has(entry.id))
+      .slice(0, 20);
+
+    if (!matches.length) {
+      box?.remove();
+      return;
+    }
+    const host = nativePlotResultsHost();
+    if (!host) return;
+    if (!box) {
+      box = document.createElement('div');
+      box.id = PLOT_NATIVE_RESULTS_ID;
+    }
+    box.textContent = '';
+
+    for (const entry of matches) {
+      const row = document.createElement('div');
+      row.className = 'flex flex-col gap-2 border-b border-b-white/[3%] py-3';
+      const line = document.createElement('div');
+      line.className = 'flex flex-row items-center';
+      const link = document.createElement('a');
+      link.className = 'flex flex-1 flex-row items-center gap-3 pr-2';
+      link.href = entry.href;
+
+      if (entry.image) {
+        const image = document.createElement('img');
+        image.className = 'zrm-plot-avatar';
+        image.src = entry.image;
+        image.alt = '';
+        image.width = 39;
+        image.height = 52;
+        link.appendChild(image);
+      } else {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'zrm-plot-avatar-placeholder';
+        link.appendChild(placeholder);
+      }
+
+      const text = document.createElement('div');
+      text.className = 'flex shrink flex-col';
+      const title = document.createElement('div');
+      title.className = 'line-clamp-1 shrink body1 font-medium text-ellipsis';
+      title.textContent = entry.alias;
+      const original = document.createElement('div');
+      original.className = 'caption1 text-white/50';
+      original.textContent = entry.original && entry.original !== entry.alias
+        ? entry.original
+        : '별명으로 찾은 플롯';
+      text.append(title, original);
+      link.appendChild(text);
+      line.appendChild(link);
+      row.appendChild(line);
+      box.appendChild(row);
+    }
+    if (box.parentElement !== host) host.prepend(box);
+  }
+
+  function bindNativePlotSearch() {
+    const input = nativePlotSearchInput();
+    if (!input || input.dataset.zrmAliasSearchBound === '1') return;
+    input.dataset.zrmAliasSearchBound = '1';
+    const update = () => scheduleRefresh();
+    input.addEventListener('input', update);
+    input.addEventListener('search', update);
+    input.addEventListener('change', update);
+  }
+
   function refresh() {
     observer?.disconnect();
     injectStyle();
@@ -770,6 +892,9 @@
     if (currentSection() === 'room') {
       bindNativeRoomSearch();
       renderNativeAliasResults(nativeRoomQuery());
+    } else if (currentSection() === 'plot-search') {
+      bindNativePlotSearch();
+      renderNativePlotAliasResults(nativePlotSearchInput()?.value || '');
     } else {
       const input = panel?.querySelector('input');
       applySearch(input?.value || '');
