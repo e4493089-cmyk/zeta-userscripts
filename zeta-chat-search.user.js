@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.0
-// @description  현재 열어둔 Zeta 채팅방에서 불러온 메시지 내용을 검색하고 이전/다음 결과로 이동합니다.
+// @version      0.2.0
+// @description  현재 열어둔 Zeta 채팅방의 이전 메시지를 끝까지 불러와 내용을 검색하고 이전/다음 결과로 이동합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -22,6 +22,9 @@
   let current = -1;
   let refreshTimer = 0;
   let lastUrl = location.href;
+  let loading = false;
+  let loadToken = 0;
+  let historyReadyFor = '';
 
   function chatRoot() {
     return document.querySelector(
@@ -43,6 +46,47 @@
     return [...root.querySelectorAll(selector)].filter((node, index, list) =>
       !list.some((other, otherIndex) => otherIndex !== index && other.contains(node))
     );
+  }
+
+  function scrollContainer() {
+    const root = chatRoot();
+    if (!root) return null;
+    let node = root;
+    while (node && node !== document.body) {
+      const style = getComputedStyle(node);
+      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 24) return node;
+      node = node.parentElement;
+    }
+    return root;
+  }
+
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function loadAllHistory(token) {
+    let stable = 0;
+    let previousCount = -1;
+    let previousHeight = -1;
+
+    for (let attempt = 0; attempt < 80 && token === loadToken; attempt += 1) {
+      const scroller = scrollContainer();
+      if (!scroller) break;
+      const beforeCount = messageNodes().length;
+      const beforeHeight = scroller.scrollHeight;
+      scroller.scrollTop = 0;
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+      await wait(400);
+
+      const nextScroller = scrollContainer();
+      const nextCount = messageNodes().length;
+      const nextHeight = nextScroller?.scrollHeight || 0;
+      const unchanged = nextCount === beforeCount && nextHeight === beforeHeight &&
+        nextCount === previousCount && nextHeight === previousHeight;
+      stable = unchanged ? stable + 1 : 0;
+      previousCount = nextCount;
+      previousHeight = nextHeight;
+      updateMeta(`이전 메시지 불러오는 중… ${nextCount}개 확인`);
+      if (stable >= 3) break;
+    }
   }
 
   function normalized(value) {
@@ -107,29 +151,56 @@
     updateMeta();
   }
 
-  function search() {
+  function scanMessages(query, jumpToFirst = true) {
+    clearMarks();
+    hits = messageNodes().filter(node =>
+      normalized(node.innerText || node.textContent).includes(query)
+    );
+    current = -1;
+    hits.forEach(node => node.classList.add(HIT_CLASS));
+    if (hits.length && jumpToFirst) goTo(0);
+    else updateMeta();
+  }
+
+  async function search() {
     const host = ui();
     const input = host?.querySelector('input');
     if (!input) return;
-
-    clearMarks();
-    hits = [];
-    current = -1;
     const query = normalized(input.value);
+
     if (!query) {
+      loadToken += 1;
+      loading = false;
+      clearMarks();
+      hits = [];
+      current = -1;
       updateMeta('검색어를 입력하세요');
       return;
     }
 
-    hits = messageNodes().filter(node => normalized(node.innerText || node.textContent).includes(query));
-    hits.forEach(node => node.classList.add(HIT_CLASS));
-    if (hits.length) goTo(0);
-    else updateMeta();
+    scanMessages(query);
+    const roomKey = location.href;
+    if (historyReadyFor === roomKey || loading) return;
+
+    const token = ++loadToken;
+    loading = true;
+    updateMeta(`이전 메시지 불러오는 중… ${messageNodes().length}개 확인`);
+    await loadAllHistory(token);
+    if (token !== loadToken) return;
+
+    loading = false;
+    historyReadyFor = roomKey;
+    const latestQuery = normalized(input.value);
+    if (!latestQuery) {
+      updateMeta('검색어를 입력하세요');
+      return;
+    }
+    scanMessages(latestQuery);
   }
 
   function scheduleSearch() {
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(search, 120);
+    refreshTimer = setTimeout(search, 180);
   }
 
   function setPanel(open) {
@@ -143,6 +214,8 @@
       if (input.value) search();
       else updateMeta('현재 불러온 메시지를 검색합니다');
     } else {
+      loadToken += 1;
+      loading = false;
       clearMarks();
       hits = [];
       current = -1;
@@ -174,7 +247,13 @@
       host.querySelector('.zcs-close').addEventListener('click', () => setPanel(false));
       host.querySelector('.zcs-prev').addEventListener('click', () => goTo(current - 1));
       host.querySelector('.zcs-next').addEventListener('click', () => goTo(current + 1));
-      input.addEventListener('input', scheduleSearch);
+      input.addEventListener('input', () => {
+        if (loading) {
+          loadToken += 1;
+          loading = false;
+        }
+        scheduleSearch();
+      });
       input.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
           event.preventDefault();
@@ -195,6 +274,9 @@
   function refresh() {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
+      loadToken += 1;
+      loading = false;
+      historyReadyFor = '';
       const host = ui();
       if (host) {
         host.querySelector('input').value = '';
