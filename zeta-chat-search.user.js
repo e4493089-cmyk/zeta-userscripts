@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.0
+// @version      0.2.1
 // @description  현재 열어둔 Zeta 채팅방의 이전 메시지를 끝까지 불러와 내용을 검색하고 이전/다음 결과로 이동합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -51,46 +51,74 @@
   function scrollContainer() {
     const root = chatRoot();
     if (!root) return null;
-    let node = root;
-    while (node && node !== document.body) {
-      const style = getComputedStyle(node);
-      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 24) return node;
-      node = node.parentElement;
+
+    const candidates = [root, ...root.querySelectorAll('*')];
+    let parent = root.parentElement;
+    while (parent && parent !== document.body) {
+      candidates.push(parent);
+      parent = parent.parentElement;
     }
-    return root;
+    candidates.push(document.scrollingElement);
+
+    return candidates
+      .filter(Boolean)
+      .map(node => ({ node, range: Math.max(0, node.scrollHeight - node.clientHeight) }))
+      .filter(item => item.range > 24)
+      .sort((a, b) => b.range - a.range)[0]?.node || root;
   }
 
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-  async function loadAllHistory(token) {
-    let stable = 0;
-    let previousCount = -1;
-    let previousHeight = -1;
+  function pushOlderEdge(scroller, mode) {
+    const nodes = messageNodes();
+    const visualTop = nodes
+      .map(node => ({ node, top: node.getBoundingClientRect().top }))
+      .sort((a, b) => a.top - b.top)[0]?.node;
+    visualTop?.scrollIntoView({ block: 'start', behavior: 'auto' });
 
-    for (let attempt = 0; attempt < 80 && token === loadToken; attempt += 1) {
-      const scroller = scrollContainer();
-      if (!scroller) break;
-      const beforeCount = messageNodes().length;
-      const beforeHeight = scroller.scrollHeight;
-      scroller.scrollTop = 0;
-      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-      await wait(400);
+    const distance = Math.max(scroller.scrollHeight, 1);
+    if (mode === 0) scroller.scrollTop = 0;
+    else if (mode === 1) scroller.scrollTop = distance;
+    else scroller.scrollTop = -distance;
 
-      const nextScroller = scrollContainer();
-      const nextCount = messageNodes().length;
-      const nextHeight = nextScroller?.scrollHeight || 0;
-      const unchanged = nextCount === beforeCount && nextHeight === beforeHeight &&
-        nextCount === previousCount && nextHeight === previousHeight;
-      stable = unchanged ? stable + 1 : 0;
-      previousCount = nextCount;
-      previousHeight = nextHeight;
-      updateMeta(`이전 메시지 불러오는 중… ${nextCount}개 확인`);
-      if (stable >= 3) break;
-    }
+    scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+    window.dispatchEvent(new Event('scroll'));
   }
 
-  function normalized(value) {
-    return String(value || '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('ko-KR');
+  async function loadAllHistory(token) {
+    let stableRounds = 0;
+    let knownCount = messageNodes().length;
+    let knownHeight = scrollContainer()?.scrollHeight || 0;
+    let preferredMode = null;
+
+    for (let attempt = 0; attempt < 120 && token === loadToken; attempt += 1) {
+      const modes = preferredMode === null ? [0, 1, 2] : [preferredMode];
+      let grew = false;
+
+      for (const mode of modes) {
+        if (token !== loadToken) return;
+        const scroller = scrollContainer();
+        if (!scroller) return;
+        pushOlderEdge(scroller, mode);
+        await wait(500);
+
+        const count = messageNodes().length;
+        const height = scrollContainer()?.scrollHeight || 0;
+        if (count > knownCount || height > knownHeight + 8) {
+          knownCount = Math.max(knownCount, count);
+          knownHeight = Math.max(knownHeight, height);
+          preferredMode = mode;
+          stableRounds = 0;
+          grew = true;
+          break;
+        }
+      }
+
+      const count = messageNodes().length;
+      updateMeta(`이전 메시지 불러오는 중… ${count}개 확인`);
+      if (!grew) stableRounds += 1;
+      if (stableRounds >= 3) break;
+    }
   }
 
   function installStyle() {
