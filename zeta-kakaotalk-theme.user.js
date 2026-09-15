@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.4
+// @version      3.50.5
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.4
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.4
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.5
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.5
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -4788,6 +4788,101 @@
 
 
     /* =========================================================
+       스냅샷 이미지 신고 바텀시트
+    ========================================================= */
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      > div.absolute.inset-0 {
+      background: rgba(43,57,66,.34) !important;
+      backdrop-filter: blur(7px) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      > div[class*="rounded-t-"] {
+      background: #FFFFFF !important;
+      color: #26343C !important;
+      border-top: 1px solid #DDE4E8 !important;
+      box-shadow: 0 -10px 30px rgba(38,52,61,.18) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      > div[class*="rounded-t-"] > div:first-child > div:first-child {
+      border-bottom-color: #E5EAED !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      h3,
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      h4 {
+      color: #26343C !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      button[aria-label="Close"],
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      button[aria-label="Close"] svg {
+      color: #53636C !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      button[class*="bg-gray-800"] {
+      background: #F1F4F5 !important;
+      color: #46545E !important;
+      border: 1px solid #DDE4E8 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      button[class*="bg-primary-"] {
+      background: var(--kt-yellow) !important;
+      color: #191919 !important;
+      border-color: #E2CB00 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      label[data-sentry-component="Input"] {
+      background: #F5F7F8 !important;
+      color: #26343C !important;
+      border-color: #DCE3E7 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      input[name="reason"] {
+      background: transparent !important;
+      color: #26343C !important;
+      caret-color: #5C5425 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      input[name="reason"]::placeholder {
+      color: #929DA3 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      button[data-sentry-component="LogRawButton"] {
+      color: #716600 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      button[data-sentry-component="LogRawButton"]:disabled {
+      color: #A8B0B4 !important;
+    }
+
+
+    /* =========================================================
        메시지 신고 및 오류제보 바텀시트
     ========================================================= */
 
@@ -8454,7 +8549,10 @@
         text.includes('저장된 대화를 삭제하시겠어요?') ||
         isChatDeleteConfirm(text) ||
         text.includes('비공개 대화로 전환할까요?') ||
-        text.includes('스냅샷 생성에 실패하면 피스는 환불돼요')
+        text.includes('스냅샷 생성에 실패하면 피스는 환불돼요') ||
+        (text.includes('신고가 접수되었어요') &&
+          text.includes('신고한 대화를 삭제할까요?')) ||
+        text.includes('스냅샷에 대한 의견을 보내주세요')
       );
     };
 
@@ -8497,7 +8595,7 @@
       Array.from(panel.querySelectorAll('button')).forEach(btn => {
         const txt = normalizeText(btn.textContent);
 
-        if (txt === '취소' || txt === '저장 안함') {
+        if (txt === '취소' || txt === '저장 안함' || txt === '유지하기') {
           btn.classList.add('kt-dialog-cancel');
         }
 
@@ -8508,12 +8606,17 @@
           txt === '계속하기' ||
           txt === '전환' ||
           txt === '삭제하기' ||
-          txt === '새로하기'
+          txt === '새로하기' ||
+          txt === '의견 보내기'
         ) {
           btn.classList.add('kt-dialog-confirm');
         }
 
-        if (txt === '삭제') {
+        if (
+          txt === '삭제' ||
+          (txt === '삭제하기' &&
+            normalizeText(panel.textContent).includes('신고가 접수되었어요'))
+        ) {
           btn.classList.add('kt-dialog-danger');
         }
       });
