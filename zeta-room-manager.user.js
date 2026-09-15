@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Zeta Room Manager
+// @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.5.1
-// @description  제타 대화방/플롯에 로컬 별명을 붙이고 제타 기본 검색창에서 별명도 검색합니다.
+// @version      0.5.2
+// @description  Android/PC용. 제타 대화방/플롯에 로컬 별명을 붙이고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
