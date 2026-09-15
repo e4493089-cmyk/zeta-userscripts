@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.2.0
+// @version      0.2.1
 // @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -118,11 +118,14 @@
         background: #2a2a2e;
       }
 
-      /* iOS 스와이프 폭(144px) 안에 별명/고정/나가기 3개를 배치한다. */
+      /* iOS 스와이프 메뉴를 168px로 넓혀 별명/고정/나가기를 배치한다. */
       .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
+      .zrm-room-item[style*="translateX(-144px)"] {
+        transform: translateX(-168px) !important;
+      }
       .zrm-room-actions > button {
-        width: 48px !important;
-        min-width: 48px !important;
+        width: 56px !important;
+        min-width: 56px !important;
         gap: 6px !important;
       }
       .zrm-room-actions > button > span {
@@ -131,8 +134,8 @@
       }
       .zrm-room-rename {
         display: flex !important;
-        width: 48px !important;
-        min-width: 48px !important;
+        width: 56px !important;
+        min-width: 56px !important;
         flex-direction: column;
         align-items: center;
         justify-content: center;
