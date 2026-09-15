@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.3.0
+// @version      0.3.1
 // @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -25,7 +25,7 @@
   const state = loadState();
   let observer = null;
   let swipeObserver = null;
-  const adjustedSwipeTransforms = new WeakMap();
+  const swipeSettleTimers = new WeakMap();
   let rafPending = false;
   let lastRoomContextRecord = null;
 
@@ -120,8 +120,12 @@
         background: #2a2a2e;
       }
 
-      /* 56px 버튼 3개에 맞춰 스와이프 전체 폭을 168px로 확장한다. */
+      /* 기본 드래그가 끝난 뒤 마지막 24px만 확장해 총 168px을 보여준다. */
       .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
+      .zrm-room-item.zrm-swipe-expanded {
+        transform: translateX(-168px) !important;
+        transition: transform 120ms ease-out !important;
+      }
       .zrm-room-actions > button {
         width: 56px !important;
         min-width: 56px !important;
@@ -968,40 +972,43 @@
     observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
 
-  function adjustSwipeTransform(item) {
+  function nativeSwipeX(item) {
+    const match = (item?.style?.transform || '').match(/translateX\((-?[\d.]+)px\)/);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function settleSwipeTransform(item) {
     if (!item?.matches?.('[data-sentry-component="SwipeableRoomListItem"]')) return;
-    const current = item.style.transform || '';
-    if (!current || current === 'none') {
-      adjustedSwipeTransforms.delete(item);
-      return;
+    clearTimeout(swipeSettleTimers.get(item));
+    const timer = setTimeout(() => {
+      const x = nativeSwipeX(item);
+      item.classList.toggle('zrm-swipe-expanded', x <= -130);
+    }, 90);
+    swipeSettleTimers.set(item, timer);
+  }
+
+  function releaseExpandedSwipe(event) {
+    const active = document.querySelectorAll('.zrm-room-item.zrm-swipe-expanded');
+    for (const item of active) {
+      if (!item.contains(event.target)) item.classList.remove('zrm-swipe-expanded');
     }
-    if (adjustedSwipeTransforms.get(item) === current) return;
-
-    const match = current.match(/translateX\((-?[\d.]+)px\)/);
-    if (!match) return;
-    const nativeX = Number(match[1]);
-    if (!Number.isFinite(nativeX)) return;
-
-    // 제타의 기본 -144px 동작 전체를 -168px 동작으로 연속 변환한다.
-    // 닫힐 때 발생하는 양수 스프링 오버슈트는 화면 오른쪽을 넘지 않게 막는다.
-    const adjustedX = nativeX < 0 ? nativeX * (168 / 144) : 0;
-    const next = current.replace(match[0], `translateX(${adjustedX.toFixed(3)}px)`);
-    if (next === current) return;
-    adjustedSwipeTransforms.set(item, next);
-    item.style.transform = next;
+    const touched = event.target?.closest?.('[data-sentry-component="SwipeableRoomListItem"]');
+    if (touched) touched.classList.remove('zrm-swipe-expanded');
   }
 
   function startSwipeMotionAdapter() {
-    document.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]').forEach(adjustSwipeTransform);
+    document.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]').forEach(settleSwipeTransform);
     swipeObserver?.disconnect();
     swipeObserver = new MutationObserver(mutations => {
-      for (const mutation of mutations) adjustSwipeTransform(mutation.target);
+      for (const mutation of mutations) settleSwipeTransform(mutation.target);
     });
     swipeObserver.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['style'],
       subtree: true
     });
+    document.addEventListener('pointerdown', releaseExpandedSwipe, true);
+    document.addEventListener('touchstart', releaseExpandedSwipe, { capture: true, passive: true });
   }
 
   function scheduleRefresh() {
