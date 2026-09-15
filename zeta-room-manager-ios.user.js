@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.3.4
+// @version      0.3.5
 // @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -998,13 +998,31 @@
       }
     }, { capture: true, passive: true });
 
-    document.addEventListener('touchend', () => {
+    document.addEventListener('touchend', event => {
       const gesture = swipeGesture;
       swipeGesture = null;
-      if (!gesture?.horizontal) return;
-      setTimeout(() => {
-        gesture.item.classList.toggle('zrm-swipe-open', swipeX(gesture.item) <= -130);
-      }, 180);
+      if (!gesture) return;
+
+      const touch = event.changedTouches?.[0];
+      const dx = touch ? touch.clientX - gesture.x : 0;
+      const dy = touch ? touch.clientY - gesture.y : 0;
+      const horizontal = gesture.horizontal || Math.abs(dx) > Math.abs(dy) + 6;
+      if (!horizontal) return;
+
+      // 오른쪽으로 닫는 동작이면 즉시 해제한다.
+      if (dx > 0) {
+        gesture.item.classList.remove('zrm-swipe-open');
+        return;
+      }
+
+      // 제타의 스프링 종료 시간이 기기마다 달라 여러 시점에서 열린 상태를 확인한다.
+      const lockIfOpen = () => {
+        if (swipeX(gesture.item) <= -90) gesture.item.classList.add('zrm-swipe-open');
+      };
+      lockIfOpen();
+      setTimeout(lockIfOpen, 160);
+      setTimeout(lockIfOpen, 320);
+      setTimeout(lockIfOpen, 520);
     }, { capture: true, passive: true });
   }
 
