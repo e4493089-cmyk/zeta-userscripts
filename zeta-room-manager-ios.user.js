@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.3.1
+// @version      0.3.2
 // @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -24,8 +24,6 @@
 
   const state = loadState();
   let observer = null;
-  let swipeObserver = null;
-  const swipeSettleTimers = new WeakMap();
   let rafPending = false;
   let lastRoomContextRecord = null;
 
@@ -120,15 +118,11 @@
         background: #2a2a2e;
       }
 
-      /* 기본 드래그가 끝난 뒤 마지막 24px만 확장해 총 168px을 보여준다. */
+      /* 제타 기본 144px 스와이프 모션과 폭을 그대로 사용한다. */
       .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
-      .zrm-room-item.zrm-swipe-expanded {
-        transform: translateX(-168px) !important;
-        transition: transform 120ms ease-out !important;
-      }
       .zrm-room-actions > button {
-        width: 56px !important;
-        min-width: 56px !important;
+        width: 48px !important;
+        min-width: 48px !important;
         gap: 6px !important;
       }
       .zrm-room-actions > button > span {
@@ -137,8 +131,8 @@
       }
       .zrm-room-rename {
         display: flex !important;
-        width: 56px !important;
-        min-width: 56px !important;
+        width: 52px !important;
+        min-width: 52px !important;
         flex-direction: column;
         align-items: center;
         justify-content: center;
@@ -146,6 +140,14 @@
         border: 0;
         background: #6957d9;
         color: #fff;
+      }
+      .zrm-room-actions > button:nth-child(2) {
+        width: 52px !important;
+        min-width: 52px !important;
+      }
+      .zrm-room-actions > button:last-child {
+        width: 40px !important;
+        min-width: 40px !important;
       }
       .zrm-room-rename svg { width: 16px; height: 16px; flex: 0 0 auto; }
       .zrm-room-rename span { font-size: 10px; white-space: nowrap; }
@@ -972,45 +974,6 @@
     observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
 
-  function nativeSwipeX(item) {
-    const match = (item?.style?.transform || '').match(/translateX\((-?[\d.]+)px\)/);
-    return match ? Number(match[1]) : 0;
-  }
-
-  function settleSwipeTransform(item) {
-    if (!item?.matches?.('[data-sentry-component="SwipeableRoomListItem"]')) return;
-    clearTimeout(swipeSettleTimers.get(item));
-    const timer = setTimeout(() => {
-      const x = nativeSwipeX(item);
-      item.classList.toggle('zrm-swipe-expanded', x <= -130);
-    }, 90);
-    swipeSettleTimers.set(item, timer);
-  }
-
-  function releaseExpandedSwipe(event) {
-    const active = document.querySelectorAll('.zrm-room-item.zrm-swipe-expanded');
-    for (const item of active) {
-      if (!item.contains(event.target)) item.classList.remove('zrm-swipe-expanded');
-    }
-    const touched = event.target?.closest?.('[data-sentry-component="SwipeableRoomListItem"]');
-    if (touched) touched.classList.remove('zrm-swipe-expanded');
-  }
-
-  function startSwipeMotionAdapter() {
-    document.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]').forEach(settleSwipeTransform);
-    swipeObserver?.disconnect();
-    swipeObserver = new MutationObserver(mutations => {
-      for (const mutation of mutations) settleSwipeTransform(mutation.target);
-    });
-    swipeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['style'],
-      subtree: true
-    });
-    document.addEventListener('pointerdown', releaseExpandedSwipe, true);
-    document.addEventListener('touchstart', releaseExpandedSwipe, { capture: true, passive: true });
-  }
-
   function scheduleRefresh() {
     if (rafPending) return;
     rafPending = true;
@@ -1028,7 +991,6 @@
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
 
     observer = new MutationObserver(scheduleRefresh);
-    startSwipeMotionAdapter();
     refresh();
 
     let lastUrl = location.href;
