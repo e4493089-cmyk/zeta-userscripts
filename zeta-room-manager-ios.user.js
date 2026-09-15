@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.3.3
+// @version      0.3.4
 // @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -24,6 +24,7 @@
 
   const state = loadState();
   let observer = null;
+  let swipeGesture = null;
   let rafPending = false;
   let lastRoomContextRecord = null;
 
@@ -118,8 +119,11 @@
         background: #2a2a2e;
       }
 
-      /* 제타 기본 스와이프 모션은 유지하고 버튼은 56px씩 배치한다. */
+      /* 제타 기본 모션으로 열린 뒤 스크롤 재렌더링에도 168px 상태를 유지한다. */
       .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
+      .zrm-room-item.zrm-swipe-open {
+        transform: translateX(-168px) !important;
+      }
       .zrm-room-actions > button {
         width: 56px !important;
         min-width: 56px !important;
@@ -966,6 +970,44 @@
     observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  function swipeX(item) {
+    const match = (item?.style?.transform || '').match(/translateX\((-?[\d.]+)px\)/);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function bindSwipeOpenLock() {
+    document.addEventListener('touchstart', event => {
+      const touch = event.touches?.[0];
+      const item = event.target?.closest?.('[data-sentry-component="SwipeableRoomListItem"]');
+      if (!touch || !item) {
+        swipeGesture = null;
+        return;
+      }
+      swipeGesture = { item, x: touch.clientX, y: touch.clientY, horizontal: false };
+    }, { capture: true, passive: true });
+
+    document.addEventListener('touchmove', event => {
+      if (!swipeGesture) return;
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      const dx = touch.clientX - swipeGesture.x;
+      const dy = touch.clientY - swipeGesture.y;
+      if (!swipeGesture.horizontal && Math.abs(dx) > Math.abs(dy) + 6) {
+        swipeGesture.horizontal = true;
+        swipeGesture.item.classList.remove('zrm-swipe-open');
+      }
+    }, { capture: true, passive: true });
+
+    document.addEventListener('touchend', () => {
+      const gesture = swipeGesture;
+      swipeGesture = null;
+      if (!gesture?.horizontal) return;
+      setTimeout(() => {
+        gesture.item.classList.toggle('zrm-swipe-open', swipeX(gesture.item) <= -130);
+      }, 180);
+    }, { capture: true, passive: true });
+  }
+
   function scheduleRefresh() {
     if (rafPending) return;
     rafPending = true;
@@ -983,6 +1025,7 @@
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
 
     observer = new MutationObserver(scheduleRefresh);
+    bindSwipeOpenLock();
     refresh();
 
     let lastUrl = location.href;
