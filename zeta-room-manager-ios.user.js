@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.1.0
+// @version      0.1.1
 // @description  iPhone/iPad용. 제타 설정에서 대화방 별명을 관리하고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -190,16 +190,12 @@
       #${MODAL_ID} .zrm-save { background: #6d52ff; color: #fff; font-weight: 700; }
 
       .${IOS_ENTRY_CLASS} {
-        width: calc(100% - 24px);
-        min-height: 48px;
-        margin: 10px 12px;
-        padding: 0 14px;
-        border: 1px solid rgba(255,255,255,.12);
-        border-radius: 12px;
-        background: rgba(255,255,255,.07);
+        width: 100%;
+        min-height: 44px;
+        border: 0;
+        background: transparent;
         color: inherit;
         font: inherit;
-        font-weight: 700;
         text-align: left;
       }
       #${IOS_MANAGER_ID} {
@@ -620,39 +616,40 @@
     return rect.width > 0 && rect.height > 0;
   }
 
-  function settingsSurface() {
-    const candidates = [
-      ...document.querySelectorAll('[role="dialog"], [role="menu"], [data-sentry-component*="Setting"], [data-sentry-source-file*="Setting"]')
-    ].filter(element =>
-      element.id !== MODAL_ID &&
-      element.id !== IOS_MANAGER_ID &&
-      visibleElement(element)
+  function roomSettingsMenu() {
+    return document.querySelector(
+      'ul[data-sentry-source-file="DropdownMenu.tsx"], ' +
+      '[data-sentry-source-file="DropdownMenu.tsx"] ul'
     );
-
-    const named = candidates.find(element => /설정|settings/i.test(normalizeText(element.textContent)));
-    if (named) return named;
-    if (/settings?|preferences?/i.test(location.pathname)) {
-      return document.querySelector('main#contents, main, [role="main"]');
-    }
-    return null;
   }
 
   function injectIosSettingsEntry() {
-    const surface = settingsSurface();
-    if (!surface || surface.querySelector('.' + IOS_ENTRY_CLASS)) return;
+    const menu = roomSettingsMenu();
+    if (!menu || menu.querySelector('.' + IOS_ENTRY_CLASS)) return;
+
+    const item = document.createElement('li');
+    item.className = 'border-r border-b border-l border-white/5 transition-colors hover:bg-gray-700';
+    item.setAttribute('data-zrm-ios-menu-item', '1');
 
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = IOS_ENTRY_CLASS;
-    button.textContent = '대화방 별명 관리';
+    button.className = 'flex h-[44px] w-full cursor-pointer flex-row items-center gap-2 bg-transparent px-4 ' + IOS_ENTRY_CLASS;
+    button.setAttribute('aria-label', '대화방 별명 관리');
+
+    const label = document.createElement('span');
+    label.className = 'body2 text-gray-200';
+    label.textContent = '대화방 별명 관리';
+    button.appendChild(label);
+
     button.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
       openIosManager();
     }, true);
 
-    const host = surface.querySelector('[class*="flex-col"], [role="list"]') || surface;
-    host.appendChild(button);
+    item.appendChild(button);
+    const editRoom = menu.querySelector('#delete-room')?.closest('li');
+    menu.insertBefore(item, editRoom || null);
   }
 
   function currentSection() {
