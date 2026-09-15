@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.5
+// @version      3.50.6
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.5
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.5
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.6
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.6
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -3973,13 +3973,13 @@
        원래 343px 레이아웃/패딩은 절대 건드리지 않음
     ========================================================= */
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"] {
       background: rgba(43,57,66,.34) !important;
       backdrop-filter: blur(8px) !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"] > div[data-sentry-source-file="Popup.tsx"] {
       background: #FFFFFF !important;
       color: #26343C !important;
@@ -3988,12 +3988,12 @@
       box-sizing: border-box !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"] h5 {
       color: #202124 !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       label[data-sentry-component="Input"] {
       background: #F5F7F8 !important;
@@ -4002,7 +4002,7 @@
       box-shadow: none !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       label[data-sentry-component="Input"]:focus-within {
       background: #FFFFFF !important;
@@ -4010,7 +4010,7 @@
       box-shadow: 0 0 0 3px rgba(254,229,0,.18) !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       input[data-sentry-component="Input"] {
       background: transparent !important;
@@ -4018,14 +4018,14 @@
       caret-color: #3D474C !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       input[data-sentry-component="Input"]::placeholder {
       color: #98A1A6 !important;
       opacity: 1 !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       label[data-sentry-component="Input"] > button {
       background: #DCE1E4 !important;
@@ -4033,14 +4033,14 @@
       border: 0 !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       label[data-sentry-component="Input"] > button svg {
       color: #65747C !important;
     }
 
     /* 팝업 하단 취소/완료 */
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       button.kt-saved-title-cancel {
       background: #ECEFF1 !important;
@@ -4048,7 +4048,7 @@
       border: 1px solid #E0E5E8 !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       button.kt-saved-title-submit {
       background: var(--kt-yellow) !important;
@@ -4056,7 +4056,7 @@
       border: 1px solid #E4CF00 !important;
     }
 
-    html.kt-saved-rooms-active #portal-container
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
       [data-sentry-component="Popup"]
       button.kt-saved-title-submit:hover {
       background: var(--kt-yellow-hover) !important;
@@ -7901,25 +7901,39 @@
   }
 
   function markSavedTitlePopup() {
-    if (!isSavedRoomsPage()) {
+    const isTitlePopupPage =
+      isSavedRoomsPage() ||
+      isSavedRoomPage() ||
+      isBookmarkPage();
+
+    if (!isTitlePopupPage) {
       clearSavedTitlePopupMarkers();
       return;
     }
 
     document.querySelectorAll(
-      '#portal-container [data-sentry-component="Popup"] button'
-    ).forEach(btn => {
-      const label = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+      '#portal-container [data-sentry-component="Popup"]'
+    ).forEach(popup => {
+      const text = (popup.textContent || '').replace(/\s+/g, ' ').trim();
+      const isTitlePopup =
+        text.includes('저장된 대화의 제목을 입력해주세요') ||
+        text.includes('책갈피의 제목을 입력해주세요');
 
-      btn.classList.toggle(
-        'kt-saved-title-cancel',
-        label === '취소'
-      );
+      if (!isTitlePopup) return;
 
-      btn.classList.toggle(
-        'kt-saved-title-submit',
-        label === '완료' || label === '저장'
-      );
+      popup.querySelectorAll('button').forEach(btn => {
+        const label = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+
+        btn.classList.toggle(
+          'kt-saved-title-cancel',
+          label === '취소'
+        );
+
+        btn.classList.toggle(
+          'kt-saved-title-submit',
+          label === '완료' || label === '저장'
+        );
+      });
     });
   }
 
@@ -8694,6 +8708,7 @@
       clearProfileEditMarkers();
       clearSavedRoomMarkers();
       markBookmarkPage();
+      markSavedTitlePopup();
       return;
     }
 
@@ -8715,6 +8730,7 @@
       clearProfileEditMarkers();
       clearBookmarkMarkers();
       markSavedRoomPage();
+      markSavedTitlePopup();
       markThemeDialogs();
       markSnapshotLoading();
       return;
