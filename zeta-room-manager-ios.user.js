@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.2.2
+// @version      0.3.0
 // @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -24,6 +24,8 @@
 
   const state = loadState();
   let observer = null;
+  let swipeObserver = null;
+  const adjustedSwipeTransforms = new WeakMap();
   let rafPending = false;
   let lastRoomContextRecord = null;
 
@@ -118,11 +120,11 @@
         background: #2a2a2e;
       }
 
-      /* 제타 기본 스와이프 폭(144px)을 유지해 스프링 모션이 튀지 않게 한다. */
+      /* 56px 버튼 3개에 맞춰 스와이프 전체 폭을 168px로 확장한다. */
       .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
       .zrm-room-actions > button {
-        width: 48px !important;
-        min-width: 48px !important;
+        width: 56px !important;
+        min-width: 56px !important;
         gap: 6px !important;
       }
       .zrm-room-actions > button > span {
@@ -131,8 +133,8 @@
       }
       .zrm-room-rename {
         display: flex !important;
-        width: 52px !important;
-        min-width: 52px !important;
+        width: 56px !important;
+        min-width: 56px !important;
         flex-direction: column;
         align-items: center;
         justify-content: center;
@@ -140,14 +142,6 @@
         border: 0;
         background: #6957d9;
         color: #fff;
-      }
-      .zrm-room-actions > button:nth-child(2) {
-        width: 52px !important;
-        min-width: 52px !important;
-      }
-      .zrm-room-actions > button:last-child {
-        width: 40px !important;
-        min-width: 40px !important;
       }
       .zrm-room-rename svg { width: 16px; height: 16px; flex: 0 0 auto; }
       .zrm-room-rename span { font-size: 10px; white-space: nowrap; }
@@ -974,6 +968,42 @@
     observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  function adjustSwipeTransform(item) {
+    if (!item?.matches?.('[data-sentry-component="SwipeableRoomListItem"]')) return;
+    const current = item.style.transform || '';
+    if (!current || current === 'none') {
+      adjustedSwipeTransforms.delete(item);
+      return;
+    }
+    if (adjustedSwipeTransforms.get(item) === current) return;
+
+    const match = current.match(/translateX\((-?[\d.]+)px\)/);
+    if (!match) return;
+    const nativeX = Number(match[1]);
+    if (!Number.isFinite(nativeX)) return;
+
+    // 제타의 기본 -144px 동작 전체를 -168px 동작으로 연속 변환한다.
+    // 닫힐 때 발생하는 양수 스프링 오버슈트는 화면 오른쪽을 넘지 않게 막는다.
+    const adjustedX = nativeX < 0 ? nativeX * (168 / 144) : 0;
+    const next = current.replace(match[0], `translateX(${adjustedX.toFixed(3)}px)`);
+    if (next === current) return;
+    adjustedSwipeTransforms.set(item, next);
+    item.style.transform = next;
+  }
+
+  function startSwipeMotionAdapter() {
+    document.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]').forEach(adjustSwipeTransform);
+    swipeObserver?.disconnect();
+    swipeObserver = new MutationObserver(mutations => {
+      for (const mutation of mutations) adjustSwipeTransform(mutation.target);
+    });
+    swipeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style'],
+      subtree: true
+    });
+  }
+
   function scheduleRefresh() {
     if (rafPending) return;
     rafPending = true;
@@ -991,6 +1021,7 @@
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
 
     observer = new MutationObserver(scheduleRefresh);
+    startSwipeMotionAdapter();
     refresh();
 
     let lastUrl = location.href;
