@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.3.5
+// @version      0.3.6
 // @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -19,8 +19,6 @@
   const MODAL_ID = 'zeta-room-manager-modal';
   const NATIVE_RESULTS_ID = 'zeta-room-manager-native-results';
   const PLOT_NATIVE_RESULTS_ID = 'zeta-room-manager-plot-native-results';
-  const IOS_MANAGER_ID = 'zeta-room-manager-ios-panel';
-  const IOS_ENTRY_CLASS = 'zrm-ios-settings-entry';
 
   const state = loadState();
   let observer = null;
@@ -214,100 +212,6 @@
       #${MODAL_ID} .zrm-reset { background: #3a3030; color: #ffaaaa; }
       #${MODAL_ID} .zrm-save { background: #6d52ff; color: #fff; font-weight: 700; }
 
-      .${IOS_ENTRY_CLASS} {
-        width: 100%;
-        min-height: 44px;
-        border: 0;
-        background: transparent;
-        color: inherit;
-        font: inherit;
-        text-align: left;
-      }
-      #${IOS_MANAGER_ID} {
-        position: fixed;
-        inset: 0;
-        z-index: 2147483645;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        background: rgba(0,0,0,.58);
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-sheet {
-        width: min(560px,100%);
-        max-height: min(82vh,760px);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        border-radius: 20px 20px 0 0;
-        background: #19191c;
-        color: #fff;
-        box-shadow: 0 -10px 32px rgba(0,0,0,.3);
-        padding-bottom: env(safe-area-inset-bottom);
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px;
-        border-bottom: 1px solid rgba(255,255,255,.1);
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-head h3 { margin: 0; font-size: 18px; }
-      #${IOS_MANAGER_ID} .zrm-ios-close {
-        width: 36px;
-        height: 36px;
-        border: 0;
-        border-radius: 50%;
-        background: rgba(255,255,255,.1);
-        color: #fff;
-        font-size: 24px;
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-search {
-        height: 42px;
-        margin: 12px 16px 8px;
-        padding: 0 13px;
-        border: 1px solid rgba(255,255,255,.14);
-        border-radius: 11px;
-        background: #29292d;
-        color: #fff;
-        font: inherit;
-        font-size: 15px;
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-list { overflow-y: auto; padding: 4px 12px 16px; }
-      #${IOS_MANAGER_ID} .zrm-ios-row {
-        display: flex;
-        align-items: center;
-        gap: 11px;
-        min-height: 66px;
-        padding: 9px 4px;
-        border-bottom: 1px solid rgba(255,255,255,.08);
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-avatar {
-        width: 42px;
-        height: 52px;
-        flex: 0 0 auto;
-        border-radius: 7px;
-        object-fit: cover;
-        background: #303036;
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-copy { min-width: 0; flex: 1; }
-      #${IOS_MANAGER_ID} .zrm-ios-copy b,
-      #${IOS_MANAGER_ID} .zrm-ios-copy span {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-copy span { margin-top: 3px; color: rgba(255,255,255,.5); font-size: 12px; }
-      #${IOS_MANAGER_ID} .zrm-ios-edit {
-        height: 34px;
-        padding: 0 12px;
-        border: 0;
-        border-radius: 9px;
-        background: #6d52ff;
-        color: #fff;
-        font-weight: 700;
-      }
-      #${IOS_MANAGER_ID} .zrm-ios-empty { padding: 36px 18px; color: rgba(255,255,255,.55); text-align: center; line-height: 1.55; }
     `;
     document.documentElement.appendChild(style);
   }
@@ -572,132 +476,6 @@
 
     document.body.appendChild(overlay);
     setTimeout(() => { input.focus(); input.select(); }, 0);
-  }
-
-  function roomEntries() {
-    return Object.entries(state.index)
-      .filter(([, entry]) => entry?.type === 'room' && entry.original)
-      .map(([key, entry]) => ({ key, ...entry }))
-      .sort((a, b) => normalizeText(a.alias || a.original).localeCompare(normalizeText(b.alias || b.original), 'ko'));
-  }
-
-  function openIosManager() {
-    document.getElementById(IOS_MANAGER_ID)?.remove();
-    const overlay = document.createElement('div');
-    overlay.id = IOS_MANAGER_ID;
-    overlay.innerHTML = `
-      <section class="zrm-ios-sheet" role="dialog" aria-modal="true" aria-label="대화방 별명 관리">
-        <div class="zrm-ios-head"><h3>대화방 별명 관리</h3><button class="zrm-ios-close" type="button" aria-label="닫기">×</button></div>
-        <input class="zrm-ios-search" type="search" placeholder="대화방 이름 또는 별명 검색">
-        <div class="zrm-ios-list"></div>
-      </section>
-    `;
-
-    const list = overlay.querySelector('.zrm-ios-list');
-    const search = overlay.querySelector('.zrm-ios-search');
-    const render = () => {
-      const query = normalizeText(search.value).toLocaleLowerCase('ko-KR');
-      const entries = roomEntries().filter(entry =>
-        !query || normalizeText(entry.alias + ' ' + entry.original).toLocaleLowerCase('ko-KR').includes(query)
-      );
-      list.textContent = '';
-
-      if (!entries.length) {
-        const empty = document.createElement('div');
-        empty.className = 'zrm-ios-empty';
-        empty.textContent = roomEntries().length
-          ? '일치하는 대화방이 없어요.'
-          : '저장된 대화방 정보가 없어요.\n대화 목록을 한 번 스크롤한 뒤 다시 열어주세요.';
-        list.appendChild(empty);
-        return;
-      }
-
-      for (const entry of entries) {
-        const row = document.createElement('div');
-        row.className = 'zrm-ios-row';
-
-        if (entry.image) {
-          const image = document.createElement('img');
-          image.className = 'zrm-ios-avatar';
-          image.src = entry.image;
-          image.alt = '';
-          row.appendChild(image);
-        } else {
-          const placeholder = document.createElement('span');
-          placeholder.className = 'zrm-ios-avatar';
-          row.appendChild(placeholder);
-        }
-
-        const copy = document.createElement('div');
-        copy.className = 'zrm-ios-copy';
-        const title = document.createElement('b');
-        title.textContent = entry.alias || entry.original;
-        const original = document.createElement('span');
-        original.textContent = entry.alias ? `원래 이름: ${entry.original}` : '별명 없음';
-        copy.append(title, original);
-
-        const edit = document.createElement('button');
-        edit.type = 'button';
-        edit.className = 'zrm-ios-edit';
-        edit.textContent = entry.alias ? '수정' : '별명';
-        edit.addEventListener('click', () => {
-          overlay.remove();
-          openRenameModal({ key: entry.key, original: entry.original });
-        });
-
-        row.append(copy, edit);
-        list.appendChild(row);
-      }
-    };
-
-    search.addEventListener('input', render);
-    overlay.querySelector('.zrm-ios-close').addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', event => { if (event.target === overlay) overlay.remove(); });
-    document.body.appendChild(overlay);
-    render();
-    setTimeout(() => search.focus(), 80);
-  }
-
-  function visibleElement(element) {
-    if (!element) return false;
-    const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  }
-
-  function roomSettingsMenu() {
-    return document.querySelector(
-      'ul[data-sentry-source-file="DropdownMenu.tsx"], ' +
-      '[data-sentry-source-file="DropdownMenu.tsx"] ul'
-    );
-  }
-
-  function injectIosSettingsEntry() {
-    const menu = roomSettingsMenu();
-    if (!menu || menu.querySelector('.' + IOS_ENTRY_CLASS)) return;
-
-    const item = document.createElement('li');
-    item.className = 'border-r border-b border-l border-white/5 transition-colors hover:bg-gray-700';
-    item.setAttribute('data-zrm-ios-menu-item', '1');
-
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'flex h-[44px] w-full cursor-pointer flex-row items-center gap-2 bg-transparent px-4 ' + IOS_ENTRY_CLASS;
-    button.setAttribute('aria-label', '대화방 별명 관리');
-
-    const label = document.createElement('span');
-    label.className = 'body2 text-gray-200';
-    label.textContent = '대화방 별명 관리';
-    button.appendChild(label);
-
-    button.addEventListener('click', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      openIosManager();
-    }, true);
-
-    item.appendChild(button);
-    const editRoom = menu.querySelector('#delete-room')?.closest('li');
-    menu.insertBefore(item, editRoom || null);
   }
 
   function currentSection() {
