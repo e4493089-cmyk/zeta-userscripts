@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.3.2
+// @version      0.3.3
 // @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -118,11 +118,11 @@
         background: #2a2a2e;
       }
 
-      /* 제타 기본 144px 스와이프 모션과 폭을 그대로 사용한다. */
+      /* 제타 기본 스와이프 모션은 유지하고 버튼은 56px씩 배치한다. */
       .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
       .zrm-room-actions > button {
-        width: 48px !important;
-        min-width: 48px !important;
+        width: 56px !important;
+        min-width: 56px !important;
         gap: 6px !important;
       }
       .zrm-room-actions > button > span {
@@ -131,8 +131,8 @@
       }
       .zrm-room-rename {
         display: flex !important;
-        width: 52px !important;
-        min-width: 52px !important;
+        width: 56px !important;
+        min-width: 56px !important;
         flex-direction: column;
         align-items: center;
         justify-content: center;
@@ -140,14 +140,6 @@
         border: 0;
         background: #6957d9;
         color: #fff;
-      }
-      .zrm-room-actions > button:nth-child(2) {
-        width: 52px !important;
-        min-width: 52px !important;
-      }
-      .zrm-room-actions > button:last-child {
-        width: 40px !important;
-        min-width: 40px !important;
       }
       .zrm-room-rename svg { width: 16px; height: 16px; flex: 0 0 auto; }
       .zrm-room-rename span { font-size: 10px; white-space: nowrap; }
