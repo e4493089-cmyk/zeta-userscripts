@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.1.1
-// @description  iPhone/iPad용. 제타 설정에서 대화방 별명을 관리하고 기본 검색창에서 별명도 검색합니다.
+// @version      0.2.0
+// @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -118,10 +118,31 @@
         background: #2a2a2e;
       }
 
-      /* 대화방 목록에는 별명 버튼을 상시 표시하지 않음.
-         별명 편집은 제타의 길게 누르기 메뉴에 주입한다. */
+      /* iOS 스와이프 폭(144px) 안에 별명/고정/나가기 3개를 배치한다. */
       .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
-      .zrm-room-rename { display: none !important; }
+      .zrm-room-actions > button {
+        width: 48px !important;
+        min-width: 48px !important;
+        gap: 6px !important;
+      }
+      .zrm-room-actions > button > span {
+        font-size: 10px !important;
+        white-space: nowrap;
+      }
+      .zrm-room-rename {
+        display: flex !important;
+        width: 48px !important;
+        min-width: 48px !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 0;
+        background: #6957d9;
+        color: #fff;
+      }
+      .zrm-room-rename svg { width: 16px; height: 16px; flex: 0 0 auto; }
+      .zrm-room-rename span { font-size: 10px; white-space: nowrap; }
       .zrm-context-rename svg { flex: 0 0 auto; }
       .zrm-plot-rename {
         height: 30px;
@@ -381,8 +402,31 @@
 
   function makeRenameButton(record) {
     if (record.type === 'room') {
-      record.item.querySelector('.zrm-room-rename')?.remove();
       record.item.classList.add('zrm-room-item');
+      const actions = record.item.querySelector(
+        '[data-sentry-element="RoomListItemRightActions"], ' +
+        '[data-sentry-source-file="SwipeableRoomListItem.tsx"].absolute.translate-x-full'
+      );
+      if (!actions) return;
+      actions.classList.add('zrm-room-actions');
+      if (actions.querySelector('.zrm-room-rename')) return;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'zrm-room-rename';
+      btn.setAttribute('aria-label', `${record.original} 별명 편집`);
+      btn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor" d="M21.675 7.905c.433-.433.433-1.155 0-1.566l-4.014-4.014c-.41-.433-1.133-.433-1.566 0L14.05 4.358l5.58 5.58M2.293 16.127a1 1 0 0 0-.293.707V21a1 1 0 0 0 1 1h4.166a1 1 0 0 0 .707-.293l10.58-10.591-5.58-5.58z"/>
+        </svg>
+        <span>별명</span>
+      `;
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        openRenameModal(snapshotRecord(record));
+      }, true);
+      actions.prepend(btn);
       return;
     }
 
@@ -892,7 +936,6 @@
 
   function refresh() {
     observer?.disconnect();
-    injectIosSettingsEntry();
     const section = currentSection();
     removeLegacyPanel();
 
@@ -943,12 +986,6 @@
     refresh();
 
     let lastUrl = location.href;
-    setInterval(injectIosSettingsEntry, 700);
-    document.addEventListener('click', () => {
-      setTimeout(injectIosSettingsEntry, 80);
-      setTimeout(injectIosSettingsEntry, 350);
-    }, true);
-
     setInterval(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
