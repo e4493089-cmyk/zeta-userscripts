@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.6
+// @version      3.50.7
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.6
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.6
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.7
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.7
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -8505,9 +8505,10 @@
         if (layer.querySelector('input[name="message-report-description"]')) return;
 
         const text = normalizeText(layer.textContent);
+        /* 스냅샷은 대화/메시지 상태에 따라 제타가 숨길 수 있으므로
+           공통으로 항상 존재하는 나머지 액션들로 판별한다. */
         const isMessageActionSheet =
           text.includes('신고 및 오류제보') &&
-          text.includes('스냅샷') &&
           text.includes('책갈피 설정') &&
           text.includes('여기서부터 새로하기') &&
           text.includes('복사') &&
