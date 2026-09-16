@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.2.2
+// @version      0.2.3
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.2
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.2
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.3
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.3
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -41,6 +41,23 @@
     '제타 캐릭터 시점의 서술을 이어 쓰지 말고, 그 말과 행동에 대한 사용자의 반응만 작성한다.',
     '직전 제타 캐릭터의 대사나 문장을 사용자 대사로 복사하거나 그대로 반복하지 않는다.',
     '해설이나 분석 없이 제타 입력창에 바로 전송할 사용자 답장만 출력한다.'
+  ].join('\n');
+  const PROFILE_RULES = [
+    '[사용자 프로필 적용 규칙]',
+    '사용자 프로필은 사용자 캐릭터의 성격과 말투를 정하는 최우선 기준이다.',
+    '최근 대화의 분위기나 제타 캐릭터의 말투를 따라 하느라 사용자 프로필의 성격을 평범하게 바꾸지 않는다.',
+    '매 답변마다 프로필에 적힌 핵심 성격, 감정 표현 방식, 말투 특징을 실제 행동과 대사에 드러낸다.',
+    '프로필과 충돌하는 전형적인 반응이나 임의의 성격을 새로 만들지 않는다.',
+    '프로필을 요약하거나 설명하지 말고 답변의 선택과 표현에만 반영한다.'
+  ].join('\n');
+  const STYLE_RULES = [
+    '[문체와 행동 규칙]',
+    '문체는 담백하고 자연스럽게 유지하며 감정을 장황하게 해설하지 않는다.',
+    '지문은 구체적인 행동과 반응만 짧게 쓰고, 과장된 비유나 소설식 미사여구를 피한다.',
+    '숨이 멎었다, 심장이 요동쳤다, 목덜미가 달아올랐다, 입가에 여유로운 웃음을 걸었다, 턱을 들었다, 손끝을 꼼지락거렸다는 식의 상투적인 신체 반응을 습관적으로 쓰지 않는다.',
+    '능동성은 상황에 맞는 선택과 대답을 스스로 한다는 뜻이다. 매번 신체 접촉, 도발, 유혹, 우위 행동 또는 새로운 사건을 억지로 만들라는 뜻이 아니다.',
+    '가만히 보기, 짧게 대답하기, 망설이기, 화제를 넘기기처럼 작은 반응이 자연스러운 장면에서는 그 정도만 표현한다.',
+    '사용자 캐릭터의 행동은 프로필과 현재 상황에서 자연스럽게 나올 때만 작성한다.'
   ].join('\n');
   const DEFAULTS = {
     apiKey: '',
@@ -348,8 +365,10 @@
     const profile = normalizeText(settings.profile).slice(0, 20000);
     const systemPrompt = [
       settings.prompt.trim() || DEFAULT_PROMPT,
-      profile ? '\n[사용자 프로필]\n' + profile : '',
-      '\n' + HARD_ROLE_RULES
+      '\n' + HARD_ROLE_RULES,
+      profile ? '\n[최우선 사용자 프로필]\n' + profile : '',
+      profile ? '\n' + PROFILE_RULES : '',
+      '\n' + STYLE_RULES
     ].filter(Boolean).join('\n');
 
     /* API의 user/assistant 역할을 뒤집으면 가벼운 모델이 화자를 혼동할 수 있다.
@@ -364,8 +383,9 @@
       '',
       '[이번 출력 대상]',
       '위 기록에서 제타 캐릭터의 마지막 말과 행동에 반응하는 "사용자 캐릭터"의 다음 답장만 작성한다.',
-      '제타 캐릭터의 다음 행동·표정·감정·생각·대사는 예측하거나 대신 쓰지 않는다.'
-    ].join('\n');
+      '제타 캐릭터의 다음 행동·표정·감정·생각·대사는 예측하거나 대신 쓰지 않는다.',
+      profile ? '작성 전에 [최우선 사용자 프로필]의 핵심 성격과 말투 특징을 내부적으로 확인하고 이번 행동과 대사에 반드시 반영한다. 확인 과정은 출력하지 않는다.' : ''
+    ].filter(Boolean).join('\n');
 
     const payload = {
       model: settings.model.trim() || DEFAULTS.model,
