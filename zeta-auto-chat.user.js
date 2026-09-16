@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.2.6
+// @version      0.2.7
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.6
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.7
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.5
 // @run-at       document-idle
 // @grant        none
@@ -574,9 +574,7 @@
   }
 
   async function fillAndSend(reply, signal) {
-    const maxAttempts = 3;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    for (let attempt = 1; ; attempt += 1) {
       const textarea = document.querySelector('textarea[aria-label="내용 입력하기"]');
       if (!textarea || textarea.disabled) return false;
 
@@ -598,7 +596,7 @@
       if (!send || send.disabled || send.getAttribute('aria-disabled') === 'true') return false;
 
       if (attempt > 1) {
-        setStatus(`전송 재시도 ${attempt - 1}/${maxAttempts - 1}`, 'busy');
+        setStatus(`전송 재시도 ${attempt - 1}회`, 'busy');
         renderWidget();
       }
 
@@ -613,10 +611,8 @@
         throw new Error('입력창 내용이 바뀌어 재전송을 중단했어요.');
       }
 
-      if (attempt < maxAttempts) await wait(1500, signal);
+      await wait(1500, signal);
     }
-
-    throw new Error('메시지 전송에 3번 실패해 자동대화를 정지했어요.');
   }
 
   function startAuto() {
