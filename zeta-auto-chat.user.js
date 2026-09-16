@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.2.1
+// @version      0.2.2
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.1
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.1
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.2
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.2
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -407,6 +407,25 @@
 
     let data = await openRouterRequest(payload, signal);
     let reply = formatStructuredReply(readResponseContent(data));
+
+    /* 긴 구조화 답변이 토큰 제한으로 잘리면 JSON 원문을 전송하지 않고
+       출력 한도를 늘려 짧은 답변으로 한 번만 재생성한다. */
+    if (!reply || data?.choices?.[0]?.finish_reason === 'length') {
+      payload.max_tokens = Math.min(4000, Math.max(1000, payload.max_tokens * 2));
+      payload.messages[0].content += [
+        '',
+        '[길이 제한]',
+        '전체 답변을 narration과 dialogue 합계 2~4개 항목으로 간결하게 작성한다.',
+        '각 항목을 끝까지 완성하고 유효한 JSON 객체 하나로 출력한다.'
+      ].join('\n');
+      data = await openRouterRequest(payload, signal);
+      reply = formatStructuredReply(readResponseContent(data));
+    }
+
+    if (!reply) {
+      throw new Error('구조화 답변이 중간에 잘렸어요. 최대 출력 토큰을 1000 이상으로 올려줘.');
+    }
+
     const lastCharacterText = [...history].reverse()
       .find(item => item.role === 'assistant')?.content || '';
 
@@ -419,6 +438,7 @@
       ].join('\n');
       data = await openRouterRequest(payload, signal);
       reply = formatStructuredReply(readResponseContent(data));
+      if (!reply) throw new Error('재생성된 구조화 답변이 중간에 잘렸어요.');
     }
 
     return removeCharacterEcho(reply, lastCharacterText);
@@ -484,7 +504,14 @@
         }).filter(Boolean);
         if (parts.length) return parts.join('\n\n');
       }
-    } catch (_) {}
+    } catch (_) {
+      /* JSON처럼 시작한 응답은 파싱 실패 시 불완전한 구조화 출력이다.
+         일반 문장으로 취급하면 JSON 원문이 채팅창에 전송된다. */
+      if (/^[\[{]/.test(source)) return '';
+    }
+
+    /* 파싱은 됐지만 요구한 parts 구조가 아닌 JSON도 그대로 보내지 않는다. */
+    if (/^[\[{]/.test(source)) return '';
 
     /* 구조화 출력을 지원하지 않는 모델로 바꾼 경우의 호환용 처리. */
     return normalizeGeneratedReply(source);
