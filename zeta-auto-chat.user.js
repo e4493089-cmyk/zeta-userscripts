@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.2
+// @version      0.1.3
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
 // @run-at       document-idle
@@ -583,8 +583,10 @@
     const button = widget.querySelector('.zac-toggle');
     if (!button) return;
     const usage = getDailyUsage();
-    button.textContent = enabled ? (busy ? 'AUTO 처리 중' : `AUTO ON · ${sessionTurns}`) : 'AUTO OFF';
-    button.title = `${widget.dataset.status || '정지됨'} · 오늘 ${usage.count}회`;
+    const nextText = enabled ? (busy ? 'AUTO 처리 중' : `AUTO ON · ${sessionTurns}`) : 'AUTO OFF';
+    const nextTitle = `${widget.dataset.status || '정지됨'} · 오늘 ${usage.count}회`;
+    if (button.textContent !== nextText) button.textContent = nextText;
+    if (button.title !== nextTitle) button.title = nextTitle;
   }
 
   let toastTimer = 0;
@@ -608,7 +610,9 @@
     setStatus('정지됨', 'off');
 
     observer = new MutationObserver(() => {
-      installUi();
+      if (!document.getElementById(WIDGET_ID) || !document.getElementById(PANEL_ID)) {
+        installUi();
+      }
       if (!enabled || busy) return;
       noteConversationChange();
       scheduleCheck();
