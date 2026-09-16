@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.2.4
+// @version      0.2.5
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.4
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.4
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.5
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.5
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -58,6 +58,15 @@
     '능동성은 상황에 맞는 선택과 대답을 스스로 한다는 뜻이다. 매번 신체 접촉, 도발, 유혹, 우위 행동 또는 새로운 사건을 억지로 만들라는 뜻이 아니다.',
     '가만히 보기, 짧게 대답하기, 망설이기, 화제를 넘기기처럼 작은 반응이 자연스러운 장면에서는 그 정도만 표현한다.',
     '사용자 캐릭터의 행동은 프로필과 현재 상황에서 자연스럽게 나올 때만 작성한다.'
+  ].join('\n');
+  const INTERACTION_RULES = [
+    '[상호작용 규칙]',
+    '답변은 반드시 직전 제타 캐릭터의 핵심 대사나 행동을 알아듣고 직접 호응해야 한다.',
+    '질문을 받으면 그 질문에 답하거나 답을 피하는 반응을 먼저 보이고, 제안·감정 표현·접촉에는 그에 맞는 수락·거절·감정·행동으로 반응한다.',
+    '제타 캐릭터가 이미 한 말과 이미 일어난 행동은 답변에서 자연스럽게 언급하거나 그 대상으로 반응해도 된다.',
+    '사용자 캐릭터가 제타 캐릭터에게 말을 걸거나, 바라보거나, 다가가거나, 손을 잡는 등 상호작용을 먼저 시도할 수 있다. 단, 그에 대한 제타 캐릭터의 다음 반응은 정하지 않는다.',
+    '사용자 캐릭터 혼자 새로운 행동이나 독백만 이어가며 상대의 직전 발화를 무시하지 않는다.',
+    '새로운 화제나 사건을 일방적으로 시작하기 전에 현재 주고받는 대화를 한 번 이상 이어받는다.'
   ].join('\n');
   const DEFAULTS = {
     apiKey: '',
@@ -368,7 +377,8 @@
       '\n' + HARD_ROLE_RULES,
       profile ? '\n[최우선 사용자 프로필]\n' + profile : '',
       profile ? '\n' + PROFILE_RULES : '',
-      '\n' + STYLE_RULES
+      '\n' + STYLE_RULES,
+      '\n' + INTERACTION_RULES
     ].filter(Boolean).join('\n');
 
     /* API의 user/assistant 역할을 뒤집으면 가벼운 모델이 화자를 혼동할 수 있다.
@@ -384,6 +394,7 @@
       '[이번 출력 대상]',
       '위 기록에서 제타 캐릭터의 마지막 말과 행동에 반응하는 "사용자 캐릭터"의 다음 답장만 작성한다.',
       '제타 캐릭터의 다음 행동·표정·감정·생각·대사는 예측하거나 대신 쓰지 않는다.',
+      '직전 제타 캐릭터의 핵심 발화를 무시하지 말고 이번 대사나 행동으로 분명하게 이어받는다.',
       profile ? '작성 전에 [최우선 사용자 프로필]의 핵심 성격과 말투 특징을 내부적으로 확인하고 이번 행동과 대사에 반드시 반영한다. 확인 과정은 출력하지 않는다.' : ''
     ].filter(Boolean).join('\n');
 
