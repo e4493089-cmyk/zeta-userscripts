@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.9
+// @version      0.2.0
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.9
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.9
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.0
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.0
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -35,6 +35,7 @@
     '출력에는 사용자 자신의 narration 항목을 최소 하나 이상 반드시 포함한다.',
     '별표 마크다운은 스크립트가 붙이므로 text 값에는 별표나 따옴표를 넣지 않는다.',
     '제타 캐릭터 시점의 서술을 이어 쓰지 말고, 그 말과 행동에 대한 사용자의 반응만 작성한다.',
+    '직전 제타 캐릭터의 대사나 문장을 사용자 대사로 복사하거나 그대로 반복하지 않는다.',
     '해설이나 분석 없이 제타 입력창에 바로 전송할 사용자 답장만 출력한다.'
   ].join('\n');
   const DEFAULTS = {
@@ -391,15 +392,64 @@
       }
     };
 
-    const data = await openRouterRequest(payload, signal);
+    let data = await openRouterRequest(payload, signal);
+    let reply = formatStructuredReply(readResponseContent(data));
+    const lastCharacterText = [...history].reverse()
+      .find(item => item.role === 'assistant')?.content || '';
+
+    if (isLikelyCharacterEcho(reply, lastCharacterText)) {
+      payload.messages[0].content += [
+        '',
+        '[재생성 지시]',
+        '방금 출력은 직전 제타 캐릭터의 대사를 복사했다.',
+        '그 문장을 절대 반복하지 말고 사용자 자신의 새로운 반응만 다시 작성한다.'
+      ].join('\n');
+      data = await openRouterRequest(payload, signal);
+      reply = formatStructuredReply(readResponseContent(data));
+    }
+
+    return removeCharacterEcho(reply, lastCharacterText);
+  }
+
+  function readResponseContent(data) {
     const content = data?.choices?.[0]?.message?.content;
     let text = '';
     if (typeof content === 'string') text = content;
     else if (Array.isArray(content)) {
       text = content.map(x => typeof x === 'string' ? x : x?.text || '').join('');
     }
+    return text;
+  }
 
-    return formatStructuredReply(text);
+  function comparisonText(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\{\{[^}]+\}\}/g, '')
+      .replace(/[*_~`“”"'‘’.,!?…·:;()\[\]{}<>\-—\s]/g, '');
+  }
+
+  function copiedDialogueParagraphs(reply, characterText) {
+    const source = comparisonText(characterText);
+    if (!source) return [];
+    return String(reply || '').split(/\n{2,}/).filter(paragraph => {
+      const trimmed = paragraph.trim();
+      if (!trimmed || (trimmed.startsWith('*') && trimmed.endsWith('*'))) return false;
+      const candidate = comparisonText(trimmed);
+      return candidate.length >= 6 && source.includes(candidate);
+    });
+  }
+
+  function isLikelyCharacterEcho(reply, characterText) {
+    return copiedDialogueParagraphs(reply, characterText).length > 0;
+  }
+
+  function removeCharacterEcho(reply, characterText) {
+    const copied = new Set(copiedDialogueParagraphs(reply, characterText));
+    if (!copied.size) return reply;
+    return String(reply || '').split(/\n{2,}/)
+      .filter(paragraph => !copied.has(paragraph))
+      .join('\n\n')
+      .trim();
   }
 
   function formatStructuredReply(raw) {
