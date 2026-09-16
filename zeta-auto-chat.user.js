@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.2.5
+// @version      0.2.6
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.5
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.6
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.5
 // @run-at       document-idle
 // @grant        none
@@ -319,7 +319,7 @@
       await wait((min + Math.random() * (max - min)) * 1000, abortController.signal);
       if (!enabled) return;
 
-      const sent = await fillAndSend(reply);
+      const sent = await fillAndSend(reply, abortController.signal);
       if (!sent) throw new Error('입력창 또는 전송 버튼을 찾지 못했어요.');
 
       lastHandledFingerprint = fingerprint;
@@ -565,17 +565,58 @@
     textarea.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  async function fillAndSend(reply) {
-    const textarea = document.querySelector('textarea[aria-label="내용 입력하기"]');
-    if (!textarea || textarea.disabled) return false;
-    textarea.focus();
-    setNativeTextareaValue(textarea, reply);
+  function replyAppearedInChat(reply) {
+    const target = normalizeText(reply);
+    if (!target) return false;
+    return collectConversation().slice(-3).some(item => (
+      item.role === 'user' && normalizeText(item.text) === target
+    ));
+  }
 
-    await wait(250);
-    const send = document.querySelector('button[data-testid="chat-send-button"]');
-    if (!send || send.disabled || send.getAttribute('aria-disabled') === 'true') return false;
-    send.click();
-    return true;
+  async function fillAndSend(reply, signal) {
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const textarea = document.querySelector('textarea[aria-label="내용 입력하기"]');
+      if (!textarea || textarea.disabled) return false;
+
+      /* 이전 시도가 실제 채팅에 올라갔다면 입력창 상태와 무관하게 중복 전송하지 않는다. */
+      if (replyAppearedInChat(reply)) return true;
+
+      const current = normalizeText(textarea.value);
+      if (current && current !== normalizeText(reply)) {
+        throw new Error('입력창 내용이 바뀌어 재전송을 중단했어요.');
+      }
+
+      if (!current) {
+        textarea.focus();
+        setNativeTextareaValue(textarea, reply);
+        await wait(300, signal);
+      }
+
+      const send = document.querySelector('button[data-testid="chat-send-button"]');
+      if (!send || send.disabled || send.getAttribute('aria-disabled') === 'true') return false;
+
+      if (attempt > 1) {
+        setStatus(`전송 재시도 ${attempt - 1}/${maxAttempts - 1}`, 'busy');
+        renderWidget();
+      }
+
+      send.click();
+      await wait(2500, signal);
+
+      if (replyAppearedInChat(reply)) return true;
+
+      const after = document.querySelector('textarea[aria-label="내용 입력하기"]');
+      if (!after || !normalizeText(after.value)) return true;
+      if (normalizeText(after.value) !== normalizeText(reply)) {
+        throw new Error('입력창 내용이 바뀌어 재전송을 중단했어요.');
+      }
+
+      if (attempt < maxAttempts) await wait(1500, signal);
+    }
+
+    throw new Error('메시지 전송에 3번 실패해 자동대화를 정지했어요.');
   }
 
   function startAuto() {
