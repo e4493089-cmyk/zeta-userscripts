@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.7
+// @version      0.1.8
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.7
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.7
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.8
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.8
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -25,6 +25,17 @@
     '상대 캐릭터의 행동이나 대사를 대신 결정하지 않는다.',
     '해설, 분석, 따옴표, 답변 머리말 없이 실제로 전송할 내용만 출력한다.',
     '기본 언어는 한국어다.'
+  ].join('\n');
+  const HARD_ROLE_RULES = [
+    '[절대 출력 규칙]',
+    '너는 반드시 사용자 프로필의 인물만 연기한다.',
+    '제타 캐릭터의 행동, 표정, 감정, 생각, 대사를 절대 대신 작성하지 않는다.',
+    '사용자 자신의 행동, 표정, 상황 묘사, 속마음은 반드시 별표 한 개로 시작하고 별표 한 개로 끝낸다: *이렇게 작성한다.*',
+    '사용자가 실제로 말하는 대사는 별표와 따옴표 없이 일반 문장으로 작성한다.',
+    '출력에는 사용자 자신의 별표 지문을 최소 한 문단 이상 반드시 포함한다.',
+    '별표 두 개를 사용하는 굵은 글씨 문법은 사용하지 않는다.',
+    '제타 캐릭터 시점의 서술을 이어 쓰지 말고, 그 말과 행동에 대한 사용자의 반응만 작성한다.',
+    '해설이나 분석 없이 제타 입력창에 바로 전송할 사용자 답장만 출력한다.'
   ].join('\n');
   const DEFAULTS = {
     apiKey: '',
@@ -332,14 +343,22 @@
     const profile = normalizeText(settings.profile).slice(0, 20000);
     const systemPrompt = [
       settings.prompt.trim() || DEFAULT_PROMPT,
-      profile ? '\n[사용자 프로필]\n' + profile : ''
+      profile ? '\n[사용자 프로필]\n' + profile : '',
+      '\n' + HARD_ROLE_RULES
     ].filter(Boolean).join('\n');
+
+    /* OpenRouter의 assistant가 '사용자 역할'을 생성해야 하므로
+       Zeta의 사용자/캐릭터 역할을 API 대화 역할에 반대로 매핑한다. */
+    const apiHistory = history.map(item => ({
+      role: item.role === 'user' ? 'assistant' : 'user',
+      content: item.content
+    }));
 
     const payload = {
       model: settings.model.trim() || DEFAULTS.model,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...history
+        ...apiHistory
       ],
       temperature: clampNumber(settings.temperature, 0, 2, DEFAULTS.temperature),
       max_tokens: clampNumber(settings.maxOutputTokens, 50, 4000, DEFAULTS.maxOutputTokens)
