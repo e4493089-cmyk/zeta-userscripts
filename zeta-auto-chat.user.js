@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.0
+// @version      0.1.1
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
 // @run-at       document-idle
@@ -38,8 +38,7 @@
     minDelay: 2,
     maxDelay: 5,
     settleSeconds: 3,
-    sessionLimit: 30,
-    dailyLimit: 100
+    sessionLimit: 0
   };
 
   let settings = loadSettings();
@@ -251,12 +250,9 @@
     const fp = conversationFingerprint(items);
     if (fp === lastHandledFingerprint) return;
 
-    if (sessionTurns >= clampNumber(settings.sessionLimit, 1, 500, DEFAULTS.sessionLimit)) {
+    const sessionLimit = clampNumber(settings.sessionLimit, 0, 100000, DEFAULTS.sessionLimit);
+    if (sessionLimit > 0 && sessionTurns >= sessionLimit) {
       stopAuto('세션 한도 도달');
-      return;
-    }
-    if (getDailyUsage().count >= clampNumber(settings.dailyLimit, 1, 5000, DEFAULTS.dailyLimit)) {
-      stopAuto('오늘 한도 도달');
       return;
     }
 
@@ -510,8 +506,7 @@
             <div><label>최대 출력 토큰</label><input name="maxOutputTokens" type="number" min="50" max="4000"></div>
             <div><label>최소 전송 대기(초)</label><input name="minDelay" type="number" min="0" max="60" step="0.5"></div>
             <div><label>최대 전송 대기(초)</label><input name="maxDelay" type="number" min="0" max="120" step="0.5"></div>
-            <div><label>세션 전송 한도</label><input name="sessionLimit" type="number" min="1" max="500"></div>
-            <div><label>하루 전송 한도</label><input name="dailyLimit" type="number" min="1" max="5000"></div>
+            <div><label>세션 전송 한도 (0=무제한)</label><input name="sessionLimit" type="number" min="0" max="100000"></div>
           </div>
           <div class="zac-actions"><button class="zac-stop" type="button">자동대화 정지</button><button class="zac-save" type="button">저장</button></div>
         </div>`;
@@ -556,8 +551,7 @@
       maxOutputTokens: clampNumber(formValue(panel, 'maxOutputTokens'), 50, 4000, DEFAULTS.maxOutputTokens),
       minDelay: clampNumber(formValue(panel, 'minDelay'), 0, 60, DEFAULTS.minDelay),
       maxDelay: clampNumber(formValue(panel, 'maxDelay'), 0, 120, DEFAULTS.maxDelay),
-      sessionLimit: clampNumber(formValue(panel, 'sessionLimit'), 1, 500, DEFAULTS.sessionLimit),
-      dailyLimit: clampNumber(formValue(panel, 'dailyLimit'), 1, 5000, DEFAULTS.dailyLimit)
+      sessionLimit: clampNumber(formValue(panel, 'sessionLimit'), 0, 100000, DEFAULTS.sessionLimit)
     });
     closePanel();
     showToast('설정을 저장했어요.');
