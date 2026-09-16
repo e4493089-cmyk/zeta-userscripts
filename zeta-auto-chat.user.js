@@ -1,9 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.3
+// @version      0.1.4
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.4
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.4
 // @run-at       document-idle
 // @connect      openrouter.ai
 // @grant        GM_getValue
