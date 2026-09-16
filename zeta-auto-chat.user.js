@@ -1,16 +1,13 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.5
+// @version      0.1.6
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.5
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.5
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.6
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.6
 // @run-at       document-idle
-// @connect      openrouter.ai
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        GM_xmlhttpRequest
+// @grant        none
 // ==/UserScript==
 
 (() => {
@@ -57,9 +54,6 @@
 
   function storageGet(key, fallback) {
     try {
-      if (typeof GM_getValue === 'function') return GM_getValue(key, fallback);
-    } catch (_) {}
-    try {
       const raw = localStorage.getItem(key);
       return raw === null ? fallback : JSON.parse(raw);
     } catch (_) {
@@ -68,12 +62,6 @@
   }
 
   function storageSet(key, value) {
-    try {
-      if (typeof GM_setValue === 'function') {
-        GM_setValue(key, value);
-        return;
-      }
-    } catch (_) {}
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (_) {}
@@ -317,34 +305,6 @@
       'HTTP-Referer': 'https://zeta-ai.io/',
       'X-Title': 'Zeta Auto Chat'
     };
-
-    if (typeof GM_xmlhttpRequest === 'function') {
-      return new Promise((resolve, reject) => {
-        const request = GM_xmlhttpRequest({
-          method: 'POST',
-          url: 'https://openrouter.ai/api/v1/chat/completions',
-          headers,
-          data: body,
-          timeout: 90000,
-          onload: response => {
-            let data;
-            try { data = JSON.parse(response.responseText || '{}'); }
-            catch (_) { return reject(new Error('OpenRouter 응답을 읽지 못했어요.')); }
-            if (response.status < 200 || response.status >= 300) {
-              return reject(new Error(data?.error?.message || 'OpenRouter HTTP ' + response.status));
-            }
-            resolve(data);
-          },
-          onerror: () => reject(new Error('OpenRouter 네트워크 오류가 발생했어요.')),
-          ontimeout: () => reject(new Error('OpenRouter 요청 시간이 초과됐어요.'))
-        });
-
-        signal?.addEventListener('abort', () => {
-          try { request.abort(); } catch (_) {}
-          reject(new DOMException('Aborted', 'AbortError'));
-        }, { once: true });
-      });
-    }
 
     return fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', headers, body, signal
