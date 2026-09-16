@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.1
+// @version      0.1.2
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
 // @run-at       document-idle
@@ -30,6 +30,7 @@
   const DEFAULTS = {
     apiKey: '',
     model: 'google/gemini-2.5-flash-lite',
+    profile: '',
     prompt: DEFAULT_PROMPT,
     historyItems: 14,
     maxInputChars: 30000,
@@ -355,10 +356,16 @@
   async function generateReply(history, signal) {
     if (!settings.apiKey.trim()) throw new Error('먼저 OpenRouter API 키를 입력해줘.');
 
+    const profile = normalizeText(settings.profile).slice(0, 20000);
+    const systemPrompt = [
+      settings.prompt.trim() || DEFAULT_PROMPT,
+      profile ? '\n[사용자 프로필]\n' + profile : ''
+    ].filter(Boolean).join('\n');
+
     const payload = {
       model: settings.model.trim() || DEFAULTS.model,
       messages: [
-        { role: 'system', content: settings.prompt.trim() || DEFAULT_PROMPT },
+        { role: 'system', content: systemPrompt },
         ...history
       ],
       temperature: clampNumber(settings.temperature, 0, 2, DEFAULTS.temperature),
@@ -499,10 +506,13 @@
           <p class="zac-note">키는 이 기기의 유저스크립트 저장소에만 보관되며 GitHub로 전송되지 않습니다.</p>
           <label>모델</label>
           <input name="model" type="text">
+          <label>내 프로필</label>
+          <textarea name="profile" placeholder="성격, 말투, 상대와의 관계, 답장할 때 지켜야 할 설정 등을 적어주세요."></textarea>
+          <p class="zac-note">최근 대화와 함께 OpenRouter에 전달됩니다. 비워두면 최근 대화만 참고합니다.</p>
           <label>사용자 역할 프롬프트</label>
           <textarea name="prompt"></textarea>
           <div class="zac-grid">
-            <div><label>최근 대화 묶음 수</label><input name="historyItems" type="number" min="2" max="50"></div>
+            <div><label>최근 발화 수</label><input name="historyItems" type="number" min="2" max="50"></div>
             <div><label>최대 출력 토큰</label><input name="maxOutputTokens" type="number" min="50" max="4000"></div>
             <div><label>최소 전송 대기(초)</label><input name="minDelay" type="number" min="0" max="60" step="0.5"></div>
             <div><label>최대 전송 대기(초)</label><input name="maxDelay" type="number" min="0" max="120" step="0.5"></div>
@@ -546,6 +556,7 @@
       ...settings,
       apiKey: formValue(panel, 'apiKey').trim(),
       model: formValue(panel, 'model').trim() || DEFAULTS.model,
+      profile: formValue(panel, 'profile').trim(),
       prompt: formValue(panel, 'prompt').trim() || DEFAULT_PROMPT,
       historyItems: clampNumber(formValue(panel, 'historyItems'), 2, 50, DEFAULTS.historyItems),
       maxOutputTokens: clampNumber(formValue(panel, 'maxOutputTokens'), 50, 4000, DEFAULTS.maxOutputTokens),
