@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.2.3
+// @version      0.2.4
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.3
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.3
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.4
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.4
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -36,7 +36,7 @@
     '모든 narration의 행동 주체, 감정 주체, 생각 주체는 오직 사용자 프로필의 인물이어야 한다.',
     '제타 캐릭터가 웃거나, 움직이거나, 말하거나, 생각하거나, 표정을 짓는 새 지문은 한 문장도 쓰지 않는다.',
     '나쁜 예: *그가 미소 지으며 사용자를 끌어안았다.*',
-    '좋은 예: *나는 그의 시선을 피하며 손끝을 꼼지락거렸다.*',
+    '좋은 예: *나는 잠깐 그를 바라보다가 시선을 돌렸다.*',
     '별표 마크다운은 스크립트가 붙이므로 text 값에는 별표나 따옴표를 넣지 않는다.',
     '제타 캐릭터 시점의 서술을 이어 쓰지 말고, 그 말과 행동에 대한 사용자의 반응만 작성한다.',
     '직전 제타 캐릭터의 대사나 문장을 사용자 대사로 복사하거나 그대로 반복하지 않는다.',
