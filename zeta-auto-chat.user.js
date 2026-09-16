@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.4
+// @version      0.1.5
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.4
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.4
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.5
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.5
 // @run-at       document-idle
 // @connect      openrouter.ai
 // @grant        GM_getValue
@@ -434,6 +434,7 @@
     lastConversationChangeAt = Date.now();
     setStatus('대화 확인 중', 'on');
     renderWidget();
+    startObserver();
     scheduleCheck(300);
   }
 
@@ -441,6 +442,7 @@
     enabled = false;
     busy = false;
     clearTimeout(checkTimer);
+    stopObserver();
     abortController?.abort();
     abortController = null;
     setStatus(reason, 'off');
@@ -606,20 +608,29 @@
     toastTimer = window.setTimeout(() => toast.classList.remove('show'), 3200);
   }
 
+  function startObserver() {
+    if (observer) return;
+    observer = new MutationObserver(() => {
+      if (!enabled || busy) return;
+      /* 스트리밍 중 발생하는 수많은 변경을 한 번으로 묶는다. */
+      scheduleCheck(500);
+    });
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  }
+
+  function stopObserver() {
+    observer?.disconnect();
+    observer = null;
+  }
+
   function start() {
     installStyle();
     installUi();
     setStatus('정지됨', 'off');
-
-    observer = new MutationObserver(() => {
-      if (!document.getElementById(WIDGET_ID) || !document.getElementById(PANEL_ID)) {
-        installUi();
-      }
-      if (!enabled || busy) return;
-      noteConversationChange();
-      scheduleCheck();
-    });
-    observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   }
 
   if (document.readyState === 'loading') {
