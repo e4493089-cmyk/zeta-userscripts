@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.6
+// @version      0.1.7
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.6
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.6
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.7
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.7
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -192,16 +192,14 @@
     const textarea = document.querySelector('textarea[aria-label="내용 입력하기"]');
     if (!textarea || textarea.disabled) return true;
 
-    const loading = Array.from(document.querySelectorAll(
-      '[data-sentry-component="MessageLoadingIndicator"], [aria-label*="Stop"], [aria-label*="중지"]'
-    )).some(isVisible);
-
     const send = document.querySelector('button[data-testid="chat-send-button"]');
     const stopLike = send && /stop|중지/i.test(
       [send.getAttribute('aria-label'), send.getAttribute('title'), send.textContent].filter(Boolean).join(' ')
     );
 
-    return loading || !!stopLike;
+    /* MessageLoadingIndicator는 유휴 상태에도 DOM에 남는 버전이 있어
+       생성 여부 판정에 사용하지 않는다. 대화 내용 안정화 시간으로 대신 확인한다. */
+    return !!stopLike;
   }
 
   function scheduleCheck(delay = 350) {
@@ -225,8 +223,19 @@
 
     const items = noteConversationChange();
     const last = items[items.length - 1];
-    if (!last || last.role !== 'assistant') return;
+    if (!last) {
+      setStatus('대화 인식 못함', 'on');
+      renderWidget();
+      return;
+    }
+    if (last.role !== 'assistant') {
+      setStatus('제타 답변 대기', 'on');
+      renderWidget();
+      return;
+    }
     if (hasPendingGeneration()) {
+      setStatus('제타 생성 대기', 'on');
+      renderWidget();
       scheduleCheck(800);
       return;
     }
@@ -234,6 +243,8 @@
     const stableMs = clampNumber(settings.settleSeconds, 1, 15, DEFAULTS.settleSeconds) * 1000;
     const elapsed = Date.now() - lastConversationChangeAt;
     if (elapsed < stableMs) {
+      setStatus('답변 안정화 대기', 'on');
+      renderWidget();
       scheduleCheck(stableMs - elapsed + 150);
       return;
     }
@@ -395,6 +406,7 @@
     setStatus('대화 확인 중', 'on');
     renderWidget();
     startObserver();
+    showToast('자동대화를 시작했어요.');
     scheduleCheck(300);
   }
 
@@ -547,7 +559,18 @@
     const button = widget.querySelector('.zac-toggle');
     if (!button) return;
     const usage = getDailyUsage();
-    const nextText = enabled ? (busy ? 'AUTO 처리 중' : `AUTO ON · ${sessionTurns}`) : 'AUTO OFF';
+    const status = widget.dataset.status || '';
+    const statusLabel = {
+      '대화 확인 중': '확인 중',
+      '대화 인식 못함': '인식 못함',
+      '제타 답변 대기': '답변 대기',
+      '제타 생성 대기': '생성 대기',
+      '답변 안정화 대기': '안정화 중',
+      'AI 답변 대기 중': '답변 대기'
+    }[status] || 'ON';
+    const nextText = enabled
+      ? (busy ? 'AUTO 처리 중' : `AUTO ${statusLabel} · ${sessionTurns}`)
+      : 'AUTO OFF';
     const nextTitle = `${widget.dataset.status || '정지됨'} · 오늘 ${usage.count}회`;
     if (button.textContent !== nextText) button.textContent = nextText;
     if (button.title !== nextTitle) button.title = nextTitle;
