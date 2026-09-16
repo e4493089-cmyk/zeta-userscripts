@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.1.8
+// @version      0.1.9
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.8
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.8
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.9
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.1.9
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -30,10 +30,10 @@
     '[절대 출력 규칙]',
     '너는 반드시 사용자 프로필의 인물만 연기한다.',
     '제타 캐릭터의 행동, 표정, 감정, 생각, 대사를 절대 대신 작성하지 않는다.',
-    '사용자 자신의 행동, 표정, 상황 묘사, 속마음은 반드시 별표 한 개로 시작하고 별표 한 개로 끝낸다: *이렇게 작성한다.*',
-    '사용자가 실제로 말하는 대사는 별표와 따옴표 없이 일반 문장으로 작성한다.',
-    '출력에는 사용자 자신의 별표 지문을 최소 한 문단 이상 반드시 포함한다.',
-    '별표 두 개를 사용하는 굵은 글씨 문법은 사용하지 않는다.',
+    '사용자 자신의 행동, 표정, 상황 묘사, 속마음은 narration 항목으로 분류한다.',
+    '사용자가 실제로 말하는 대사는 dialogue 항목으로 분류한다.',
+    '출력에는 사용자 자신의 narration 항목을 최소 하나 이상 반드시 포함한다.',
+    '별표 마크다운은 스크립트가 붙이므로 text 값에는 별표나 따옴표를 넣지 않는다.',
     '제타 캐릭터 시점의 서술을 이어 쓰지 말고, 그 말과 행동에 대한 사용자의 반응만 작성한다.',
     '해설이나 분석 없이 제타 입력창에 바로 전송할 사용자 답장만 출력한다.'
   ].join('\n');
@@ -361,7 +361,34 @@
         ...apiHistory
       ],
       temperature: clampNumber(settings.temperature, 0, 2, DEFAULTS.temperature),
-      max_tokens: clampNumber(settings.maxOutputTokens, 50, 4000, DEFAULTS.maxOutputTokens)
+      max_tokens: clampNumber(settings.maxOutputTokens, 50, 4000, DEFAULTS.maxOutputTokens),
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'zeta_user_reply',
+          strict: true,
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              parts: {
+                type: 'array',
+                minItems: 1,
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    type: { type: 'string', enum: ['narration', 'dialogue'] },
+                    text: { type: 'string', minLength: 1 }
+                  },
+                  required: ['type', 'text']
+                }
+              }
+            },
+            required: ['parts']
+          }
+        }
+      }
     };
 
     const data = await openRouterRequest(payload, signal);
@@ -372,7 +399,32 @@
       text = content.map(x => typeof x === 'string' ? x : x?.text || '').join('');
     }
 
-    return normalizeGeneratedReply(text);
+    return formatStructuredReply(text);
+  }
+
+  function formatStructuredReply(raw) {
+    const source = String(raw || '')
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
+      .trim();
+
+    try {
+      const data = JSON.parse(source);
+      if (Array.isArray(data?.parts) && data.parts.length) {
+        const parts = data.parts.map(part => {
+          const text = normalizeText(part?.text)
+            .replace(/^\*+|\*+$/g, '')
+            .replace(/^[“”"]+|[“”"]+$/g, '')
+            .trim();
+          if (!text) return '';
+          return part.type === 'narration' ? `*${text}*` : text;
+        }).filter(Boolean);
+        if (parts.length) return parts.join('\n\n');
+      }
+    } catch (_) {}
+
+    /* 구조화 출력을 지원하지 않는 모델로 바꾼 경우의 호환용 처리. */
+    return normalizeGeneratedReply(source);
   }
 
   function normalizeGeneratedReply(text) {
