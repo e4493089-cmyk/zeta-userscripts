@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta Auto Chat (OpenRouter)
 // @namespace    zeta-auto-chat-openrouter
-// @version      0.2.0
+// @version      0.2.1
 // @description  OpenRouter로 다음 사용자 답장을 만들고 Zeta 채팅에 자동 전송합니다.
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.0
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.0
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.1
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-auto-chat.user.js?v=0.2.1
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -33,6 +33,10 @@
     '사용자 자신의 행동, 표정, 상황 묘사, 속마음은 narration 항목으로 분류한다.',
     '사용자가 실제로 말하는 대사는 dialogue 항목으로 분류한다.',
     '출력에는 사용자 자신의 narration 항목을 최소 하나 이상 반드시 포함한다.',
+    '모든 narration의 행동 주체, 감정 주체, 생각 주체는 오직 사용자 프로필의 인물이어야 한다.',
+    '제타 캐릭터가 웃거나, 움직이거나, 말하거나, 생각하거나, 표정을 짓는 새 지문은 한 문장도 쓰지 않는다.',
+    '나쁜 예: *그가 미소 지으며 사용자를 끌어안았다.*',
+    '좋은 예: *나는 그의 시선을 피하며 손끝을 꼼지락거렸다.*',
     '별표 마크다운은 스크립트가 붙이므로 text 값에는 별표나 따옴표를 넣지 않는다.',
     '제타 캐릭터 시점의 서술을 이어 쓰지 말고, 그 말과 행동에 대한 사용자의 반응만 작성한다.',
     '직전 제타 캐릭터의 대사나 문장을 사용자 대사로 복사하거나 그대로 반복하지 않는다.',
@@ -348,18 +352,26 @@
       '\n' + HARD_ROLE_RULES
     ].filter(Boolean).join('\n');
 
-    /* OpenRouter의 assistant가 '사용자 역할'을 생성해야 하므로
-       Zeta의 사용자/캐릭터 역할을 API 대화 역할에 반대로 매핑한다. */
-    const apiHistory = history.map(item => ({
-      role: item.role === 'user' ? 'assistant' : 'user',
-      content: item.content
-    }));
+    /* API의 user/assistant 역할을 뒤집으면 가벼운 모델이 화자를 혼동할 수 있다.
+       화자를 직접 표시한 대본으로 전달해 제타 캐릭터와 사용자 캐릭터를 분리한다. */
+    const transcript = history.map((item, index) => {
+      const speaker = item.role === 'user' ? '사용자 캐릭터' : '제타 캐릭터';
+      return `[${index + 1}. ${speaker}]\n${item.content}`;
+    }).join('\n\n');
+    const transcriptPrompt = [
+      '[대화 기록]',
+      transcript,
+      '',
+      '[이번 출력 대상]',
+      '위 기록에서 제타 캐릭터의 마지막 말과 행동에 반응하는 "사용자 캐릭터"의 다음 답장만 작성한다.',
+      '제타 캐릭터의 다음 행동·표정·감정·생각·대사는 예측하거나 대신 쓰지 않는다.'
+    ].join('\n');
 
     const payload = {
       model: settings.model.trim() || DEFAULTS.model,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...apiHistory
+        { role: 'user', content: transcriptPrompt }
       ],
       temperature: clampNumber(settings.temperature, 0, 2, DEFAULTS.temperature),
       max_tokens: clampNumber(settings.maxOutputTokens, 50, 4000, DEFAULTS.maxOutputTokens),
@@ -379,10 +391,11 @@
                   type: 'object',
                   additionalProperties: false,
                   properties: {
+                    actor: { type: 'string', enum: ['user_character'] },
                     type: { type: 'string', enum: ['narration', 'dialogue'] },
                     text: { type: 'string', minLength: 1 }
                   },
-                  required: ['type', 'text']
+                  required: ['actor', 'type', 'text']
                 }
               }
             },
