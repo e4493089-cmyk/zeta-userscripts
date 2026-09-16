@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.7
+// @version      3.50.8
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.7
@@ -909,6 +909,13 @@
     html.${ACTIVE} #portal-container
       button[aria-label^="메시지"] > span:last-child {
       color: #394A54 !important;
+    }
+
+    /* 휴대폰 몰래 보기의 메시지 앱 아이콘은 액션 패널 버튼이 아니다. */
+    html.${ACTIVE} #portal-container
+      [data-testid="phone-peek-panel"]
+      button[aria-label="메시지"] > span:first-child {
+      background: transparent !important;
     }
 
     /* 메시지 새 알림 점 */
