@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.1.8
-// @description  로드되지 않은 이전 메시지까지 거슬러 올라가 Zeta 대화 전체를 Markdown 또는 TXT로 저장합니다.
+// @version      0.2.0
+// @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -17,6 +17,7 @@
   const BUTTON_ID = APP + '-button';
   const MENU_ID = APP + '-menu';
   const PANEL_ID = APP + '-panel';
+  const RANGE_ID = APP + '-range';
   const STYLE_ID = APP + '-style';
   const MESSAGE_SELECTOR = '[data-sentry-component="BodyView"][id^="message-"]';
   const CHAT_SELECTOR = '[role="log"][aria-label="Chat messages"]';
@@ -157,6 +158,61 @@
   function messageNumber(id) {
     const match = String(id || '').match(/^message-MESSAGE-(\d+)-/);
     return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+  }
+
+  function comparableText(value) {
+    return clean(value)
+      .replace(/^@[^:\n]{1,80}:\s*/, '')
+      .replace(/[＊*`_~]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function bookmarkUrl() {
+    return location.pathname.replace(/\/bookmarks\/?$/, '').replace(/\/$/, '') + '/bookmarks';
+  }
+
+  async function loadBookmarks() {
+    const response = await fetch(bookmarkUrl(), {
+      credentials: 'include',
+      headers: { Accept: 'text/html' }
+    });
+    if (!response.ok) throw new Error('책갈피 목록을 불러오지 못했어요.');
+
+    const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const bookmarks = Array.from(page.querySelectorAll('[data-testid^="bookmark-item-"]')).map(button => ({
+      id: button.dataset.testid.replace('bookmark-item-', ''),
+      date: clean(button.querySelector('.body14')?.textContent || ''),
+      preview: clean(button.querySelector('.body12')?.textContent || '')
+    })).filter(item => item.preview);
+
+    if (bookmarks.length < 2) {
+      throw new Error('구간을 고르려면 책갈피가 2개 이상 필요해요.');
+    }
+    return bookmarks;
+  }
+
+  function bookmarkIndex(items, bookmark) {
+    const needle = comparableText(bookmark.preview);
+    if (!needle) return -1;
+
+    let bestIndex = -1;
+    let bestScore = 0;
+    items.forEach((item, index) => {
+      const haystack = comparableText(item.parts.map(part => part.text).join(' '));
+      if (!haystack) return;
+      const score = haystack.includes(needle)
+        ? needle.length + 10000
+        : needle.includes(haystack)
+          ? haystack.length + 5000
+          : 0;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    });
+    return bestIndex;
   }
 
   function mergeOrder(existing, incoming) {
@@ -322,7 +378,7 @@
     return messages.join('\n\n\n').trim() + '\n';
   }
 
-  async function exportAll(format = 'markdown') {
+  async function exportAll(format = 'markdown', range = null) {
     if (running) return;
     const log = findChatLog();
     if (!log) {
@@ -442,10 +498,22 @@
        * 가상 스크롤의 DOM 배치와 무관하게 번호 내림차순으로 과거→최신을 강제한다.
        */
       const orderIndex = new Map(order.map((id, index) => [id, index]));
-      const items = Array.from(messages.values()).sort((a, b) => {
+      let items = Array.from(messages.values()).sort((a, b) => {
         const difference = messageNumber(b.id) - messageNumber(a.id);
         return difference || (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0);
       });
+      let fileScope = '전체대화';
+      if (range) {
+        const first = bookmarkIndex(items, range.start);
+        const second = bookmarkIndex(items, range.end);
+        if (first < 0 || second < 0) {
+          throw new Error('선택한 책갈피의 원본 메시지를 찾지 못했어요.');
+        }
+        const from = Math.min(first, second);
+        const to = Math.max(first, second);
+        items = items.slice(from, to + 1);
+        fileScope = '책갈피구간';
+      }
       const meta = {
         title: titleFromPage(),
         url: location.href,
@@ -455,12 +523,12 @@
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       if (format === 'text') {
         download(
-          `${safeFileName(meta.title)}-전체대화-${stamp}.txt`,
+          `${safeFileName(meta.title)}-${fileScope}-${stamp}.txt`,
           buildText(meta, items),
           'text/plain;charset=utf-8'
         );
       } else {
-        download(`${safeFileName(meta.title)}-전체대화-${stamp}.md`, buildMarkdown(meta, items));
+        download(`${safeFileName(meta.title)}-${fileScope}-${stamp}.md`, buildMarkdown(meta, items));
       }
       updatePanel('저장 완료', `${items.length}개 메시지를 ${format === 'text' ? 'TXT' : 'MD'}로 저장했어요.`);
       await wait(1200);
@@ -479,11 +547,38 @@
     }
   }
 
+  async function openRangePicker() {
+    const dialog = document.getElementById(RANGE_ID);
+    if (!dialog) return;
+    dialog.hidden = false;
+    dialog.querySelector('.zfce-range-state').textContent = '책갈피를 불러오는 중…';
+    dialog.querySelector('.zfce-range-form').hidden = true;
+
+    try {
+      const bookmarks = await loadBookmarks();
+      dialog.bookmarks = bookmarks;
+      const options = bookmarks.map((bookmark, index) =>
+        `<option value="${index}">${escapeHtml(bookmark.date)} · ${escapeHtml(bookmark.preview.slice(0, 54))}</option>`
+      ).join('');
+      const start = dialog.querySelector('[name="start"]');
+      const end = dialog.querySelector('[name="end"]');
+      start.innerHTML = options;
+      end.innerHTML = options;
+      /* 목록은 보통 최신→과거다. 기본값은 가장 오래된 것부터 가장 최신 것까지. */
+      start.value = String(bookmarks.length - 1);
+      end.value = '0';
+      dialog.querySelector('.zfce-range-state').textContent = '시작과 끝 책갈피를 골라줘.';
+      dialog.querySelector('.zfce-range-form').hidden = false;
+    } catch (error) {
+      dialog.querySelector('.zfce-range-state').textContent = error?.message || String(error);
+    }
+  }
+
   function installUi() {
     if (!document.getElementById(STYLE_ID)) {
       const style = document.createElement('style');
       style.id = STYLE_ID;
-      style.textContent = `#${BUTTON_ID}{position:fixed;right:14px;bottom:142px;z-index:2147483643;border:0;border-radius:999px;padding:11px 15px;background:#6d48ff;color:#fff;font:800 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 5px 18px rgba(0,0,0,.24)}#${BUTTON_ID}[hidden],#${MENU_ID}[hidden]{display:none}#${MENU_ID}{position:fixed;right:14px;bottom:186px;z-index:2147483644;display:grid;min-width:174px;padding:7px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#fff;box-shadow:0 9px 28px rgba(0,0,0,.24);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${MENU_ID} button{border:0;border-radius:9px;padding:11px 13px;background:transparent;color:#263238;font-size:13px;font-weight:800;text-align:left}#${MENU_ID} button:active{background:#f0edff}#${PANEL_ID}{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.58);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${PANEL_ID}[hidden]{display:none}#${PANEL_ID} .zfce-card{width:min(360px,100%);padding:20px;border-radius:17px;background:#fff;color:#263238;box-shadow:0 18px 50px rgba(0,0,0,.35);text-align:center}#${PANEL_ID} .zfce-status{font-weight:850;font-size:16px}#${PANEL_ID} .zfce-detail{margin:8px 0 15px;color:#78858c;font-size:12px}#${PANEL_ID} .zfce-card>button{border:0;border-radius:10px;background:#eceff1;color:#45545c;padding:10px 18px;font-weight:800}`;
+      style.textContent = `#${BUTTON_ID}{position:fixed;right:14px;bottom:142px;z-index:2147483643;border:0;border-radius:999px;padding:11px 15px;background:#6d48ff;color:#fff;font:800 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 5px 18px rgba(0,0,0,.24)}#${BUTTON_ID}[hidden],#${MENU_ID}[hidden],#${PANEL_ID}[hidden],#${RANGE_ID}[hidden],#${RANGE_ID} [hidden]{display:none!important}#${MENU_ID}{position:fixed;right:14px;bottom:186px;z-index:2147483644;display:grid;min-width:190px;padding:7px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#fff;box-shadow:0 9px 28px rgba(0,0,0,.24);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${MENU_ID} button{border:0;border-radius:9px;padding:11px 13px;background:transparent;color:#263238;font-size:13px;font-weight:800;text-align:left}#${MENU_ID} button:active{background:#f0edff}#${MENU_ID} .zfce-range-open{margin-top:4px;border-top:1px solid #eceff1;border-radius:0 0 9px 9px;padding-top:13px;color:#6d48ff}#${PANEL_ID},#${RANGE_ID}{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.58);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${PANEL_ID} .zfce-card,#${RANGE_ID} .zfce-card{width:min(390px,100%);padding:20px;border-radius:17px;background:#fff;color:#263238;box-shadow:0 18px 50px rgba(0,0,0,.35)}#${PANEL_ID} .zfce-card{text-align:center}#${PANEL_ID} .zfce-status{font-weight:850;font-size:16px}#${PANEL_ID} .zfce-detail{margin:8px 0 15px;color:#78858c;font-size:12px}#${PANEL_ID} .zfce-card>button,#${RANGE_ID} button{border:0;border-radius:10px;background:#eceff1;color:#45545c;padding:10px 14px;font-weight:800}#${RANGE_ID} h3{margin:0 0 6px;font-size:17px}#${RANGE_ID} .zfce-range-state{margin-bottom:15px;color:#78858c;font-size:12px}#${RANGE_ID} label{display:block;margin:11px 0 6px;font-size:12px;font-weight:800}#${RANGE_ID} select{display:block;width:100%;height:43px;border:1px solid #dfe4e7;border-radius:10px;background:#f7f9fa;color:#263238;padding:0 10px}#${RANGE_ID} .zfce-range-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}#${RANGE_ID} .zfce-range-actions button{background:#6d48ff;color:#fff}#${RANGE_ID} .zfce-range-close{float:right;margin:-6px -6px 0 8px;background:transparent;padding:7px}`;
       document.head.appendChild(style);
     }
 
@@ -504,9 +599,14 @@
       const menu = document.createElement('div');
       menu.id = MENU_ID;
       menu.hidden = true;
-      menu.innerHTML = '<button type="button" data-format="markdown">Markdown (.md)</button><button type="button" data-format="text">텍스트 (.txt)</button>';
+      menu.innerHTML = '<button type="button" data-format="markdown">전체 · Markdown (.md)</button><button type="button" data-format="text">전체 · 텍스트 (.txt)</button><button type="button" class="zfce-range-open">책갈피 구간…</button>';
       menu.addEventListener('click', event => {
         event.stopPropagation();
+        if (event.target.closest('.zfce-range-open')) {
+          menu.hidden = true;
+          openRangePicker();
+          return;
+        }
         const format = event.target.closest('button[data-format]')?.dataset.format;
         if (!format) return;
         menu.hidden = true;
@@ -522,6 +622,25 @@
       panel.innerHTML = '<div class="zfce-card"><div class="zfce-status">준비 중…</div><div class="zfce-detail"></div><button type="button">취소</button></div>';
       panel.querySelector('button').addEventListener('click', () => { cancelled = true; });
       document.body.appendChild(panel);
+    }
+
+    if (!document.getElementById(RANGE_ID)) {
+      const range = document.createElement('div');
+      range.id = RANGE_ID;
+      range.hidden = true;
+      range.innerHTML = '<div class="zfce-card"><button type="button" class="zfce-range-close" aria-label="닫기">✕</button><h3>책갈피 구간 내보내기</h3><div class="zfce-range-state"></div><div class="zfce-range-form" hidden><label>시작 책갈피</label><select name="start"></select><label>끝 책갈피</label><select name="end"></select><div class="zfce-range-actions"><button type="button" data-format="markdown">MD로 저장</button><button type="button" data-format="text">TXT로 저장</button></div></div></div>';
+      range.querySelector('.zfce-range-close').addEventListener('click', () => { range.hidden = true; });
+      range.querySelector('.zfce-range-actions').addEventListener('click', event => {
+        const format = event.target.closest('button[data-format]')?.dataset.format;
+        if (!format) return;
+        const bookmarks = range.bookmarks || [];
+        const start = bookmarks[Number(range.querySelector('[name="start"]').value)];
+        const end = bookmarks[Number(range.querySelector('[name="end"]').value)];
+        if (!start || !end) return;
+        range.hidden = true;
+        exportAll(format, { start, end });
+      });
+      document.body.appendChild(range);
     }
 
     const hidden = !visibleChatPage();
