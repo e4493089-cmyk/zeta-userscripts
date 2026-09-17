@@ -6,6 +6,7 @@ Current public userscripts in this repository:
 3. zeta-capture-ooc-hide.user.js
 4. zeta-room-manager.user.js
 5. zeta-fullscreen.user.js
+6. zeta-full-chat-export.user.js
 
 Keep these filenames unchanged. Each userscript contains its own Tampermonkey update/download URL.
 Increase @version only when releasing an actual script update.
