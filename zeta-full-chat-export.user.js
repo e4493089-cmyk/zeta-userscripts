@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.2.2
+// @version      0.2.3
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -534,17 +534,47 @@
 
       while (!cancelled) {
         const beforeHeight = log.scrollHeight;
-        const target = reverse ? -(log.scrollHeight + log.clientHeight) : 0;
-        log.scrollTo({ top: target, behavior: 'auto' });
+        const beforeTop = log.scrollTop;
+        if (range) {
+          /* 책갈피 구간은 최신→과거 방향으로 조금씩 훑어 경계 메시지를 놓치지 않는다. */
+          const step = Math.max(280, log.clientHeight * .72);
+          log.scrollBy({ top: -step, behavior: 'auto' });
+        } else {
+          const target = reverse ? -(log.scrollHeight + log.clientHeight) : 0;
+          log.scrollTo({ top: target, behavior: 'auto' });
+        }
 
         /* 끝으로 바로 점프한 뒤 새 과거 묶음이 붙을 최소 시간만 기다린다. */
-        await wait(320);
+        await wait(range ? 180 : 320);
         order = capture(messages, order);
 
         const resized = Math.abs(log.scrollHeight - beforeHeight) > 2;
         const grew = messages.size > previousCount;
+        const moved = Math.abs(log.scrollTop - beforeTop) > 2;
         previousCount = messages.size;
-        stableAtEdge = (!resized && !grew) ? stableAtEdge + 1 : 0;
+        stableAtEdge = (!resized && !grew && !moved) ? stableAtEdge + 1 : 0;
+
+        if (range) {
+          const foundStart = messages.has(range.startMessageId);
+          const foundEnd = messages.has(range.endMessageId);
+          updatePanel(
+            '과거 대화에서 책갈피를 찾는 중…',
+            `시작 ${foundStart ? '찾음' : '탐색 중'} · 끝 ${foundEnd ? '찾음' : '탐색 중'} · ${messages.size}개 수집`
+          );
+          if (foundStart && foundEnd) break;
+          if (stableAtEdge >= 12) {
+            throw new Error('과거 대화 끝까지 확인했지만 선택한 책갈피를 찾지 못했어요.');
+          }
+          if (!moved) {
+            log.scrollTo({
+              top: reverse ? -(log.scrollHeight + log.clientHeight) : 0,
+              behavior: 'auto'
+            });
+            await wait(420);
+            order = capture(messages, order);
+          }
+          continue;
+        }
 
         updatePanel('이전 대화를 빠르게 불러오는 중…', `${messages.size}개 수집 · 맨 처음 확인 ${stableAtEdge}/8`);
         if (stableAtEdge >= 8) break;
@@ -565,7 +595,7 @@
       chronologicalOrder = capture(messages, chronologicalOrder);
       updatePanel('처음부터 순서대로 확인 중…', `${messages.size}개 수집`);
 
-      while (!cancelled) {
+      while (!range && !cancelled) {
         const beforeTop = log.scrollTop;
         const beforeCount = messages.size;
         const step = Math.max(320, log.clientHeight * 0.82);
