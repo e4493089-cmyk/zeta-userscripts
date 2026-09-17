@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.2.3
+// @version      0.2.4
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -509,15 +509,6 @@
     let previousCount = 0;
 
     try {
-      if (range) {
-        updatePanel('책갈피 위치를 확인하는 중…', '시작 책갈피 확인');
-        range.startMessageId = await resolveBookmarkMessageId(range.start);
-        updatePanel('책갈피 위치를 확인하는 중…', '끝 책갈피 확인');
-        range.endMessageId = await resolveBookmarkMessageId(range.end);
-        if (range.startMessageId === range.endMessageId) {
-          throw new Error('서로 다른 두 책갈피를 선택해줘.');
-        }
-      }
       const reverse = getComputedStyle(log).flexDirection.includes('reverse');
 
       /* 실행 위치와 관계없이 최신 메시지를 먼저 기준점으로 잡는다. */
@@ -548,6 +539,18 @@
         await wait(range ? 180 : 320);
         order = capture(messages, order);
 
+        if (range) {
+          const scanned = Array.from(messages.values());
+          if (!range.startMessageId) {
+            const index = bookmarkIndex(scanned, range.start);
+            if (index >= 0) range.startMessageId = scanned[index].id;
+          }
+          if (!range.endMessageId) {
+            const index = bookmarkIndex(scanned, range.end);
+            if (index >= 0) range.endMessageId = scanned[index].id;
+          }
+        }
+
         const resized = Math.abs(log.scrollHeight - beforeHeight) > 2;
         const grew = messages.size > previousCount;
         const moved = Math.abs(log.scrollTop - beforeTop) > 2;
@@ -561,7 +564,12 @@
             '과거 대화에서 책갈피를 찾는 중…',
             `시작 ${foundStart ? '찾음' : '탐색 중'} · 끝 ${foundEnd ? '찾음' : '탐색 중'} · ${messages.size}개 수집`
           );
-          if (foundStart && foundEnd) break;
+          if (foundStart && foundEnd) {
+            if (range.startMessageId === range.endMessageId) {
+              throw new Error('두 책갈피가 같은 메시지로 인식됐어요. 다른 책갈피를 선택해줘.');
+            }
+            break;
+          }
           if (stableAtEdge >= 12) {
             throw new Error('과거 대화 끝까지 확인했지만 선택한 책갈피를 찾지 못했어요.');
           }
@@ -790,6 +798,10 @@
         const start = bookmarks[Number(range.querySelector('[name="start"]').value)];
         const end = bookmarks[Number(range.querySelector('[name="end"]').value)];
         if (!start || !end) return;
+        if (start.id === end.id) {
+          range.querySelector('.zfce-range-state').textContent = '서로 다른 두 책갈피를 선택해줘.';
+          return;
+        }
         range.hidden = true;
         exportAll(format, { start, end });
       });
