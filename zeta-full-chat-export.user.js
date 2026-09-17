@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.2.1
+// @version      0.2.2
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -239,6 +239,74 @@
     return bookmarks;
   }
 
+  function messageIdFromCursor(value) {
+    let text = String(value || '');
+    for (let i = 0; i < 3; i += 1) {
+      try { text = decodeURIComponent(text); } catch (_) { break; }
+    }
+    const match = text.match(/(?:^|[:?=&])(MESSAGE-\d+-[A-Za-z0-9_-]+)/);
+    return match ? 'message-' + match[1] : '';
+  }
+
+  async function resolveBookmarkMessageId(bookmark) {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:420px;height:720px;border:0;opacity:.01;pointer-events:none;';
+    document.body.appendChild(frame);
+
+    try {
+      const loaded = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('책갈피 위치 확인 시간이 초과됐어요.')), 15000);
+        frame.addEventListener('load', () => {
+          clearTimeout(timer);
+          resolve();
+        }, { once: true });
+      });
+      frame.src = bookmarkUrl();
+      await loaded;
+
+      let button = null;
+      for (let attempt = 0; attempt < 35 && !button; attempt += 1) {
+        await wait(attempt ? 300 : 800);
+        const page = frame.contentDocument;
+        button = page?.querySelector(`[data-testid="bookmark-item-${CSS.escape(bookmark.id)}"]`) || null;
+        const scroller = page?.querySelector(
+          '[data-sentry-component="BookmarkList"] [data-sentry-component="WrappedDiv"]'
+        );
+        if (!button && scroller) scroller.scrollBy({ top: scroller.clientHeight * .9, behavior: 'auto' });
+      }
+      if (!button) throw new Error('선택한 책갈피 항목을 다시 찾지 못했어요.');
+
+      let navigatedUrl = '';
+      const frameWindow = frame.contentWindow;
+      ['pushState', 'replaceState'].forEach(name => {
+        const original = frameWindow.history[name].bind(frameWindow.history);
+        frameWindow.history[name] = (...args) => {
+          navigatedUrl = String(args[2] || navigatedUrl);
+          return original(...args);
+        };
+      });
+      button.click();
+
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        await wait(80);
+        let currentUrl = '';
+        let html = '';
+        try {
+          currentUrl = frame.contentWindow.location.href;
+          html = frame.contentDocument?.documentElement?.innerHTML || '';
+        } catch (_) {}
+        const id = messageIdFromCursor(navigatedUrl) ||
+          messageIdFromCursor(currentUrl) ||
+          messageIdFromCursor(html);
+        if (id) return id;
+      }
+      throw new Error('책갈피의 정확한 메시지 위치를 읽지 못했어요.');
+    } finally {
+      frame.remove();
+    }
+  }
+
   function bookmarkIndex(items, bookmark) {
     const needle = comparableText(bookmark.preview);
     if (!needle) return -1;
@@ -441,6 +509,15 @@
     let previousCount = 0;
 
     try {
+      if (range) {
+        updatePanel('책갈피 위치를 확인하는 중…', '시작 책갈피 확인');
+        range.startMessageId = await resolveBookmarkMessageId(range.start);
+        updatePanel('책갈피 위치를 확인하는 중…', '끝 책갈피 확인');
+        range.endMessageId = await resolveBookmarkMessageId(range.end);
+        if (range.startMessageId === range.endMessageId) {
+          throw new Error('서로 다른 두 책갈피를 선택해줘.');
+        }
+      }
       const reverse = getComputedStyle(log).flexDirection.includes('reverse');
 
       /* 실행 위치와 관계없이 최신 메시지를 먼저 기준점으로 잡는다. */
@@ -550,10 +627,10 @@
       });
       let fileScope = '전체대화';
       if (range) {
-        const first = bookmarkIndex(items, range.start);
-        const second = bookmarkIndex(items, range.end);
+        const first = items.findIndex(item => item.id === range.startMessageId);
+        const second = items.findIndex(item => item.id === range.endMessageId);
         if (first < 0 || second < 0) {
-          throw new Error('선택한 책갈피의 원본 메시지를 찾지 못했어요.');
+          throw new Error('선택한 책갈피 메시지를 불러온 대화에서 찾지 못했어요.');
         }
         const from = Math.min(first, second);
         const to = Math.max(first, second);
