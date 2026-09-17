@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.9
+// @version      3.50.10
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.9
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.9
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.10
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.10
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -2885,50 +2885,50 @@
     }
 
     /* 각 책갈피 행 */
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"] {
+    html.kt-bookmark-active [data-testid^="bookmark-item-"] {
       background: #FFFFFF !important;
       color: #26343C !important;
     }
 
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"] > div {
+    html.kt-bookmark-active [data-testid^="bookmark-item-"] > div {
       border-bottom-color: #E8ECEF !important;
     }
 
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"] .body14 {
+    html.kt-bookmark-active [data-testid^="bookmark-item-"] .body14 {
       color: #35434B !important;
     }
 
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"]
+    html.kt-bookmark-active [data-testid^="bookmark-item-"]
       [class*="text-white/70"],
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"] .body12 {
+    html.kt-bookmark-active [data-testid^="bookmark-item-"] .body12 {
       color: #6C7A82 !important;
     }
 
     /* 편집모드 수정/해제 */
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"] button {
+    html.kt-bookmark-active [data-testid^="bookmark-item-"] button {
       box-shadow: none !important;
       border: 1px solid #DFE5E8 !important;
     }
 
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"]
+    html.kt-bookmark-active [data-testid^="bookmark-item-"]
       .kt-bookmark-edit-button {
       background: #F2F4F5 !important;
       color: #3F4E57 !important;
     }
 
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"]
+    html.kt-bookmark-active [data-testid^="bookmark-item-"]
       .kt-bookmark-remove-button {
       background: #FFF1F1 !important;
       color: #C75151 !important;
       border-color: #F2D6D6 !important;
     }
 
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"]
+    html.kt-bookmark-active [data-testid^="bookmark-item-"]
       .kt-bookmark-edit-button:hover {
       background: #E9EDEF !important;
     }
 
-    html.kt-bookmark-active [data-sentry-component="BookmarkListItem"]
+    html.kt-bookmark-active [data-testid^="bookmark-item-"]
       .kt-bookmark-remove-button:hover {
       background: #FBE6E6 !important;
     }
@@ -8007,7 +8007,7 @@
     }
 
     document.querySelectorAll(
-      '[data-sentry-component="BookmarkListItem"] button'
+      '[data-testid^="bookmark-item-"] button'
     ).forEach(btn => {
       const label = (btn.textContent || '').replace(/\s+/g, ' ').trim();
 
