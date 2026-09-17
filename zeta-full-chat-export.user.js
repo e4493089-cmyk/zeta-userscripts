@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.2.4
+// @version      0.2.5
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -528,7 +528,7 @@
         const beforeTop = log.scrollTop;
         if (range) {
           /* 책갈피 구간은 최신→과거 방향으로 조금씩 훑어 경계 메시지를 놓치지 않는다. */
-          const step = Math.max(280, log.clientHeight * .72);
+          const step = Math.max(150, log.clientHeight * .36);
           log.scrollBy({ top: -step, behavior: 'auto' });
         } else {
           const target = reverse ? -(log.scrollHeight + log.clientHeight) : 0;
@@ -536,8 +536,14 @@
         }
 
         /* 끝으로 바로 점프한 뒤 새 과거 묶음이 붙을 최소 시간만 기다린다. */
-        await wait(range ? 180 : 320);
+        await wait(range ? 340 : 320);
         order = capture(messages, order);
+
+        /* 가상 스크롤의 늦은 렌더링까지 한 번 더 기다려 같은 위치를 재확인한다. */
+        if (range) {
+          await wait(180);
+          order = capture(messages, order);
+        }
 
         if (range) {
           const scanned = Array.from(messages.values());
