@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.1
+// @version      0.3.2
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -188,15 +188,19 @@
     document.body.appendChild(frame);
 
     try {
-      const loaded = new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('책갈피 화면 로딩 시간이 초과됐어요.')), 45000);
-        frame.addEventListener('load', () => {
-          clearTimeout(timer);
-          resolve();
-        }, { once: true });
-      });
       frame.src = bookmarkUrl();
-      await loaded;
+
+      let ready = false;
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        await wait(400);
+        try {
+          ready = !!frame.contentDocument?.querySelector(
+            '[data-sentry-component="BookmarkList"], [data-testid^="bookmark-item-"]'
+          );
+        } catch (_) {}
+        if (ready) break;
+      }
+      if (!ready) throw new Error('책갈피 화면 내용을 불러오지 못했어요.');
 
       const found = new Map();
       let stable = 0;
@@ -255,19 +259,11 @@
     document.body.appendChild(frame);
 
     try {
-      const loaded = new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('책갈피 위치 확인 시간이 초과됐어요.')), 45000);
-        frame.addEventListener('load', () => {
-          clearTimeout(timer);
-          resolve();
-        }, { once: true });
-      });
       frame.src = bookmarkUrl();
-      await loaded;
 
       let button = null;
-      for (let attempt = 0; attempt < 80 && !button; attempt += 1) {
-        await wait(attempt ? 300 : 800);
+      for (let attempt = 0; attempt < 150 && !button; attempt += 1) {
+        await wait(attempt ? 300 : 500);
         const page = frame.contentDocument;
         button = page?.querySelector(`[data-testid="bookmark-item-${CSS.escape(bookmark.id)}"]`) || null;
         const scroller = page?.querySelector(
