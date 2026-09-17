@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.0
+// @version      0.3.1
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -184,12 +184,12 @@
   async function loadBookmarksFromPage() {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
-    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:420px;height:720px;border:0;opacity:.01;pointer-events:none;';
+    frame.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
     document.body.appendChild(frame);
 
     try {
       const loaded = new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('책갈피 화면 로딩 시간이 초과됐어요.')), 15000);
+        const timer = setTimeout(() => reject(new Error('책갈피 화면 로딩 시간이 초과됐어요.')), 45000);
         frame.addEventListener('load', () => {
           clearTimeout(timer);
           resolve();
@@ -251,12 +251,12 @@
   async function openBookmarkAtMessage(bookmark) {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
-    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:420px;height:720px;border:0;opacity:.01;pointer-events:none;';
+    frame.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
     document.body.appendChild(frame);
 
     try {
       const loaded = new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('책갈피 위치 확인 시간이 초과됐어요.')), 15000);
+        const timer = setTimeout(() => reject(new Error('책갈피 위치 확인 시간이 초과됐어요.')), 45000);
         frame.addEventListener('load', () => {
           clearTimeout(timer);
           resolve();
@@ -266,7 +266,7 @@
       await loaded;
 
       let button = null;
-      for (let attempt = 0; attempt < 35 && !button; attempt += 1) {
+      for (let attempt = 0; attempt < 80 && !button; attempt += 1) {
         await wait(attempt ? 300 : 800);
         const page = frame.contentDocument;
         button = page?.querySelector(`[data-testid="bookmark-item-${CSS.escape(bookmark.id)}"]`) || null;
