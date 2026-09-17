@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.1.6
-// @description  로드되지 않은 이전 메시지까지 거슬러 올라가 Zeta 대화 전체를 요약용 Markdown으로 저장합니다.
+// @version      0.1.7
+// @description  로드되지 않은 이전 메시지까지 거슬러 올라가 Zeta 대화 전체를 Markdown 또는 TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -15,6 +15,7 @@
 
   const APP = 'zeta-full-chat-export';
   const BUTTON_ID = APP + '-button';
+  const TXT_BUTTON_ID = APP + '-txt-button';
   const PANEL_ID = APP + '-panel';
   const STYLE_ID = APP + '-style';
   const MESSAGE_SELECTOR = '[data-sentry-component="BodyView"][id^="message-"]';
@@ -56,6 +57,16 @@
     if (body.querySelector('[data-sentry-component="RightTextContent"]')) return 'user';
     if (body.querySelector('[data-sentry-component="LeftTextContent"]')) return 'assistant';
     return 'narrator';
+  }
+
+  function speakerNameOf(body, role) {
+    const selector = role === 'user'
+      ? '[data-sentry-component="RightTextContent"] .caption1'
+      : '[data-sentry-component="LeftTextContent"] .caption1';
+    return clean(body.querySelector(selector)?.innerText || '')
+      .replace(/^@+/, '')
+      .replace(/:+$/, '')
+      .trim();
   }
 
   function pushPart(parts, type, text) {
@@ -133,9 +144,11 @@
   }
 
   function readMessage(body) {
+    const role = roleOf(body);
     return {
       id: body.id,
-      role: roleOf(body),
+      role,
+      speaker: speakerNameOf(body, role),
       parts: extractParts(body),
       images: extractImages(body)
     };
@@ -219,8 +232,8 @@
     panel.querySelector('.zfce-detail').textContent = detail;
   }
 
-  function download(name, content) {
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  function download(name, content, type = 'text/markdown;charset=utf-8') {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -268,7 +281,48 @@
     return lines.join('\n').trim() + '\n';
   }
 
-  async function exportAll() {
+  function cleanSpeakerName(value, fallback) {
+    return clean(value || fallback)
+      .replace(/^@+/, '')
+      .replace(/:+$/, '')
+      .trim() || fallback;
+  }
+
+  function buildText(meta, items) {
+    const characterName = cleanSpeakerName(
+      items.find(item => item.role === 'assistant' && item.speaker)?.speaker,
+      meta.title
+    );
+    const userName = cleanSpeakerName(
+      items.find(item => item.role === 'user' && item.speaker)?.speaker,
+      '나'
+    );
+    const messages = [];
+
+    items.forEach(item => {
+      const fallback = item.role === 'user' ? userName : characterName;
+      const speaker = cleanSpeakerName(item.speaker, fallback);
+      const blocks = ['@' + speaker + ':'];
+
+      item.parts.forEach(part => {
+        if (part.type === 'narration') {
+          clean(part.text).split(/\n\s*\n/).forEach(paragraph => {
+            const text = clean(paragraph);
+            if (text) blocks.push('*' + text + '*');
+          });
+        } else {
+          const text = clean(part.text);
+          if (text) blocks.push(text);
+        }
+      });
+
+      if (blocks.length > 1) messages.push(blocks.join('\n\n'));
+    });
+
+    return messages.join('\n\n\n').trim() + '\n';
+  }
+
+  async function exportAll(format = 'markdown') {
     if (running) return;
     const log = findChatLog();
     if (!log) {
@@ -399,8 +453,16 @@
         count: items.length
       };
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      download(`${safeFileName(meta.title)}-전체대화-${stamp}.md`, buildMarkdown(meta, items));
-      updatePanel('저장 완료', `${items.length}개 메시지를 저장했어요.`);
+      if (format === 'text') {
+        download(
+          `${safeFileName(meta.title)}-전체대화-${stamp}.txt`,
+          buildText(meta, items),
+          'text/plain;charset=utf-8'
+        );
+      } else {
+        download(`${safeFileName(meta.title)}-전체대화-${stamp}.md`, buildMarkdown(meta, items));
+      }
+      updatePanel('저장 완료', `${items.length}개 메시지를 ${format === 'text' ? 'TXT' : 'MD'}로 저장했어요.`);
       await wait(1200);
       document.getElementById(PANEL_ID).hidden = true;
     } catch (error) {
@@ -421,7 +483,7 @@
     if (!document.getElementById(STYLE_ID)) {
       const style = document.createElement('style');
       style.id = STYLE_ID;
-      style.textContent = `#${BUTTON_ID}{position:fixed;right:14px;bottom:142px;z-index:2147483643;border:0;border-radius:999px;padding:11px 15px;background:#6d48ff;color:#fff;font:800 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 5px 18px rgba(0,0,0,.24)}#${BUTTON_ID}[hidden]{display:none}#${PANEL_ID}{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.58);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${PANEL_ID}[hidden]{display:none}#${PANEL_ID} .zfce-card{width:min(360px,100%);padding:20px;border-radius:17px;background:#fff;color:#263238;box-shadow:0 18px 50px rgba(0,0,0,.35);text-align:center}#${PANEL_ID} .zfce-status{font-weight:850;font-size:16px}#${PANEL_ID} .zfce-detail{margin:8px 0 15px;color:#78858c;font-size:12px}#${PANEL_ID} button{border:0;border-radius:10px;background:#eceff1;color:#45545c;padding:10px 18px;font-weight:800}`;
+      style.textContent = `#${BUTTON_ID},#${TXT_BUTTON_ID}{position:fixed;right:14px;z-index:2147483643;border:0;border-radius:999px;padding:11px 15px;color:#fff;font:800 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 5px 18px rgba(0,0,0,.24)}#${BUTTON_ID}{bottom:142px;background:#6d48ff}#${TXT_BUTTON_ID}{bottom:98px;background:#45545c}#${BUTTON_ID}[hidden],#${TXT_BUTTON_ID}[hidden]{display:none}#${PANEL_ID}{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.58);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${PANEL_ID}[hidden]{display:none}#${PANEL_ID} .zfce-card{width:min(360px,100%);padding:20px;border-radius:17px;background:#fff;color:#263238;box-shadow:0 18px 50px rgba(0,0,0,.35);text-align:center}#${PANEL_ID} .zfce-status{font-weight:850;font-size:16px}#${PANEL_ID} .zfce-detail{margin:8px 0 15px;color:#78858c;font-size:12px}#${PANEL_ID} button{border:0;border-radius:10px;background:#eceff1;color:#45545c;padding:10px 18px;font-weight:800}`;
       document.head.appendChild(style);
     }
 
@@ -429,8 +491,17 @@
       const button = document.createElement('button');
       button.id = BUTTON_ID;
       button.type = 'button';
-      button.textContent = '대화 전체 저장';
-      button.addEventListener('click', exportAll);
+      button.textContent = '전체 저장 MD';
+      button.addEventListener('click', () => exportAll('markdown'));
+      document.body.appendChild(button);
+    }
+
+    if (!document.getElementById(TXT_BUTTON_ID)) {
+      const button = document.createElement('button');
+      button.id = TXT_BUTTON_ID;
+      button.type = 'button';
+      button.textContent = '전체 저장 TXT';
+      button.addEventListener('click', () => exportAll('text'));
       document.body.appendChild(button);
     }
 
@@ -443,7 +514,9 @@
       document.body.appendChild(panel);
     }
 
-    document.getElementById(BUTTON_ID).hidden = !visibleChatPage();
+    const hidden = !visibleChatPage();
+    document.getElementById(BUTTON_ID).hidden = hidden;
+    document.getElementById(TXT_BUTTON_ID).hidden = hidden;
   }
 
   const observer = new MutationObserver(() => {
