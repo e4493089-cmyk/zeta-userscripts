@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.1.0
-// @description  로드되지 않은 이전 메시지까지 거슬러 올라가 Zeta 대화 전체를 HTML로 저장합니다.
+// @version      0.1.1
+// @description  로드되지 않은 이전 메시지까지 거슬러 올라가 Zeta 대화 전체를 요약용 Markdown으로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -169,7 +169,7 @@
   }
 
   function download(name, content) {
-    const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -180,24 +180,41 @@
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
 
-  function buildHtml(meta, items) {
-    const data = JSON.stringify({ meta, messages: items }).replace(/</g, '\\u003c');
-    const cards = items.map((item, index) => {
-      const label = item.role === 'user' ? '나' : item.role === 'assistant' ? '캐릭터' : '서술';
-      const parts = item.parts.map(part => {
-        const body = escapeHtml(part.text).replace(/\n/g, '<br>');
-        return `<div class="part ${part.type}">${body}</div>`;
-      }).join('');
-      const images = item.images.map(image => (
-        `<a class="image" href="${escapeHtml(image.src)}" target="_blank" rel="noopener"><img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"></a>`
-      )).join('');
-      return `<article class="message ${item.role}"><div class="meta"><span>${index + 1}</span><b>${label}</b><code>${escapeHtml(item.id)}</code></div>${parts}${images}</article>`;
-    }).join('\n');
+  function markdownText(value) {
+    return clean(value)
+      .replace(/^---+$/gm, '\\---')
+      .replace(/^#{1,6}\\s/gm, match => '\\' + match);
+  }
 
-    return `<!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(meta.title)} — 전체 대화</title>
-<style>body{margin:0;background:#eef1f3;color:#20272c;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(920px,calc(100% - 28px));margin:32px auto}.head{background:#fff;border:1px solid #dde2e5;border-radius:18px;padding:22px;margin-bottom:14px}.head h1{margin:0 0 8px;font-size:25px}.head p{margin:4px 0;color:#6d7880;font-size:13px}.message{margin:10px 0;padding:16px;border:1px solid #dde2e5;border-radius:16px;background:#fff}.message.user{margin-left:10%;background:#fffbe0;border-color:#e6d86b}.message.assistant{margin-right:10%}.message.narrator{background:#f7f8f9;color:#536069}.meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:#89939a}.meta b{color:#47535a}.meta code{margin-left:auto;max-width:55%;overflow:hidden;text-overflow:ellipsis}.part{line-height:1.72;word-break:break-word}.part+.part{margin-top:12px}.part.narration{color:#66727a;font-style:italic}.image{display:inline-block;margin:12px 8px 0 0}.image img{display:block;max-width:min(300px,100%);max-height:360px;border-radius:12px}.foot{padding:20px;text-align:center;color:#89939a;font-size:11px}@media(max-width:600px){.wrap{margin:14px auto}.message.user,.message.assistant{margin-left:0;margin-right:0}.meta code{display:none}}</style></head>
-<body><main class="wrap"><section class="head"><h1>${escapeHtml(meta.title)}</h1><p>총 ${items.length}개 메시지</p><p>저장 시각: ${escapeHtml(meta.exportedAt)}</p><p>원본 주소: ${escapeHtml(meta.url)}</p></section>${cards}<div class="foot">Zeta Full Chat Export</div></main><script id="zeta-chat-data" type="application/json">${data}<\/script></body></html>`;
+  function buildMarkdown(meta, items) {
+    const lines = [
+      '# ' + markdownText(meta.title),
+      '',
+      '- 메시지 수: ' + items.length,
+      '- 저장 시각: ' + meta.exportedAt,
+      '- 원본 주소: ' + meta.url,
+      '',
+      '---',
+      ''
+    ];
+
+    items.forEach((item, index) => {
+      const label = item.role === 'user' ? '나' : item.role === 'assistant' ? '캐릭터' : '서술';
+      lines.push('## ' + (index + 1) + '. ' + label, '');
+
+      item.parts.forEach(part => {
+        lines.push(part.type === 'narration' ? '[지문]' : '[대사]');
+        lines.push(markdownText(part.text), '');
+      });
+
+      item.images.forEach((image, imageIndex) => {
+        lines.push('[이미지 ' + (imageIndex + 1) + '] ' + image.src, '');
+      });
+
+      lines.push('---', '');
+    });
+
+    return lines.join('\\n').trim() + '\\n';
   }
 
   async function exportAll() {
@@ -248,7 +265,7 @@
         count: items.length
       };
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      download(`${safeFileName(meta.title)}-전체대화-${stamp}.html`, buildHtml(meta, items));
+      download(`${safeFileName(meta.title)}-전체대화-${stamp}.md`, buildMarkdown(meta, items));
       updatePanel('저장 완료', `${items.length}개 메시지를 저장했어요.`);
       await wait(1200);
       document.getElementById(PANEL_ID).hidden = true;
