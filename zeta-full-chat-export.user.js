@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.2
+// @version      0.3.3
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -550,12 +550,12 @@
 
         const beforeTop = log.scrollTop;
         const beforeHeight = log.scrollHeight;
-        const step = Math.max(220, log.clientHeight * .55);
+        const step = Math.max(320, log.clientHeight * .82);
         const delta = direction === 'older' ? -step : step;
         log.scrollBy({ top: delta, behavior: 'auto' });
-        await wait(220);
+        await wait(120);
         order = capture(messages, order, root, log);
-        await wait(80);
+        await wait(40);
         order = capture(messages, order, root, log);
 
         const moved = Math.abs(log.scrollTop - beforeTop) > 2;
