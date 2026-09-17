@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.8
+// @version      3.50.9
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.7
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.7
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.9
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.9
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -7476,6 +7476,18 @@
 
     html.${ACTIVE} .kt-delete-mode-button:hover {
       background: var(--kt-yellow-hover) !important;
+    }
+
+    /* =========================================================
+       iPhone 삭제 모드 상태바 safe-area
+       바깥 여백은 채팅 배경, 실제 헤더만 흰색으로 유지
+    ========================================================= */
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] {
+      background: var(--kt-chat) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] > header {
+      background: var(--kt-white) !important;
     }
 
     /* =========================================================
