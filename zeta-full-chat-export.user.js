@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.2.7
+// @version      0.3.0
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -248,7 +248,7 @@
     return match ? 'message-' + match[1] : '';
   }
 
-  async function resolveBookmarkMessageId(bookmark) {
+  async function openBookmarkAtMessage(bookmark) {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:420px;height:720px;border:0;opacity:.01;pointer-events:none;';
@@ -288,7 +288,7 @@
       });
       button.click();
 
-      for (let attempt = 0; attempt < 100; attempt += 1) {
+      for (let attempt = 0; attempt < 120; attempt += 1) {
         await wait(80);
         let currentUrl = '';
         let html = '';
@@ -296,14 +296,21 @@
           currentUrl = frame.contentWindow.location.href;
           html = frame.contentDocument?.documentElement?.innerHTML || '';
         } catch (_) {}
-        const id = messageIdFromCursor(navigatedUrl) ||
+        let id = messageIdFromCursor(navigatedUrl) ||
           messageIdFromCursor(currentUrl) ||
           messageIdFromCursor(html);
-        if (id) return id;
+        const log = frame.contentDocument?.querySelector(CHAT_SELECTOR);
+        if (!id && log) {
+          const visible = Array.from(frame.contentDocument.querySelectorAll(MESSAGE_SELECTOR)).map(readMessage);
+          const index = bookmarkIndex(visible, bookmark);
+          if (index >= 0) id = visible[index].id;
+        }
+        if (id && log) return { frame, id, log };
       }
       throw new Error('책갈피의 정확한 메시지 위치를 읽지 못했어요.');
-    } finally {
+    } catch (error) {
       frame.remove();
+      throw error;
     }
   }
 
@@ -364,9 +371,8 @@
     return [...fresh, ...existing];
   }
 
-  function capture(messages, order) {
-    const bodies = Array.from(document.querySelectorAll(MESSAGE_SELECTOR));
-    const log = findChatLog();
+  function capture(messages, order, root = document, log = findChatLog()) {
+    const bodies = Array.from(root.querySelectorAll(MESSAGE_SELECTOR));
 
     /* Zeta 채팅은 column-reverse라 DOM 순서가 최신→과거다. 저장 순서는 과거→최신으로 맞춘다. */
     if (log && getComputedStyle(log).flexDirection.includes('reverse')) {
@@ -490,6 +496,127 @@
     });
 
     return messages.join('\n\n\n').trim() + '\n';
+  }
+
+  async function exportBookmarkRange(format, range) {
+    if (running) return;
+    running = true;
+    cancelled = false;
+    document.getElementById(PANEL_ID).hidden = false;
+    let activeFrame = null;
+
+    try {
+      const points = [];
+      for (const entry of [range.start, range.end]) {
+        if (entry.special) {
+          points.push({ entry, id: '', special: entry.special });
+          continue;
+        }
+        updatePanel('책갈피로 이동하는 중…', `${entry.date} · ${entry.preview.slice(0, 28)}`);
+        const opened = await openBookmarkAtMessage(entry);
+        points.push({ entry, id: opened.id, special: '' });
+        opened.frame.remove();
+      }
+
+      let anchorPoint;
+      let targetPoint;
+      let direction;
+      if (points[0].special === 'chat-start') {
+        anchorPoint = points[1];
+        targetPoint = points[0];
+        direction = 'older';
+      } else if (points[1].special === 'chat-end') {
+        anchorPoint = points[0];
+        targetPoint = points[1];
+        direction = 'newer';
+      } else {
+        /* Zeta MESSAGE 번호는 오래된 메시지일수록 크다. */
+        const firstOlder = messageNumber(points[0].id) > messageNumber(points[1].id);
+        anchorPoint = firstOlder ? points[0] : points[1];
+        targetPoint = firstOlder ? points[1] : points[0];
+        direction = 'newer';
+      }
+
+      updatePanel('시작 지점으로 이동하는 중…', anchorPoint.entry.preview.slice(0, 42));
+      const opened = await openBookmarkAtMessage(anchorPoint.entry);
+      activeFrame = opened.frame;
+      const root = activeFrame.contentDocument;
+      const log = opened.log;
+      const reverse = getComputedStyle(log).flexDirection.includes('reverse');
+      const messages = new Map();
+      let order = [];
+      let stable = 0;
+      let previousCount = -1;
+      order = capture(messages, order, root, log);
+
+      while (!cancelled) {
+        if (!targetPoint.special && messages.has(targetPoint.id)) break;
+
+        const beforeTop = log.scrollTop;
+        const beforeHeight = log.scrollHeight;
+        const step = Math.max(220, log.clientHeight * .55);
+        const delta = direction === 'older' ? -step : step;
+        log.scrollBy({ top: delta, behavior: 'auto' });
+        await wait(220);
+        order = capture(messages, order, root, log);
+        await wait(80);
+        order = capture(messages, order, root, log);
+
+        const moved = Math.abs(log.scrollTop - beforeTop) > 2;
+        const resized = Math.abs(log.scrollHeight - beforeHeight) > 2;
+        const grew = messages.size > previousCount;
+        stable = !moved && !resized && !grew ? stable + 1 : 0;
+        previousCount = messages.size;
+
+        updatePanel(
+          direction === 'older' ? '대화 시작 방향으로 수집 중…' : '대화 끝 방향으로 수집 중…',
+          `${messages.size}개 수집${targetPoint.special ? ` · 끝 확인 ${stable}/8` : ''}`
+        );
+
+        if (targetPoint.special && stable >= 8) break;
+        if (!targetPoint.special && stable >= 12) {
+          throw new Error('이동한 책갈피에서 다른 책갈피까지 도달하지 못했어요.');
+        }
+        if (!moved) await wait(360);
+      }
+
+      if (cancelled) throw new DOMException('Cancelled', 'AbortError');
+      let items = Array.from(messages.values()).sort((a, b) => messageNumber(b.id) - messageNumber(a.id));
+      let firstId = anchorPoint.id;
+      let secondId = targetPoint.id;
+      if (targetPoint.special === 'chat-start') secondId = items[0]?.id || '';
+      if (targetPoint.special === 'chat-end') secondId = items[items.length - 1]?.id || '';
+      const first = items.findIndex(item => item.id === firstId);
+      const second = items.findIndex(item => item.id === secondId);
+      if (first < 0 || second < 0) throw new Error('선택한 범위의 경계 메시지를 찾지 못했어요.');
+      items = items.slice(Math.min(first, second), Math.max(first, second) + 1);
+
+      const meta = {
+        title: titleFromPage(),
+        url: location.href,
+        exportedAt: new Date().toLocaleString('ko-KR'),
+        count: items.length
+      };
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      if (format === 'text') {
+        download(`${safeFileName(meta.title)}-책갈피구간-${stamp}.txt`, buildText(meta, items), 'text/plain;charset=utf-8');
+      } else {
+        download(`${safeFileName(meta.title)}-책갈피구간-${stamp}.md`, buildMarkdown(meta, items));
+      }
+      updatePanel('저장 완료', `${items.length}개 메시지를 ${format === 'text' ? 'TXT' : 'MD'}로 저장했어요.`);
+      await wait(1200);
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.error('[Zeta Full Chat Export]', error);
+        updatePanel('저장 실패', error?.message || String(error));
+        await wait(2400);
+      }
+    } finally {
+      activeFrame?.remove();
+      document.getElementById(PANEL_ID).hidden = true;
+      running = false;
+      cancelled = false;
+    }
   }
 
   async function exportAll(format = 'markdown', range = null) {
@@ -829,7 +956,11 @@
           return;
         }
         range.hidden = true;
-        exportAll(format, { start, end });
+        if (start.special === 'chat-start' && end.special === 'chat-end') {
+          exportAll(format);
+        } else {
+          exportBookmarkRange(format, { start, end });
+        }
       });
       document.body.appendChild(range);
     }
