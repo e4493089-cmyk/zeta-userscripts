@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.2.0
+// @version      0.2.1
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -173,6 +173,54 @@
     return location.pathname.replace(/\/bookmarks\/?$/, '').replace(/\/$/, '') + '/bookmarks';
   }
 
+  function readBookmarkButtons(root) {
+    return Array.from(root.querySelectorAll('[data-testid^="bookmark-item-"]')).map(button => ({
+      id: button.dataset.testid.replace('bookmark-item-', ''),
+      date: clean(button.querySelector('.body14')?.textContent || ''),
+      preview: clean(button.querySelector('.body12')?.textContent || '')
+    })).filter(item => item.preview);
+  }
+
+  async function loadBookmarksFromPage() {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:420px;height:720px;border:0;opacity:.01;pointer-events:none;';
+    document.body.appendChild(frame);
+
+    try {
+      const loaded = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('책갈피 화면 로딩 시간이 초과됐어요.')), 15000);
+        frame.addEventListener('load', () => {
+          clearTimeout(timer);
+          resolve();
+        }, { once: true });
+      });
+      frame.src = bookmarkUrl();
+      await loaded;
+
+      const found = new Map();
+      let stable = 0;
+      let previousSize = -1;
+      for (let attempt = 0; attempt < 30 && stable < 4; attempt += 1) {
+        await wait(attempt ? 350 : 900);
+        const page = frame.contentDocument;
+        if (!page) continue;
+        readBookmarkButtons(page).forEach(item => found.set(item.id, item));
+
+        const scroller = page.querySelector(
+          '[data-sentry-component="BookmarkList"] [data-sentry-component="WrappedDiv"]'
+        );
+        if (scroller) scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' });
+
+        stable = found.size === previousSize ? stable + 1 : 0;
+        previousSize = found.size;
+      }
+      return Array.from(found.values());
+    } finally {
+      frame.remove();
+    }
+  }
+
   async function loadBookmarks() {
     const response = await fetch(bookmarkUrl(), {
       credentials: 'include',
@@ -181,11 +229,9 @@
     if (!response.ok) throw new Error('책갈피 목록을 불러오지 못했어요.');
 
     const page = new DOMParser().parseFromString(await response.text(), 'text/html');
-    const bookmarks = Array.from(page.querySelectorAll('[data-testid^="bookmark-item-"]')).map(button => ({
-      id: button.dataset.testid.replace('bookmark-item-', ''),
-      date: clean(button.querySelector('.body14')?.textContent || ''),
-      preview: clean(button.querySelector('.body12')?.textContent || '')
-    })).filter(item => item.preview);
+    let bookmarks = readBookmarkButtons(page);
+    /* 제타는 첫 HTML에 일부만 넣고 나머지는 클라이언트에서 가상 스크롤로 불러온다. */
+    if (bookmarks.length < 2) bookmarks = await loadBookmarksFromPage();
 
     if (bookmarks.length < 2) {
       throw new Error('구간을 고르려면 책갈피가 2개 이상 필요해요.');
