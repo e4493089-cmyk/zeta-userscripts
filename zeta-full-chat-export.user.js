@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.1.7
+// @version      0.1.8
 // @description  로드되지 않은 이전 메시지까지 거슬러 올라가 Zeta 대화 전체를 Markdown 또는 TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -15,7 +15,7 @@
 
   const APP = 'zeta-full-chat-export';
   const BUTTON_ID = APP + '-button';
-  const TXT_BUTTON_ID = APP + '-txt-button';
+  const MENU_ID = APP + '-menu';
   const PANEL_ID = APP + '-panel';
   const STYLE_ID = APP + '-style';
   const MESSAGE_SELECTOR = '[data-sentry-component="BodyView"][id^="message-"]';
@@ -483,7 +483,7 @@
     if (!document.getElementById(STYLE_ID)) {
       const style = document.createElement('style');
       style.id = STYLE_ID;
-      style.textContent = `#${BUTTON_ID},#${TXT_BUTTON_ID}{position:fixed;right:14px;z-index:2147483643;border:0;border-radius:999px;padding:11px 15px;color:#fff;font:800 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 5px 18px rgba(0,0,0,.24)}#${BUTTON_ID}{bottom:142px;background:#6d48ff}#${TXT_BUTTON_ID}{bottom:98px;background:#45545c}#${BUTTON_ID}[hidden],#${TXT_BUTTON_ID}[hidden]{display:none}#${PANEL_ID}{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.58);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${PANEL_ID}[hidden]{display:none}#${PANEL_ID} .zfce-card{width:min(360px,100%);padding:20px;border-radius:17px;background:#fff;color:#263238;box-shadow:0 18px 50px rgba(0,0,0,.35);text-align:center}#${PANEL_ID} .zfce-status{font-weight:850;font-size:16px}#${PANEL_ID} .zfce-detail{margin:8px 0 15px;color:#78858c;font-size:12px}#${PANEL_ID} button{border:0;border-radius:10px;background:#eceff1;color:#45545c;padding:10px 18px;font-weight:800}`;
+      style.textContent = `#${BUTTON_ID}{position:fixed;right:14px;bottom:142px;z-index:2147483643;border:0;border-radius:999px;padding:11px 15px;background:#6d48ff;color:#fff;font:800 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 5px 18px rgba(0,0,0,.24)}#${BUTTON_ID}[hidden],#${MENU_ID}[hidden]{display:none}#${MENU_ID}{position:fixed;right:14px;bottom:186px;z-index:2147483644;display:grid;min-width:174px;padding:7px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#fff;box-shadow:0 9px 28px rgba(0,0,0,.24);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${MENU_ID} button{border:0;border-radius:9px;padding:11px 13px;background:transparent;color:#263238;font-size:13px;font-weight:800;text-align:left}#${MENU_ID} button:active{background:#f0edff}#${PANEL_ID}{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.58);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${PANEL_ID}[hidden]{display:none}#${PANEL_ID} .zfce-card{width:min(360px,100%);padding:20px;border-radius:17px;background:#fff;color:#263238;box-shadow:0 18px 50px rgba(0,0,0,.35);text-align:center}#${PANEL_ID} .zfce-status{font-weight:850;font-size:16px}#${PANEL_ID} .zfce-detail{margin:8px 0 15px;color:#78858c;font-size:12px}#${PANEL_ID} .zfce-card>button{border:0;border-radius:10px;background:#eceff1;color:#45545c;padding:10px 18px;font-weight:800}`;
       document.head.appendChild(style);
     }
 
@@ -491,18 +491,28 @@
       const button = document.createElement('button');
       button.id = BUTTON_ID;
       button.type = 'button';
-      button.textContent = '전체 저장 MD';
-      button.addEventListener('click', () => exportAll('markdown'));
+      button.textContent = '대화 내보내기';
+      button.addEventListener('click', event => {
+        event.stopPropagation();
+        const menu = document.getElementById(MENU_ID);
+        menu.hidden = !menu.hidden;
+      });
       document.body.appendChild(button);
     }
 
-    if (!document.getElementById(TXT_BUTTON_ID)) {
-      const button = document.createElement('button');
-      button.id = TXT_BUTTON_ID;
-      button.type = 'button';
-      button.textContent = '전체 저장 TXT';
-      button.addEventListener('click', () => exportAll('text'));
-      document.body.appendChild(button);
+    if (!document.getElementById(MENU_ID)) {
+      const menu = document.createElement('div');
+      menu.id = MENU_ID;
+      menu.hidden = true;
+      menu.innerHTML = '<button type="button" data-format="markdown">Markdown (.md)</button><button type="button" data-format="text">텍스트 (.txt)</button>';
+      menu.addEventListener('click', event => {
+        event.stopPropagation();
+        const format = event.target.closest('button[data-format]')?.dataset.format;
+        if (!format) return;
+        menu.hidden = true;
+        exportAll(format);
+      });
+      document.body.appendChild(menu);
     }
 
     if (!document.getElementById(PANEL_ID)) {
@@ -516,8 +526,13 @@
 
     const hidden = !visibleChatPage();
     document.getElementById(BUTTON_ID).hidden = hidden;
-    document.getElementById(TXT_BUTTON_ID).hidden = hidden;
+    if (hidden) document.getElementById(MENU_ID).hidden = true;
   }
+
+  document.addEventListener('click', () => {
+    const menu = document.getElementById(MENU_ID);
+    if (menu) menu.hidden = true;
+  });
 
   const observer = new MutationObserver(() => {
     clearTimeout(observer.timer);
