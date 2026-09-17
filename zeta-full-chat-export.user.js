@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.2.6
+// @version      0.2.7
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -519,6 +519,9 @@
       await wait(180);
       order = capture(messages, order);
       const latestAnchorId = order[order.length - 1] || '';
+      if (range?.end?.special === 'chat-end') {
+        range.endMessageId = latestAnchorId;
+      }
       updatePanel('이전 대화를 불러오는 중…', `${messages.size}개 수집`);
 
       previousCount = messages.size;
@@ -547,11 +550,11 @@
 
         if (range) {
           const scanned = Array.from(messages.values());
-          if (!range.startMessageId) {
+          if (!range.startMessageId && !range.start.special) {
             const index = bookmarkIndex(scanned, range.start);
             if (index >= 0) range.startMessageId = scanned[index].id;
           }
-          if (!range.endMessageId) {
+          if (!range.endMessageId && !range.end.special) {
             const index = bookmarkIndex(scanned, range.end);
             if (index >= 0) range.endMessageId = scanned[index].id;
           }
@@ -577,6 +580,13 @@
             break;
           }
           if (stableAtEdge >= 12) {
+            if (range.start.special === 'chat-start') {
+              const oldest = Array.from(messages.values()).sort((a, b) =>
+                messageNumber(b.id) - messageNumber(a.id)
+              )[0];
+              range.startMessageId = oldest?.id || '';
+              if (range.startMessageId && range.endMessageId) break;
+            }
             throw new Error('과거 대화 끝까지 확인했지만 선택한 책갈피를 찾지 못했어요.');
           }
           if (!moved) {
@@ -724,15 +734,26 @@
     try {
       const bookmarks = await loadBookmarks();
       dialog.bookmarks = bookmarks;
-      const options = bookmarks.map((bookmark, index) =>
-        `<option value="${index}">${escapeHtml(bookmark.date)} · ${escapeHtml(bookmark.preview.slice(0, 54))}</option>`
+      const bookmarkChoices = bookmarks.map(bookmark => ({ ...bookmark }));
+      const startChoices = [
+        { id: '__chat_start__', special: 'chat-start', date: '', preview: '대화 시작부터' },
+        ...bookmarkChoices
+      ];
+      const endChoices = [
+        ...bookmarkChoices,
+        { id: '__chat_end__', special: 'chat-end', date: '', preview: '대화 끝까지' }
+      ];
+      const makeOptions = choices => choices.map((bookmark, index) =>
+        `<option value="${index}">${bookmark.special ? '' : escapeHtml(bookmark.date) + ' · '}${escapeHtml(bookmark.preview.slice(0, 54))}</option>`
       ).join('');
+      dialog.startChoices = startChoices;
+      dialog.endChoices = endChoices;
       const start = dialog.querySelector('[name="start"]');
       const end = dialog.querySelector('[name="end"]');
-      start.innerHTML = options;
-      end.innerHTML = options;
+      start.innerHTML = makeOptions(startChoices);
+      end.innerHTML = makeOptions(endChoices);
       /* 목록은 보통 최신→과거다. 기본값은 가장 오래된 것부터 가장 최신 것까지. */
-      start.value = String(bookmarks.length - 1);
+      start.value = String(startChoices.length - 1);
       end.value = '0';
       dialog.querySelector('.zfce-range-state').textContent = '시작과 끝 책갈피를 골라줘.';
       dialog.querySelector('.zfce-range-form').hidden = false;
@@ -800,9 +821,8 @@
       range.querySelector('.zfce-range-actions').addEventListener('click', event => {
         const format = event.target.closest('button[data-format]')?.dataset.format;
         if (!format) return;
-        const bookmarks = range.bookmarks || [];
-        const start = bookmarks[Number(range.querySelector('[name="start"]').value)];
-        const end = bookmarks[Number(range.querySelector('[name="end"]').value)];
+        const start = (range.startChoices || [])[Number(range.querySelector('[name="start"]').value)];
+        const end = (range.endChoices || [])[Number(range.querySelector('[name="end"]').value)];
         if (!start || !end) return;
         if (start.id === end.id) {
           range.querySelector('.zfce-range-state').textContent = '서로 다른 두 책갈피를 선택해줘.';
