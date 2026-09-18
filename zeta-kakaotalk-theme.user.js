@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.10
+// @version      3.50.11
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.10
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.10
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.11
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.11
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -7217,6 +7217,20 @@
     html.${ACTIVE} #portal-container
       [data-sentry-component="CharacterDescription"] strong {
       color: #26343C !important;
+    }
+
+    /* 흰 설명창에서 원본 text-white/60 기울임 문구 대비 보정 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="CharacterDescription"] em,
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="CharacterDescription"] i {
+      color: #3F4D56 !important;
+      opacity: 1 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="CharacterDescription"] blockquote > div:first-child {
+      background: #C7D0D5 !important;
     }
 
     html.${ACTIVE} #portal-container
