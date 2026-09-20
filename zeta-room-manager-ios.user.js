@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.2
+// @version      0.20.3
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -131,10 +131,12 @@
     saveStateNow();
   }
 
-  // 전부 지우고 처음부터 다시 수집한다. 별명은 유지된다.
-  window.zrmResetIndex = function () {
+  // 수집 데이터만 비운다. 사용자가 붙인 별명은 유지한다.
+  function resetCollectedIndex() {
     state.index = {};
     state.plotMeta = {};
+    plotLookup = null;
+    plotLookupDirty = true;
     localStorage.removeItem('zeta-room-manager:last-full-index-at:v3');
     localStorage.removeItem('zeta-room-manager:last-plot-index-at:v1');
     localStorage.removeItem('zeta-room-manager:last-plot-index-at:v2');
@@ -142,6 +144,11 @@
     localStorage.removeItem(ROOM_COLLECTION_STAMP_KEY);
     localStorage.removeItem(CLEANUP_STAMP_KEY);
     saveStateNow();
+  }
+
+  // 전부 지우고 처음부터 다시 수집한다. 별명은 유지된다.
+  window.zrmResetIndex = function () {
+    resetCollectedIndex();
     return '인덱스를 비웠습니다. 별명은 그대로입니다. 대화방/플롯 목록에서 전체 수집을 다시 실행해 주세요.';
   };
 
@@ -883,7 +890,7 @@
 
   // 같은 플롯을 쓰는 방이 여럿이면 한 번만 연다.
   // 이미 이름을 아는 플롯(항목이든 plotMeta든)은 건너뛴다.
-  function profileCollectionTargets() {
+  function profileCollectionTargets(force = false) {
     const handledPlots = new Set();
     const targets = [];
 
@@ -893,13 +900,13 @@
       const meta = plotMetaForEntry(entry);
       const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
       const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
-      if (characters.length && creators.length) continue;
+      if (!force && characters.length && creators.length) continue;
 
       // 제작자명이 프로필에 아예 없는 플롯은 캐릭터명만으로 충분하다.
-      if (characters.length && meta && meta.creatorUnavailable) continue;
+      if (!force && characters.length && meta && meta.creatorUnavailable) continue;
 
       // 두 번 넘게 못 연 플롯은 일주일 동안 건너뛴다.
-      if (meta && Number(meta.profileFailCount || 0) >= 2 &&
+      if (!force && meta && Number(meta.profileFailCount || 0) >= 2 &&
         Date.now() - Number(meta.profileFailedAt || 0) < 7 * 24 * 60 * 60 * 1000) continue;
 
       const keys = [normalizeText(entry.plotId), normalizeText(entry.originatedId)].filter(Boolean);
@@ -1003,15 +1010,14 @@
     }
   }
 
-  // 플롯 ID를 알면 프로필 주소로 바로 간다(페이지 1번).
-  async function visitPlotProfile(plotId) {
+  // 플롯마다 새 iframe을 사용한다.
+  // 이전 프로필 DOM을 재사용하면 URL만 먼저 바뀐 순간의 낡은 DOM을 새 플롯으로
+  // 오인할 수 있으므로, 프로필 수집에서는 history.pushState 재사용을 하지 않는다.
+  async function visitPlotProfile(plotId, timeoutMs = 18000) {
     const frame = hiddenFrame();
     frame.src = '/' + localeSegment() + '/plots/' + plotId + '/profile';
     try {
-      return await readInFrame(frame, win => {
-        if (!PROFILE_PATH.test(win.location.pathname)) return null;
-        return readPlotProfile(win);
-      }, 12000);
+      return await readProfileIn(frame, plotId, timeoutMs);
     } finally {
       dropFrame(frame);
     }
@@ -1148,20 +1154,6 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     return lastProfileFailures.length + '건을 파일로 내려받았어요.';
   };
-  // 한 화면을 계속 쓰면 메모리가 쌓여 느려진다. 일정 횟수마다 새로 띄운다.
-  const FRAME_RECYCLE = 20;
-
-  function profilePath(plotId) {
-    return '/' + localeSegment() + '/plots/' + plotId + '/profile';
-  }
-
-  function routeFrame(frame, path) {
-    const win = frame.contentWindow;
-    if (!win || !win.history) throw new Error('프레임을 쓸 수 없습니다');
-    win.history.pushState({}, '', path);
-    win.dispatchEvent(new win.PopStateEvent('popstate', { state: {} }));
-  }
-
   // 실패했을 때 어디까지 갔는지 알아야 원인을 말해줄 수 있다.
   function profileFailureReason(error, trace, plotId) {
     const message = normalizeText((error && error.message) || error);
@@ -1216,84 +1208,46 @@
   }
 
   async function profileWorker(queue, onResult) {
-    let frame = null;
-    let booted = false;
-    let used = 0;
+    for (;;) {
+      const target = queue.next();
+      if (!target) return;
 
-    try {
-      for (;;) {
-        const target = queue.next();
-        if (!target) return;
+      try {
+        if (!target.plotId) {
+          onResult(target, await visitRoomProfile(target.roomId), null);
+          continue;
+        }
+
+        let result = null;
+        let directError = null;
 
         try {
-          if (!target.plotId) {
-            onResult(target, await visitRoomProfile(target.roomId), null);
-            continue;
-          }
-
-          // 오래 쓴 화면은 버리고 새로 띄운다.
-          if (frame && used >= FRAME_RECYCLE) {
-            dropFrame(frame);
-            frame = null;
-            booted = false;
-            used = 0;
-            await sleep(200);
-          }
-
-          const path = profilePath(target.plotId);
-          let result = null;
-
-          if (booted && frame) {
-            try {
-              routeFrame(frame, path);
-              result = await readProfileIn(frame, target.plotId, 7000);
-            } catch (_) {
-              // 화면 안에서 이동이 안 되면 통째로 다시 띄운다.
-              dropFrame(frame);
-              frame = null;
-              booted = false;
-            }
-          }
-
-          if (!result) {
-            if (!frame) frame = hiddenFrame();
-            frame.src = path;
-            try {
-              result = await readProfileIn(frame, target.plotId, 18000);
-              booted = true;
-            } catch (directError) {
-              // 비공개 플롯 등은 프로필 주소로 바로 갈 수 없다.
-              // 사람이 하듯 방을 열고 헤더의 프로필 버튼을 누른다.
-              dropFrame(frame);
-              frame = null;
-              booted = false;
-              used = 0;
-
-              if (target.originatedId && target.originatedId !== target.plotId) {
-                try {
-                  frame = hiddenFrame();
-                  frame.src = profilePath(target.originatedId);
-                  result = await readProfileIn(frame, target.originatedId, 15000);
-                  booted = true;
-                } catch (_) {
-                  dropFrame(frame);
-                  frame = null;
-                  booted = false;
-                }
-              }
-
-              if (!result) result = await visitRoomProfile(target.roomId);
-            }
-          }
-
-          used++;
-          onResult(target, result, null);
+          // 매 항목마다 새 iframe으로 직접 연다. 이전 플롯의 DOM이 섞이지 않는다.
+          result = await visitPlotProfile(target.plotId, 18000);
         } catch (error) {
-          onResult(target, null, error);
+          directError = error;
         }
+
+        // 비공개/복제 플롯은 원본 ID 프로필로 한 번 더 확인한다.
+        if (!result && target.originatedId && target.originatedId !== target.plotId) {
+          try {
+            result = await visitPlotProfile(target.originatedId, 15000);
+          } catch (_) {}
+        }
+
+        // 직접 프로필 주소가 막히면 실제 대화방을 열고 프로필 버튼을 누른다.
+        if (!result) {
+          try {
+            result = await visitRoomProfile(target.roomId);
+          } catch (roomError) {
+            throw roomError || directError || new Error('프로필을 열 수 없습니다');
+          }
+        }
+
+        onResult(target, result, null);
+      } catch (error) {
+        onResult(target, null, error);
       }
-    } finally {
-      dropFrame(frame);
     }
   }
 
@@ -1305,8 +1259,8 @@
     return '약 ' + Math.round(left / 60) + '분 남음';
   }
 
-  async function collectProfilesForEmptyPlots() {
-    const targets = profileCollectionTargets();
+  async function collectProfilesForEmptyPlots(force = false) {
+    const targets = profileCollectionTargets(force);
     if (!targets.length) return { targets: 0, done: 0, failed: 0 };
 
     const startedAt = Date.now();
@@ -1339,7 +1293,7 @@
       roomCollectionProgress = {
         running: true,
         count: roomCollectionCount(),
-        phase: '이름 수집',
+        phase: force ? '강제 이름 재수집' : '이름 수집',
         current: completed,
         total: targets.length,
         note: remainingText(startedAt, completed, targets.length)
@@ -1352,7 +1306,7 @@
     roomCollectionProgress = {
       running: true,
       count: roomCollectionCount(),
-      phase: '이름 수집',
+      phase: force ? '강제 이름 재수집' : '이름 수집',
       current: 0,
       total: targets.length
     };
@@ -1370,7 +1324,8 @@
     return { targets: targets.length, done, failed, failures };
   }
 
-  async function collectAllRoomsByScrolling() {
+  async function collectAllRoomsByScrolling(options = {}) {
+    const force = Boolean(options && options.force);
     if (currentSection() !== 'room') {
       alert('대화방 목록에서 실행해 주세요.');
       return false;
@@ -1380,11 +1335,17 @@
     roomCollectionPromise = (async () => {
       collectionAborted = false;
       void holdScreenAwake();
+      if (force) resetCollectedIndex();
       // PC판과 같은 수집 흐름은 유지하되, iOS WebKit에서만 발생하는
       // MutationObserver → refresh → renderedItems 중복 분석을 막는다.
       suspendObserverRefresh = true;
       observer?.disconnect();
-      roomCollectionProgress = { running: true, count: roomCollectionCount(), phase: '목록 수집' };
+      roomCollectionProgress = {
+        running: true,
+        count: roomCollectionCount(),
+        phase: force ? '강제 목록 재수집' : '목록 수집',
+        force
+      };
       renderCollectionTools();
 
       const host = roomCollectionScrollHost();
@@ -1394,7 +1355,7 @@
       let stableRounds = 0;
       let barrenRounds = 0;
       let skippedKnown = false;
-      const knownAtStart = roomCollectionCount();
+      const knownAtStart = force ? 0 : roomCollectionCount();
 
       setScrollTop(host, 0);
       await sleep(450);
@@ -1422,10 +1383,10 @@
           stableRounds = 0;
           // 이미 아는 방만 지나가는 구간은 크게 건너뛴다.
           // 다시 수집할 때 목록 전체를 처음부터 훑는 시간을 줄인다.
-          const factor = barrenRounds >= 3 ? 2.6 : 0.78;
+          const factor = !force && barrenRounds >= 3 ? 2.6 : 0.78;
           const step = Math.max(320, Math.floor(before.client * factor));
           setScrollTop(host, Math.min(before.height, before.top + step));
-          await sleep(barrenRounds >= 3 ? 170 : 320);
+          await sleep(!force && barrenRounds >= 3 ? 170 : 320);
         }
 
         const now = scrollMetrics(host);
@@ -1436,7 +1397,7 @@
 
         // 새로 들어오는 방이 한참 없으면 나머지는 이미 수집된 구간이다.
         // 제타는 최근 대화 순으로 정렬하므로 새 방은 위쪽에 있다.
-        if (knownAtStart > 0 && barrenRounds >= 14) {
+        if (!force && knownAtStart > 0 && barrenRounds >= 14) {
           skippedKnown = true;
           break;
         }
@@ -1452,7 +1413,7 @@
       setScrollTop(host, originalTop);
       await sleep(100);
 
-      const profiles = await collectProfilesForEmptyPlots();
+      const profiles = await collectProfilesForEmptyPlots(force);
 
       const total = roomCollectionCount();
       roomCollectionProgress = { running: false, count: total };
@@ -1462,7 +1423,9 @@
         entry && entry.type === 'room' && normalizeText(entry.alias)
       ).length;
       alert(
-        (collectionAborted ? '대화방 수집 중지됨' : '대화방 전체 수집 완료') + ' · 저장된 방 ' + total + '개' +
+        (collectionAborted
+          ? (force ? '강제 대화방 재수집 중지됨' : '대화방 수집 중지됨')
+          : (force ? '강제 대화방 전체 재수집 완료' : '대화방 전체 수집 완료')) + ' · 저장된 방 ' + total + '개' +
         (skippedKnown ? ' (이미 수집된 구간은 건너뜀)' : '') +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 플롯 ' + profiles.targets + '개 중 ' + profiles.done + '개 성공' +
@@ -1853,6 +1816,7 @@
         '<div class="zrm-collection-count"></div>' +
         '<div class="zrm-collection-actions">' +
           '<button type="button" data-zrm-action="collect"></button>' +
+          (isRoom ? '<button type="button" data-zrm-action="force-collect">강제 전체 재수집</button>' : '') +
           '<button type="button" data-zrm-action="export">내보내기</button>' +
           '<button type="button" data-zrm-action="import">불러오기</button>' +
         '</div>' +
@@ -1863,8 +1827,10 @@
       (progress.running && progress.phase ? ' · ' + progress.phase : '');
 
     const collect = modal.querySelector('[data-zrm-action="collect"]');
+    const forceCollect = modal.querySelector('[data-zrm-action="force-collect"]');
     collect.disabled = false;
-    collect.textContent = progress.running ? '중지' : '전체 수집';
+    collect.textContent = progress.running ? '중지' : (isRoom ? '일반 전체 수집' : '전체 수집');
+    if (forceCollect) forceCollect.disabled = progress.running;
 
     modal.querySelector('.zrm-collection-close').addEventListener('click', closeCollectionPopup);
     modal.addEventListener('click', event => {
@@ -1876,8 +1842,13 @@
         abortCollection();
         return;
       }
-      if (isRoom) collectAllRoomsByScrolling();
+      if (isRoom) collectAllRoomsByScrolling({ force: false });
       else collectAllPlotsByScrolling();
+    });
+    forceCollect?.addEventListener('click', () => {
+      closeCollectionPopup();
+      if (progress.running) return;
+      collectAllRoomsByScrolling({ force: true });
     });
     modal.querySelector('[data-zrm-action="export"]').addEventListener('click', () => {
       closeCollectionPopup();
