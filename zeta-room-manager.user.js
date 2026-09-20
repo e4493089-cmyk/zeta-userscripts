@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.6.1
+// @version      0.7.0
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -40,10 +40,20 @@
     }
   }
 
-  function saveState() {
+  let saveTimer = null;
+
+  function saveStateNow() {
+    saveTimer = null;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (_) {}
+  }
+
+  // 인덱스가 커지면 JSON.stringify 비용이 커진다.
+  // 렌더 루프에서 매번 저장하면 검색 입력이 눈에 띄게 끊기므로 묶어서 저장한다.
+  function saveState() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(saveStateNow, 400);
   }
 
   function keyOf(type, id) {
@@ -287,6 +297,59 @@
     return searchValues(entry).some(value => value.toLocaleLowerCase('ko-KR').includes(query));
   }
 
+  // 플롯이 삭제됐거나 제타 목록에서 사라진 방은 눌러도 "없는 페이지"로 간다.
+  function isDeadEntry(entry) {
+    if (!entry) return true;
+    if (entry.missingSince) return true;
+    if (entry.plotMissing) return true;
+    const meta = plotMetaForEntry(entry);
+    return Boolean(meta && meta.missing);
+  }
+
+  function roomIndexStats() {
+    let rooms = 0;
+    let dead = 0;
+    for (const entry of Object.values(state.index)) {
+      if (!entry || entry.type !== 'room') continue;
+      rooms++;
+      if (isDeadEntry(entry)) dead++;
+    }
+    return { rooms, dead };
+  }
+
+  // 검색이 "안 되는" 이유를 화면에서 바로 알 수 있게 한 줄로 설명한다.
+  function indexStatusText() {
+    if (Date.now() < apiUnavailableUntil) {
+      if (lastApiIssue === 'auth') {
+        return '제타 로그인 정보를 읽지 못해 전체 대화방 인덱스를 만들 수 없어요. 제타에 로그인한 상태에서 새로고침해 주세요.';
+      }
+      if (lastApiIssue === 'rate') return '제타 서버 요청이 잠시 제한됐어요. 곧 자동으로 다시 시도합니다.';
+      return '제타 서버에 연결하지 못했어요. 곧 자동으로 다시 시도합니다.';
+    }
+    if (backgroundIndexPromise) return '전체 대화방을 인덱싱하는 중이에요. 잠시 후 다시 검색해 주세요.';
+    if (!roomIndexStats().rooms) {
+      return '아직 인덱싱된 대화방이 없어요. 대화방 목록을 연 채로 잠시 기다리면 자동으로 만들어집니다.';
+    }
+    return '';
+  }
+
+  // 인덱스가 비어 있는데 사용자가 검색을 시작했다면 즉시 한 번 더 시도한다.
+  function ensureIndexForSearch() {
+    if (currentSection() !== 'room') return;
+    if (backgroundIndexPromise || Date.now() < apiUnavailableUntil) return;
+    if (roomIndexStats().rooms) return;
+    if (Date.now() - lastForcedIndexAt < 30000) return;
+    lastForcedIndexAt = Date.now();
+    ensureBackgroundRoomIndex(true);
+  }
+
+  function noteElement(text) {
+    const note = document.createElement('div');
+    note.className = 'zrm-native-note';
+    note.textContent = text;
+    return note;
+  }
+
   function searchDetail(entry, fallback) {
     const parts = [];
     if (normalizeText(entry?.alias) && normalizeText(entry?.original) && entry.alias !== entry.original) {
@@ -305,6 +368,8 @@
   const WEB_CLIENT_VERSION = '3.44.7';
   let backgroundIndexPromise = null;
   let apiUnavailableUntil = 0;
+  let lastApiIssue = '';
+  let lastForcedIndexAt = 0;
 
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -420,8 +485,10 @@
     return headers;
   }
 
-  async function apiGet(path, params) {
-    if (Date.now() < apiUnavailableUntil) return null;
+  // 상태 코드가 필요할 때가 있다(404 = 삭제된 플롯).
+  async function apiRequest(path, params) {
+    if (Date.now() < apiUnavailableUntil) return { ok: false, status: 0, data: null, skipped: true };
+
     const url = new URL(path, API_BASE);
     for (const [key, value] of Object.entries(params || {})) {
       if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
@@ -437,18 +504,32 @@
 
       if (response.status === 401 || response.status === 403) {
         apiUnavailableUntil = Date.now() + 60000;
-        return null;
+        lastApiIssue = 'auth';
+        return { ok: false, status: response.status, data: null };
       }
       if (response.status === 429) {
         apiUnavailableUntil = Date.now() + 30000;
-        return null;
+        lastApiIssue = 'rate';
+        return { ok: false, status: 429, data: null };
       }
-      if (!response.ok) return null;
-      return await response.json();
+      if (!response.ok) {
+        if (response.status >= 500) lastApiIssue = 'server';
+        return { ok: false, status: response.status, data: null };
+      }
+
+      const data = await response.json();
+      lastApiIssue = '';
+      return { ok: true, status: response.status, data };
     } catch (_) {
       apiUnavailableUntil = Date.now() + 30000;
-      return null;
+      lastApiIssue = 'network';
+      return { ok: false, status: 0, data: null };
     }
+  }
+
+  async function apiGet(path, params) {
+    const result = await apiRequest(path, params);
+    return result.ok ? result.data : null;
   }
 
   function unwrapApi(payload) {
@@ -497,6 +578,8 @@
     if (detailFetched) {
       next.detailFetchedAt = Date.now();
       delete next.failedAt;
+      delete next.missing;
+      delete next.missingAt;
       next.failCount = 0;
       next.emptyDetail = next.characterNames.length === 0 && next.creatorNames.length === 0;
     }
@@ -520,6 +603,8 @@
       entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
       entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
       if (!entry.image && meta.image) entry.image = meta.image;
+      if (meta.missing) entry.plotMissing = true;
+      else delete entry.plotMissing;
     }
   }
 
@@ -538,10 +623,13 @@
     const key = keyOf('room', roomId);
     const previous = state.index[key] || {};
 
+    delete previous.missingSince;
+
     state.index[key] = {
       ...previous,
       type: 'room',
       id: roomId,
+      apiSeenAt: Date.now(),
       href: previous.href || '/' + localePrefix() + '/rooms/' + roomId,
       original: normalizeText(plot.name || plot.title || previous.original),
       alias: normalizeText(state.aliases[key]),
@@ -560,17 +648,23 @@
     let cursor = '';
     const seen = new Set();
     let gotAny = false;
+    const roomIds = new Set();
+    let complete = false;
 
     for (let page = 0; page < 250; page++) {
-      const payload = await apiGet('/v2/rooms', { limit: 100, cursor: cursor || undefined });
-      if (!payload) return gotAny;
+      const result = await apiRequest('/v2/rooms', { limit: 100, cursor: cursor || undefined });
+      if (!result.ok) return { gotAny, complete: false, roomIds };
 
+      const payload = result.data;
       const body = unwrapApi(payload);
       const rooms = Array.isArray(body && body.rooms)
         ? body.rooms
         : (Array.isArray(payload.rooms) ? payload.rooms : []);
 
-      for (const room of rooms) ingestApiRoom(room);
+      for (const room of rooms) {
+        const entry = ingestApiRoom(room);
+        if (entry && entry.id) roomIds.add(entry.id);
+      }
       if (rooms.length) gotAny = true;
 
       saveState();
@@ -581,11 +675,68 @@
         payload.nextCursor ||
         payload.next_cursor
       );
-      if (!next || seen.has(next)) break;
+      if (!next || seen.has(next)) {
+        complete = true;
+        break;
+      }
       seen.add(next);
       cursor = next;
     }
-    return gotAny;
+    return { gotAny, complete, roomIds };
+  }
+
+  // 목록을 끝까지 받아왔는데 없는 방은 제타에서 사라진 방이다.
+  // 바로 지우지 않고 한 번 표시해 둔 뒤(동기화 지연 대비) 다음 순회에서 정리한다.
+  function pruneVanishedRooms(roomIds) {
+    if (!(roomIds instanceof Set) || !roomIds.size) return 0;
+
+    const now = Date.now();
+    let removed = 0;
+
+    for (const [key, entry] of Object.entries(state.index)) {
+      if (!entry || entry.type !== 'room' || !entry.id) continue;
+      if (roomIds.has(entry.id)) continue;
+      // 실제 방 ID가 없는 임시 항목은 대조할 수 없으니 건드리지 않는다.
+      if (String(entry.id).startsWith('local-')) continue;
+
+      if (!entry.missingSince) {
+        entry.missingSince = now;
+        continue;
+      }
+      if (now - entry.missingSince < 10 * 60 * 1000) continue;
+
+      delete state.index[key];
+      removed++;
+    }
+    return removed;
+  }
+
+  // 플롯이 삭제돼도 대화방 자체는 목록에 남는데, 그 방은 열면 "없는 페이지"가 된다.
+  // 검색 결과에서 걸러낼 수 있도록 삭제 사실을 캐시에 남긴다.
+  function markPlotMissing(target) {
+    if (!target || !target.canonicalId) return null;
+
+    const previous = state.plotMeta[target.canonicalId]
+      || (target.plotId ? state.plotMeta[target.plotId] : null)
+      || {};
+
+    const meta = {
+      ...previous,
+      canonicalId: target.canonicalId,
+      plotId: target.plotId || previous.plotId || '',
+      originatedId: target.originatedId || previous.originatedId || '',
+      characterNames: previous.characterNames || [],
+      creatorNames: previous.creatorNames || [],
+      missing: true,
+      missingAt: Date.now(),
+      detailFetchedAt: Date.now(),
+      failCount: 0
+    };
+    delete meta.failedAt;
+
+    state.plotMeta[target.canonicalId] = meta;
+    applyPlotMetaToRooms(target.canonicalId, meta);
+    return meta;
   }
 
   async function enrichMissingPlotMeta() {
@@ -640,9 +791,18 @@
         ]);
 
         let meta = null;
+        let sawGone = false;
+        let sawLive = false;
+
         for (const candidate of candidates) {
-          const payload = await apiGet('/v1/plots/' + encodeURIComponent(candidate));
-          if (!payload) {
+          const result = await apiRequest('/v1/plots/' + encodeURIComponent(candidate));
+
+          // 404/410은 "삭제된 플롯"이라는 확실한 신호다. 통신 실패와 구분한다.
+          if (result.status === 404 || result.status === 410) {
+            sawGone = true;
+            continue;
+          }
+          if (!result.ok) {
             if (Date.now() < apiUnavailableUntil) {
               stop = true;
               break;
@@ -650,9 +810,10 @@
             continue;
           }
 
-          const plot = unwrapApi(payload);
+          const plot = unwrapApi(result.data);
           if (!plot || typeof plot !== 'object') continue;
           if (!plot.id && !plot.name && !plot.title && !plot.characters && !plot.chatProfiles) continue;
+          sawLive = true;
 
           meta = ingestPlotMeta(
             plot,
@@ -665,6 +826,8 @@
 
         if (meta) {
           applyPlotMetaToRooms(target.canonicalId, meta);
+        } else if (sawGone && !sawLive && !stop) {
+          markPlotMissing(target);
         } else if (!stop) {
           const previous = state.plotMeta[target.canonicalId]
             || (target.plotId ? state.plotMeta[target.plotId] : null)
@@ -744,12 +907,14 @@
     const last = Number(localStorage.getItem(BACKGROUND_INDEX_STAMP_KEY) || 0);
     if (!force && Date.now() - last < 5 * 60 * 1000) return true;
 
-    const gotRooms = await fetchAllRoomsFromApi();
-    if (!gotRooms) {
+    const sweep = await fetchAllRoomsFromApi();
+    if (!sweep.gotAny) {
       saveState();
       scheduleRefresh();
       return false;
     }
+
+    if (sweep.complete) pruneVanishedRooms(sweep.roomIds);
 
     await harvestScrappedPlots();
     await enrichMissingPlotMeta();
@@ -819,6 +984,27 @@
         height: 56px;
         border-radius: 7px;
         background: #2a2a2e;
+      }
+      #${NATIVE_RESULTS_ID} .zrm-native-note,
+      #${PLOT_NATIVE_RESULTS_ID} .zrm-native-note {
+        padding: 10px 16px;
+        color: rgba(255,255,255,.45);
+        font-size: 11px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+      [data-zrm-dead="1"] a[href*="/rooms/"] { opacity: .45; }
+      [data-zrm-dead="1"] a[href*="/rooms/"]::after {
+        content: '플롯 삭제됨';
+        align-self: center;
+        flex: 0 0 auto;
+        margin-left: 6px;
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: rgba(255,120,120,.16);
+        color: #ff9a9a;
+        font-size: 10px;
+        white-space: nowrap;
       }
       #${PLOT_NATIVE_RESULTS_ID} { flex: 0 0 auto; padding: 0 16px; }
       #${PLOT_NATIVE_RESULTS_ID}:empty { display: none; }
@@ -946,6 +1132,8 @@
     const key = keyOf(type, id);
     const alias = normalizeText(state.aliases[key]);
     const previous = state.index[key] || {};
+    // 제타가 실제로 그려준 방이면 사라진 방이 아니다.
+    delete previous.missingSince;
     const searchMeta = collectSearchMeta(item, titleEl);
     const roomPlot = type === 'room' ? reactRoomPlotMeta(item) : null;
     const roomPlotId = normalizeText((roomPlot && (roomPlot.id || roomPlot.plotId)) || previous.plotId);
@@ -1004,7 +1192,7 @@
     record.titleEl.classList.toggle('zrm-has-alias', !!alias);
 
     const indexed = state.index[record.key] || {};
-    state.index[record.key] = {
+    const next = {
       ...indexed,
       type: record.type,
       id: record.id,
@@ -1013,6 +1201,11 @@
       alias,
       image: (record.link || record.item).querySelector('img')?.src || indexed.image || ''
     };
+    state.index[record.key] = next;
+
+    // 삭제된 플롯의 방은 눌러도 열리지 않으므로 목록에서 미리 표시해 준다.
+    if (record.type === 'room' && next.plotMissing) record.item.dataset.zrmDead = '1';
+    else if (record.item.dataset.zrmDead) delete record.item.dataset.zrmDead;
   }
 
   function makeRenameButton(record) {
@@ -1174,8 +1367,35 @@
     document.getElementById(PANEL_ID)?.remove();
   }
 
+  function usableInputs(scope) {
+    return Array.from((scope || document).querySelectorAll('input')).filter(el => {
+      if (el.closest('#' + MODAL_ID)) return false;
+      if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio') return false;
+      return true;
+    });
+  }
+
+  function looksLikeSearchInput(el) {
+    if (!el) return false;
+    if (el.type === 'search') return true;
+    const hints = [
+      el.getAttribute('name'),
+      el.getAttribute('placeholder'),
+      el.getAttribute('aria-label'),
+      el.getAttribute('id')
+    ].map(value => String(value || ''));
+    return hints.some(value => /검색|search/i.test(value));
+  }
+
+  // 제타가 마크업을 바꿔도 검색 입력을 놓치지 않도록 단계적으로 찾는다.
   function nativeRoomSearchInput() {
-    return document.querySelector('input[name="room-list-search-input"]');
+    const direct = document.querySelector('input[name="room-list-search-input"]');
+    if (direct) return direct;
+
+    const roomList = document.querySelector('[data-sentry-component="RoomList"]');
+    return usableInputs(roomList).find(looksLikeSearchInput)
+      || usableInputs(document).find(looksLikeSearchInput)
+      || null;
   }
 
   function nativeRoomQuery() {
@@ -1188,13 +1408,27 @@
     }
   }
 
+  function anyRoomLink() {
+    return Array.from(document.querySelectorAll('a[href*="/rooms/"]'))
+      .find(link => !link.closest('#' + NATIVE_RESULTS_ID)) || null;
+  }
+
   function nativeRoomListHost() {
     const roomList = document.querySelector('[data-sentry-component="RoomList"]');
-    if (!roomList) return null;
     const input = nativeRoomSearchInput();
+
+    if (roomList) {
+      const inner = input?.closest('.flex.flex-col.grow')
+        || roomList.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]')
+        || roomList.querySelector('.overflow-y-auto');
+      if (inner) return inner;
+      return roomList;
+    }
+
+    // RoomList 컴포넌트 표식이 사라져도 검색 결과는 보여줄 수 있어야 한다.
     return input?.closest('.flex.flex-col.grow')
-      || roomList.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]')
-      || roomList.querySelector('.overflow-y-auto')
+      || anyRoomLink()?.closest('.overflow-y-auto, main, [role="main"]')
+      || document.querySelector('main#contents, main, [role="main"]')
       || null;
   }
 
@@ -1214,13 +1448,19 @@
         .map(link => extractId(link.href, 'room'))
         .filter(Boolean)
     );
-    const matches = Object.values(state.index)
+    const found = Object.values(state.index)
       .filter(entry => entry?.type === 'room' && entry.href)
       .filter(entry => matchesSearch(entry, q))
-      .filter(entry => !nativeIds.has(entry.id))
-      .slice(0, 20);
+      .filter(entry => !nativeIds.has(entry.id));
 
-    if (!matches.length) {
+    const alive = found.filter(entry => !isDeadEntry(entry));
+    const matches = alive.slice(0, 20);
+    const deadCount = found.length - alive.length;
+    const status = matches.length ? '' : indexStatusText();
+
+    if (status) ensureIndexForSearch();
+
+    if (!matches.length && !deadCount && !status) {
       box?.remove();
       return;
     }
@@ -1283,6 +1523,13 @@
       box.appendChild(row);
     }
 
+    if (deadCount) {
+      box.appendChild(noteElement(
+        '제타에서 사라진 대화방 ' + deadCount + '개는 결과에서 숨겼어요. 눌러도 열리지 않는 방이에요.'
+      ));
+    }
+    if (status) box.appendChild(noteElement(status));
+
     const input = nativeRoomSearchInput();
     const searchRow = input?.closest('.p-4');
     const searchBlock = searchRow?.parentElement;
@@ -1307,7 +1554,8 @@
 
   function nativePlotSearchInput() {
     if (currentSection() !== 'plot-search') return null;
-    return document.querySelector('input[type="search"], input[placeholder*="검색"], input');
+    const inputs = usableInputs(document);
+    return inputs.find(looksLikeSearchInput) || inputs[0] || null;
   }
 
   function nativePlotResultsHost() {
@@ -1334,6 +1582,7 @@
       .filter(entry => entry?.type === 'plot' && entry.href)
       .filter(entry => matchesSearch(entry, q))
       .filter(entry => !nativeIds.has(entry.id))
+      .filter(entry => !isDeadEntry(entry))
       .slice(0, 20);
 
     if (!matches.length) {
@@ -1441,6 +1690,9 @@
 
   function start() {
     injectStyle();
+
+    window.addEventListener('pagehide', saveStateNow);
+    window.addEventListener('beforeunload', saveStateNow);
 
     document.addEventListener('pointerdown', rememberRoomContextTarget, true);
     document.addEventListener('contextmenu', rememberRoomContextTarget, true);
