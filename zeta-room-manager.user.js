@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.21.0
+// @version      0.22.0
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -2326,15 +2326,27 @@
       || localFallbackId(original, image);
     if (!id) return null;
 
-    // 카드에 텍스트로 안 보여도 React props 안의 plot 데이터에서 이름을 보강한다.
-    harvestReactPlotData(item);
-
     const key = keyOf(type, id);
     const previous = state.index[key] || {};
     const alias = normalizeText(state.aliases[key] || previous.alias);
     if (alias && state.aliases[key] !== alias) state.aliases[key] = alias;
     // 제타가 실제로 그려준 방이면 사라진 방이 아니다.
     delete previous.missingSince;
+
+    // 이미 이름까지 수집된 항목은 화면을 지나갈 때마다 다시 훑지 않는다.
+    // 아래 fiber 탐색이 항목당 수천 노드라, 목록 수집 시간의 대부분이 여기서 나온다.
+    if (previous.type === type
+      && normalizeText(previous.original) === original
+      && uniqueTexts(previous.characterNames).length
+      && uniqueTexts(previous.creatorNames).length) {
+      previous.alias = alias;
+      if (link && link.href) previous.href = link.href;
+      if (image && !previous.image) previous.image = image;
+      return { key, type, id, item, link, titleEl, original, alias };
+    }
+
+    // 카드에 텍스트로 안 보여도 React props 안의 plot 데이터에서 이름을 보강한다.
+    harvestReactPlotData(item);
     const searchMeta = collectSearchMeta(item, titleEl);
     // 플롯 목록 항목은 API 보강 대상이 아니라 화면 데이터가 유일한 출처다.
     const ownEntity = reactEntityForId(item, id);
