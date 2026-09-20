@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.11.0
+// @version      0.12.1
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -870,12 +870,56 @@
     throw new Error('시간 초과');
   }
 
-  async function visitRoomProfile(roomId) {
+  function readPlotProfile(win) {
+    const root = win.document.querySelector('[data-sentry-component="PlotProfile"]');
+    if (!root) return null;
+
+    const creators = uniqueTexts(
+      Array.from(root.querySelectorAll('a[href*="/creators/"][href*="/profile"]'))
+        .map(a => a.querySelector('span.caption1:not([data-sentry-element="Span"])')?.textContent)
+    );
+    if (!creators.length) return null;
+
+    const characters = uniqueTexts(
+      Array.from(root.querySelectorAll('img[alt^="Profile image of "]'))
+        .map(img => normalizeText(img.getAttribute('alt')).slice('Profile image of '.length))
+    );
+    return { creators, characters, profileId: win.location.pathname.split('/')[3] || '' };
+  }
+
+  function hiddenFrame() {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.tabIndex = -1;
     frame.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:390px;height:850px;opacity:0;pointer-events:none;border:0';
     document.body.appendChild(frame);
+    return frame;
+  }
+
+  function dropFrame(frame) {
+    if (frame && frame.isConnected) {
+      frame.src = 'about:blank';
+      frame.remove();
+    }
+  }
+
+  // 플롯 ID를 알면 프로필 주소로 바로 간다(페이지 1번).
+  async function visitPlotProfile(plotId) {
+    const frame = hiddenFrame();
+    frame.src = '/' + localeSegment() + '/plots/' + plotId + '/profile';
+    try {
+      return await readInFrame(frame, win => {
+        if (!PROFILE_PATH.test(win.location.pathname)) return null;
+        return readPlotProfile(win);
+      }, 12000);
+    } finally {
+      dropFrame(frame);
+    }
+  }
+
+  // 프로필 주소를 모르거나 열리지 않으면 방을 거쳐 간다(페이지 2번).
+  async function visitRoomProfile(roomId) {
+    const frame = hiddenFrame();
     frame.src = '/' + localeSegment() + '/rooms/' + roomId;
 
     try {
@@ -887,27 +931,26 @@
 
       return await readInFrame(frame, win => {
         if (!PROFILE_PATH.test(win.location.pathname)) return null;
-        const root = win.document.querySelector('[data-sentry-component="PlotProfile"]');
-        if (!root) return null;
-
-        const creators = uniqueTexts(
-          Array.from(root.querySelectorAll('a[href*="/creators/"][href*="/profile"]'))
-            .map(a => a.querySelector('span.caption1:not([data-sentry-element="Span"])')?.textContent)
-        );
-        if (!creators.length) return null;
-
-        const characters = uniqueTexts(
-          Array.from(root.querySelectorAll('img[alt^="Profile image of "]'))
-            .map(img => normalizeText(img.getAttribute('alt')).slice('Profile image of '.length))
-        );
-        return { creators, characters, profileId: win.location.pathname.split('/')[3] || '' };
+        return readPlotProfile(win);
       }, 18000);
     } finally {
-      if (frame.isConnected) {
-        frame.src = 'about:blank';
-        frame.remove();
-      }
+      dropFrame(frame);
     }
+  }
+
+  // 가능하면 프로필로 바로, 안 되면 방을 거쳐서.
+  async function collectOneProfile(target) {
+    if (target.plotId) {
+      try {
+        return await visitPlotProfile(target.plotId);
+      } catch (_) {}
+    }
+    if (target.originatedId && target.originatedId !== target.plotId) {
+      try {
+        return await visitPlotProfile(target.originatedId);
+      } catch (_) {}
+    }
+    return await visitRoomProfile(target.roomId);
   }
 
   function applyProfileResult(target, result) {
@@ -946,7 +989,7 @@
       renderCollectionTools();
 
       try {
-        applyProfileResult(targets[i], await visitRoomProfile(targets[i].roomId));
+        applyProfileResult(targets[i], await collectOneProfile(targets[i]));
         done++;
       } catch (error) {
         failed++;
@@ -1474,6 +1517,19 @@
       });
     }
 
+    const progress = currentSection() === 'plot' ? plotCollectionProgress : roomCollectionProgress;
+    let badge = tools.querySelector('.zrm-tools-progress');
+    if (progress.running && progress.phase) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'zrm-tools-progress';
+        tools.appendChild(badge);
+      }
+      badge.textContent = progress.phase;
+    } else if (badge) {
+      badge.remove();
+    }
+
     const anchor = collectionToolsAnchor();
     if (anchor && anchor.host) {
       tools.classList.remove('zrm-tools-fallback');
@@ -1647,6 +1703,21 @@
         align-items: center;
         flex: 0 0 auto;
       }
+      #${PLOT_TOOLS_ID} .zrm-tools-progress {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 2px;
+        padding: 2px 7px;
+        border-radius: 8px;
+        background: #6d52ff;
+        color: #fff;
+        font-size: 10px;
+        line-height: 1.6;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+      #${PLOT_TOOLS_ID} { position: relative; }
       #${PLOT_TOOLS_ID}.zrm-tools-fallback {
         position: fixed;
         top: 14px;
