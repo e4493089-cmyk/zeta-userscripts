@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.11
+// @version      3.50.12
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
-// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.11
-// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.11
+// @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.12
+// @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js?v=3.50.12
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -5175,7 +5175,7 @@
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) {
       background: rgba(43,57,66,.42) !important;
       backdrop-filter: blur(7px) !important;
@@ -5183,7 +5183,7 @@
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) > div {
       background: #FFFFFF !important;
       color: #26343C !important;
@@ -5193,14 +5193,14 @@
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) h5 {
       color: #202124 !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) > div > p {
       color: #66757D !important;
     }
@@ -5208,7 +5208,7 @@
     /* 요청 입력칸 */
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) label[data-sentry-component="Input"] {
       background: #F5F7F8 !important;
       color: #26343C !important;
@@ -5218,7 +5218,7 @@
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) label[data-sentry-component="Input"]:focus-within {
       background: #FFFFFF !important;
       border-color: #D2C24C !important;
@@ -5227,7 +5227,7 @@
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) input[data-sentry-component="Input"] {
       background: transparent !important;
       color: #26343C !important;
@@ -5243,7 +5243,7 @@
     /* 취소 / 수정 */
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) > div > div:last-child > button:first-child {
       background: #ECEFF1 !important;
       color: #46545E !important;
@@ -5252,14 +5252,14 @@
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) > div > div:last-child > button:first-child:hover {
       background: #E3E8EB !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) > div > div:last-child > button:last-child {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
@@ -5268,14 +5268,14 @@
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) > div > div:last-child > button:last-child:hover {
       background: var(--kt-yellow-hover) !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-sentry-component="Popup"]:has(
-        [data-sentry-component="InputMultiPlaceholder"]
+        label[data-sentry-component="Input"] input[data-sentry-component="Input"]
       ) > div > div:last-child > button:last-child:disabled {
       background: #ECEFF1 !important;
       color: #A2AAAE !important;
