@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.16.0
+// @version      0.17.0
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1015,6 +1015,39 @@
   // 플롯마다 iframe을 새로 띄우면 제타 앱을 매번 처음부터 부팅한다.
   // 손으로 할 때처럼, 앱은 한 번만 띄우고 그 안에서 화면만 바꾼다.
   const PROFILE_WORKERS = 4;
+  let lastProfileFailures = [];
+
+  // 실패 사유별로 묶는다. 같은 이유가 반복되는 경우가 대부분이다.
+  function failureSummary(failures) {
+    const counts = new Map();
+    for (const item of failures) counts.set(item.reason, (counts.get(item.reason) || 0) + 1);
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([reason, count]) => reason + ' ' + count + '건');
+  }
+
+  // 실패 목록 전체를 파일로 받는다.
+  window.zrmFailures = function () {
+    if (!lastProfileFailures.length) return '마지막 수집에서 실패한 항목이 없어요.';
+
+    const lines = ['Zeta Room Manager 이름 수집 실패 목록', new Date().toISOString(), ''];
+    for (const item of failureSummary(lastProfileFailures)) lines.push('- ' + item);
+    lines.push('', '방 ID · 플롯 ID · 사유');
+    for (const item of lastProfileFailures) {
+      lines.push(item.roomId + ' · ' + (item.plotId || '(없음)') + ' · ' + item.reason);
+    }
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zeta-room-manager-failures-' + new Date().toISOString().slice(0, 10) + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return lastProfileFailures.length + '건을 파일로 내려받았어요.';
+  };
   // 한 화면을 계속 쓰면 메모리가 쌓여 느려진다. 일정 횟수마다 새로 띄운다.
   const FRAME_RECYCLE = 20;
 
@@ -1029,11 +1062,54 @@
     win.dispatchEvent(new win.PopStateEvent('popstate', { state: {} }));
   }
 
+  // 실패했을 때 어디까지 갔는지 알아야 원인을 말해줄 수 있다.
+  function profileFailureReason(error, trace, plotId) {
+    const message = normalizeText((error && error.message) || error);
+    if (message !== '시간 초과') return message || '알 수 없는 오류';
+    if (!trace.path) return '화면이 열리지 않음';
+    if (!trace.path.includes(plotId)) return '프로필 주소로 이동하지 않음';
+    if (!trace.root) return '프로필 화면이 그려지지 않음';
+    return '제작자명을 찾지 못함';
+  }
+
   async function readProfileIn(frame, plotId, timeoutMs) {
-    return await readInFrame(frame, win => {
-      if (!win.location.pathname.includes(plotId)) return null;
-      return readPlotProfile(win);
-    }, timeoutMs);
+    const trace = { path: '', root: false };
+    const end = Date.now() + timeoutMs;
+    let settledAt = 0;
+
+    while (Date.now() < end) {
+      if (collectionAborted) throw new Error('중지됨');
+
+      try {
+        const win = frame.contentWindow;
+        if (win && win.document) {
+          trace.path = win.location.pathname;
+
+          if (trace.path.includes(plotId)) {
+            const root = win.document.querySelector('[data-sentry-component="PlotProfile"]');
+            trace.root = Boolean(root);
+            if (root) {
+              const result = readPlotProfile(win);
+              if (result) return result;
+            }
+
+            // 주소도 맞고 문서도 다 불렸는데 없으면 오래 기다릴 이유가 없다.
+            // 실패 하나가 제한 시간을 다 쓰면 전체가 크게 느려진다.
+            if (win.document.readyState === 'complete') {
+              if (!settledAt) settledAt = Date.now();
+              else if (Date.now() - settledAt > 3500) break;
+            }
+          }
+        }
+      } catch (error) {
+        if (error && error.name === 'SecurityError') throw new Error('숨김 화면 접근이 막혔습니다');
+        throw error;
+      }
+
+      await sleep(100);
+    }
+
+    throw new Error(profileFailureReason(new Error('시간 초과'), trace, plotId));
   }
 
   async function profileWorker(queue, onResult) {
@@ -1107,6 +1183,7 @@
     if (!targets.length) return { targets: 0, done: 0, failed: 0 };
 
     const startedAt = Date.now();
+    const failures = [];
     let cursor = 0;
     let done = 0;
     let failed = 0;
@@ -1124,7 +1201,9 @@
         done++;
       } else {
         failed++;
-        try { console.warn('[zrm] 이름 수집 실패', target.roomId, String(error)); } catch (_) {}
+        const reason = normalizeText((error && error.message) || error) || '알 수 없는 오류';
+        failures.push({ roomId: target.roomId, plotId: target.plotId, reason });
+        try { console.warn('[zrm] 이름 수집 실패', target.roomId, reason); } catch (_) {}
       }
 
       const completed = done + failed;
@@ -1158,7 +1237,8 @@
 
     saveStateNow();
     scheduleRefresh();
-    return { targets: targets.length, done, failed };
+    lastProfileFailures = failures;
+    return { targets: targets.length, done, failed, failures };
   }
 
   async function collectAllRoomsByScrolling() {
@@ -1235,7 +1315,11 @@
         (collectionAborted ? '대화방 수집 중지됨' : '대화방 전체 수집 완료') + ' · 저장된 방 ' + total + '개' +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 플롯 ' + profiles.targets + '개 중 ' + profiles.done + '개 성공' +
-        (profiles.failed ? ' · ' + profiles.failed + '개 실패' : '')
+        (profiles.failed ? ' · ' + profiles.failed + '개 실패' : '') +
+        (profiles.failed
+          ? '\n\n실패 사유\n' + failureSummary(profiles.failures).map(line => '· ' + line).join('\n') +
+            '\n\n전체 목록은 콘솔에서 zrmFailures()'
+          : '')
       );
       return true;
     })().finally(() => {
