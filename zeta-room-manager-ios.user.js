@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.5.2
+// @version      0.5.3
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -25,6 +25,7 @@
   const PLOT_NATIVE_RESULTS_ID = 'zeta-room-manager-plot-native-results';
   const PLOT_TOOLS_ID = 'zeta-room-manager-plot-tools';
   const PLOT_COLLECTION_STAMP_KEY = 'zeta-room-manager:plot-collection-at:v1';
+  const ROOM_COLLECTION_STAMP_KEY = 'zeta-room-manager:room-collection-at:v1';
 
   const state = loadState();
   let observer = null;
@@ -33,6 +34,8 @@
   let lastRoomContextRecord = null;
   let plotCollectionPromise = null;
   let plotCollectionProgress = { running: false, count: 0 };
+  let roomCollectionPromise = null;
+  let roomCollectionProgress = { running: false, count: 0 };
 
   function loadState() {
     try {
@@ -115,11 +118,32 @@
     localStorage.removeItem('zeta-room-manager:last-plot-index-at:v1');
     localStorage.removeItem('zeta-room-manager:last-plot-index-at:v2');
     localStorage.removeItem(PLOT_COLLECTION_STAMP_KEY);
+    localStorage.removeItem(ROOM_COLLECTION_STAMP_KEY);
     localStorage.removeItem(CLEANUP_STAMP_KEY);
     saveStateNow();
-    try { ensureBackgroundRoomIndex(true); } catch (_) {}
-    return '인덱스를 비웠습니다. 별명은 그대로입니다. 비공개 플롯은 제작자센터에서 전체 수집을 다시 실행해 주세요.';
+    return '인덱스를 비웠습니다. 별명은 그대로입니다. 대화방/플롯 목록에서 전체 수집을 다시 실행해 주세요.';
   };
+
+  const NO_API_CLEANUP_STAMP_KEY = 'zeta-room-manager:no-api-cleanup:v1';
+  function cleanupOldApiFlags() {
+    if (localStorage.getItem(NO_API_CLEANUP_STAMP_KEY)) return;
+    for (const entry of Object.values(state.index || {})) {
+      if (!entry || typeof entry !== 'object') continue;
+      delete entry.missingSince;
+      delete entry.plotMissing;
+    }
+    for (const meta of Object.values(state.plotMeta || {})) {
+      if (!meta || typeof meta !== 'object') continue;
+      delete meta.failedAt;
+      delete meta.failCount;
+      delete meta.missing;
+      delete meta.missingAt;
+      delete meta.emptyDetail;
+      delete meta.detailFetchedAt;
+    }
+    localStorage.setItem(NO_API_CLEANUP_STAMP_KEY, String(Date.now()));
+    saveStateNow();
+  }
 
   function normalizeText(value) {
     // 제타에서 제목이 빈 플롯은 한글 채움문자(ㅤ) 등으로 채워져 있다.
@@ -412,30 +436,15 @@
     return { rooms, dead };
   }
 
-  // 검색이 "안 되는" 이유를 화면에서 바로 알 수 있게 한 줄로 설명한다.
+  // 전체 검색 범위는 사용자가 한 번 수동 수집한 로컬 인덱스 기준이다.
   function indexStatusText() {
-    if (Date.now() < apiUnavailableUntil) {
-      if (lastApiIssue === 'auth') {
-        return '제타 로그인 정보를 읽지 못해 전체 대화방 인덱스를 만들 수 없어요. 제타에 로그인한 상태에서 새로고침해 주세요.';
-      }
-      if (lastApiIssue === 'rate') return '제타 서버 요청이 잠시 제한됐어요. 곧 자동으로 다시 시도합니다.';
-      return '제타 서버에 연결하지 못했어요. 곧 자동으로 다시 시도합니다.';
+    if (roomCollectionProgress.running) {
+      return '대화방 전체 수집 중 · 현재 ' + roomCollectionProgress.count + '개 저장됨';
     }
-    if (backgroundIndexPromise) return '전체 대화방을 인덱싱하는 중이에요. 잠시 후 다시 검색해 주세요.';
-    if (!roomIndexStats().rooms) {
-      return '아직 인덱싱된 대화방이 없어요. 대화방 목록을 연 채로 잠시 기다리면 자동으로 만들어집니다.';
+    if (!Number(localStorage.getItem(ROOM_COLLECTION_STAMP_KEY) || 0)) {
+      return '전체 대화방 검색은 먼저 Room Manager의 ‘전체 수집’을 한 번 실행해 주세요.';
     }
     return '';
-  }
-
-  // 인덱스가 비어 있는데 사용자가 검색을 시작했다면 즉시 한 번 더 시도한다.
-  function ensureIndexForSearch() {
-    if (currentSection() !== 'room') return;
-    if (backgroundIndexPromise || Date.now() < apiUnavailableUntil) return;
-    if (roomIndexStats().rooms) return;
-    if (Date.now() - lastForcedIndexAt < 30000) return;
-    lastForcedIndexAt = Date.now();
-    ensureBackgroundRoomIndex(true);
   }
 
   function noteElement(text) {
@@ -458,13 +467,6 @@
     return parts.join(' · ') || fallback;
   }
 
-  const API_BASE = 'https://api.zeta-ai.io';
-  const WEB_CLIENT_VERSION = '3.44.7';
-  let backgroundIndexPromise = null;
-  let apiUnavailableUntil = 0;
-  let lastApiIssue = '';
-  let lastForcedIndexAt = 0;
-
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -483,169 +485,19 @@
     let harvested = 0;
     for (const item of roomItemsFromDocument(doc)) {
       const record = parseItem(item, 'room');
-      if (record) harvested++;
+      if (!record) continue;
+      applyAlias(record);
+      harvested++;
     }
+    if (harvested) saveState();
     return harvested;
   }
 
-  function readCookie(name) {
-    try {
-      const wanted = name + '=';
-      for (const part of String(document.cookie || '').split(';')) {
-        const text = part.trim();
-        if (text.startsWith(wanted)) return decodeURIComponent(text.slice(wanted.length));
-      }
-    } catch (_) {}
-    return '';
-  }
-
-  function tokenFromValue(value) {
-    let text = normalizeText(value);
-    if (!text) return '';
-
-    try {
-      const parsed = JSON.parse(text);
-      if (typeof parsed === 'string') text = parsed;
-      else if (parsed && typeof parsed === 'object') {
-        text = normalizeText(parsed.accessToken || parsed.access_token || parsed.token || parsed.TOKEN);
-      }
-    } catch (_) {}
-
-    text = text.replace(/^Bearer\s+/i, '');
-    const match = text.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
-    return match ? match[0] : '';
-  }
-
-  function findStorageToken() {
-    for (const storage of [localStorage, sessionStorage]) {
-      try {
-        for (let i = 0; i < storage.length; i++) {
-          const key = storage.key(i) || '';
-          if (!/token|auth|session/i.test(key)) continue;
-          const token = tokenFromValue(storage.getItem(key));
-          if (token) return token;
-        }
-      } catch (_) {}
-    }
-    return '';
-  }
-
-  function zetaAccessToken() {
-    return tokenFromValue(readCookie('TOKEN')) || findStorageToken();
-  }
-
-  function jwtPayload(token) {
-    try {
-      const part = token.split('.')[1];
-      if (!part) return {};
-      const padded = part.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - part.length % 4) % 4);
-      const binary = atob(padded);
-      const bytes = Array.from(binary, ch => '%' + ('00' + ch.charCodeAt(0).toString(16)).slice(-2)).join('');
-      return JSON.parse(decodeURIComponent(bytes));
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function zetaDeviceId(token) {
-    const cookie = normalizeText(readCookie('DEVICE_ID'));
-    if (cookie) return cookie;
-
-    for (const storage of [localStorage, sessionStorage]) {
-      for (const key of ['DEVICE_ID', 'deviceId', 'device_id']) {
-        try {
-          const value = normalizeText(storage.getItem(key));
-          if (value) return value.replace(/^"|"$/g, '');
-        } catch (_) {}
-      }
-    }
-
-    return normalizeText(jwtPayload(token).did);
-  }
-
-  function apiHeaders() {
-    const token = zetaAccessToken();
-    const deviceId = zetaDeviceId(token);
-    const headers = {
-      Accept: 'application/json',
-      'X-Client-Version': WEB_CLIENT_VERSION,
-      'X-Client-Native-Version': WEB_CLIENT_VERSION,
-      'X-Client-Type': 'web',
-      'X-Device-Type': /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'web' : 'pc_web',
-      'X-User-Language': 'KOREAN'
-    };
-    if (token) headers.Authorization = 'Bearer ' + token;
-    if (deviceId) headers['X-Sticky'] = deviceId;
-    return headers;
-  }
-
-  // 상태 코드가 필요할 때가 있다(404 = 삭제된 플롯).
-  async function apiRequest(path, params) {
-    if (Date.now() < apiUnavailableUntil) return { ok: false, status: 0, data: null, skipped: true };
-
-    const url = new URL(path, API_BASE);
-    for (const [key, value] of Object.entries(params || {})) {
-      if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
-    }
-
-    try {
-      const response = await fetch(url.href, {
-        method: 'GET',
-        headers: apiHeaders(),
-        credentials: 'include',
-        cache: 'no-store'
-      });
-
-      if (response.status === 401 || response.status === 403) {
-        apiUnavailableUntil = Date.now() + 60000;
-        lastApiIssue = 'auth';
-        return { ok: false, status: response.status, data: null };
-      }
-      if (response.status === 429) {
-        apiUnavailableUntil = Date.now() + 30000;
-        lastApiIssue = 'rate';
-        return { ok: false, status: 429, data: null };
-      }
-      if (!response.ok) {
-        if (response.status >= 500) lastApiIssue = 'server';
-        return { ok: false, status: response.status, data: null };
-      }
-
-      const data = await response.json();
-      lastApiIssue = '';
-      return { ok: true, status: response.status, data };
-    } catch (_) {
-      apiUnavailableUntil = Date.now() + 30000;
-      lastApiIssue = 'network';
-      return { ok: false, status: 0, data: null };
-    }
-  }
-
-  async function apiGet(path, params) {
-    const result = await apiRequest(path, params);
-    return result.ok ? result.data : null;
-  }
-
-  function unwrapApi(payload) {
-    if (!payload || typeof payload !== 'object') return payload;
-    if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) return payload.data;
-    return payload;
-  }
-
-  function localePrefix() {
-    const first = location.pathname.split('/').filter(Boolean)[0] || 'ko';
-    return /^[a-z]{2}(?:-[a-z]{2})?$/i.test(first) ? first : 'ko';
-  }
-
-  function ingestPlotMeta(plot, plotIdHint, originatedIdHint, options) {
+  function ingestPlotMeta(plot, plotIdHint, originatedIdHint) {
     if (!plot || typeof plot !== 'object') return null;
 
     const plotId = normalizeText(plot.id || plot.plotId || plotIdHint);
-    const originatedId = normalizeText(
-      plot.originatedId ||
-      plot.originalId ||
-      originatedIdHint
-    );
+    const originatedId = normalizeText(plot.originatedId || plot.originalId || originatedIdHint);
     const canonicalId = canonicalPlotId(plotIdHint || plotId, originatedId);
     if (!canonicalId) return null;
 
@@ -654,7 +506,6 @@
       || {};
     const characters = plotCharacterNames(plot);
     const creators = plotCreatorNames(plot);
-    const detailFetched = Boolean(options && options.detailFetched);
 
     const next = {
       ...previous,
@@ -669,364 +520,117 @@
       updatedAt: Date.now()
     };
 
-    if (detailFetched) {
-      next.detailFetchedAt = Date.now();
-      delete next.failedAt;
-      delete next.missing;
-      delete next.missingAt;
-      next.failCount = 0;
-      next.emptyDetail = next.characterNames.length === 0 && next.creatorNames.length === 0;
-    }
+    delete next.failedAt;
+    delete next.missing;
+    delete next.missingAt;
+    delete next.emptyDetail;
 
     state.plotMeta[canonicalId] = next;
-
-    if (plotId && plotId !== canonicalId && state.plotMeta[plotId]) {
-      delete state.plotMeta[plotId];
-    }
-
+    if (plotId && plotId !== canonicalId && state.plotMeta[plotId]) delete state.plotMeta[plotId];
     return next;
   }
 
-  function applyPlotMetaToRooms(canonicalId, meta) {
-    if (!canonicalId || !meta) return;
-    for (const entry of Object.values(state.index)) {
-      if (!entry || entry.type !== 'room') continue;
-      if (canonicalPlotId(entry.plotId, entry.originatedId) !== canonicalId) continue;
+  // ── 대화방 수동 전체 수집 ───────────────────────────────────────────
+  // API를 직접 호출하지 않고, 사용자가 버튼을 눌렀을 때 실제 방 목록을 끝까지
+  // 스크롤하면서 제타가 화면에 렌더링한 방만 로컬 인덱스에 누적 저장한다.
 
-      entry.originatedId = entry.originatedId || meta.originatedId || '';
-      entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
-      entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
-      if (!entry.image && meta.image) entry.image = meta.image;
-      if (meta.missing) entry.plotMissing = true;
-      else delete entry.plotMissing;
-    }
+  function roomCollectionCount() {
+    return Object.values(state.index).filter(entry => entry && entry.type === 'room' && entry.id).length;
   }
 
-  function ingestApiRoom(room) {
-    if (!room || typeof room !== 'object') return null;
-    const roomId = normalizeText(room.id || room.roomId);
-    if (!roomId) return null;
-
-    const plot = room.plot && typeof room.plot === 'object' ? room.plot : {};
-    const plotId = normalizeText(room.plotId || plot.id || plot.plotId);
-    const originatedId = normalizeText(plot.originatedId || plot.originalId || room.originatedId);
-    const canonicalId = canonicalPlotId(plotId, originatedId);
-    const meta = ingestPlotMeta(plot, plotId, originatedId)
-      || (canonicalId ? state.plotMeta[canonicalId] : null);
-
-    const key = keyOf('room', roomId);
-    const previous = state.index[key] || {};
-
-    delete previous.missingSince;
-
-    state.index[key] = {
-      ...previous,
-      type: 'room',
-      id: roomId,
-      apiSeenAt: Date.now(),
-      href: previous.href || '/' + localePrefix() + '/rooms/' + roomId,
-      original: normalizeText(plot.name || plot.title || previous.original),
-      alias: normalizeText(state.aliases[key]),
-      image: normalizeText(plot.imageUrl || plot.initialRoomImageUrl || previous.image),
-      plotId: plotId || previous.plotId || '',
-      originatedId: originatedId || previous.originatedId || '',
-      characterNames: uniqueTexts(previous.characterNames, meta && meta.characterNames),
-      creatorNames: uniqueTexts(previous.creatorNames, meta && meta.creatorNames)
-    };
-
-    if (canonicalId && meta) applyPlotMetaToRooms(canonicalId, meta);
-    return state.index[key];
-  }
-
-  async function fetchAllRoomsFromApi() {
-    let cursor = '';
-    const seen = new Set();
-    let gotAny = false;
-    const roomIds = new Set();
-    let complete = false;
-
-    for (let page = 0; page < 250; page++) {
-      const result = await apiRequest('/v2/rooms', { limit: 100, cursor: cursor || undefined });
-      if (!result.ok) return { gotAny, complete: false, roomIds };
-
-      const payload = result.data;
-      const body = unwrapApi(payload);
-      const rooms = Array.isArray(body && body.rooms)
-        ? body.rooms
-        : (Array.isArray(payload.rooms) ? payload.rooms : []);
-
-      for (const room of rooms) {
-        const entry = ingestApiRoom(room);
-        if (entry && entry.id) roomIds.add(entry.id);
-      }
-      if (rooms.length) gotAny = true;
-
-      saveState();
-      scheduleRefresh();
-
-      const next = normalizeText(
-        (body && (body.nextCursor || body.next_cursor)) ||
-        payload.nextCursor ||
-        payload.next_cursor
-      );
-      if (!next || seen.has(next)) {
-        complete = true;
-        break;
-      }
-      seen.add(next);
-      cursor = next;
-    }
-    return { gotAny, complete, roomIds };
-  }
-
-  // 목록을 끝까지 받아왔는데 없는 방은 제타에서 사라진 방이다.
-  // 바로 지우지 않고 한 번 표시해 둔 뒤(동기화 지연 대비) 다음 순회에서 정리한다.
-  function pruneVanishedRooms(roomIds) {
-    if (!(roomIds instanceof Set) || !roomIds.size) return 0;
-
-    const now = Date.now();
-    let removed = 0;
-
-    for (const [key, entry] of Object.entries(state.index)) {
-      if (!entry || entry.type !== 'room' || !entry.id) continue;
-      if (roomIds.has(entry.id)) continue;
-      // 실제 방 ID가 없는 임시 항목은 대조할 수 없으니 건드리지 않는다.
-      if (String(entry.id).startsWith('local-')) continue;
-
-      if (!entry.missingSince) {
-        entry.missingSince = now;
-        continue;
-      }
-      if (now - entry.missingSince < 10 * 60 * 1000) continue;
-
-      delete state.index[key];
-      removed++;
-    }
-    return removed;
-  }
-
-  // 플롯이 삭제돼도 대화방 자체는 목록에 남는데, 그 방은 열면 "없는 페이지"가 된다.
-  // 검색 결과에서 걸러낼 수 있도록 삭제 사실을 캐시에 남긴다.
-  function markPlotMissing(target) {
-    if (!target || !target.canonicalId) return null;
-
-    const previous = state.plotMeta[target.canonicalId]
-      || (target.plotId ? state.plotMeta[target.plotId] : null)
-      || {};
-
-    const meta = {
-      ...previous,
-      canonicalId: target.canonicalId,
-      plotId: target.plotId || previous.plotId || '',
-      originatedId: target.originatedId || previous.originatedId || '',
-      characterNames: previous.characterNames || [],
-      creatorNames: previous.creatorNames || [],
-      missing: true,
-      missingAt: Date.now(),
-      detailFetchedAt: Date.now(),
-      failCount: 0
-    };
-    delete meta.failedAt;
-
-    state.plotMeta[target.canonicalId] = meta;
-    applyPlotMetaToRooms(target.canonicalId, meta);
-    return meta;
-  }
-
-  async function enrichMissingPlotMeta() {
-    const targets = [];
-    const now = Date.now();
-    const seenCanonical = new Set();
-
-    for (const entry of Object.values(state.index)) {
-      if (!entry || entry.type !== 'room') continue;
-
-      const plotId = normalizeText(entry.plotId);
-      const originatedId = normalizeText(entry.originatedId);
-      const canonicalId = canonicalPlotId(plotId, originatedId);
-      if (!canonicalId || seenCanonical.has(canonicalId)) continue;
-      seenCanonical.add(canonicalId);
-
-      const cached = state.plotMeta[canonicalId] || (plotId ? state.plotMeta[plotId] : null);
-      const detailFresh = Number((cached && cached.detailFetchedAt) || 0) > now - 7 * 24 * 60 * 60 * 1000;
-
-      if (detailFresh) {
-        applyPlotMetaToRooms(canonicalId, cached);
-        continue;
-      }
-
-      const failedAt = Number((cached && cached.failedAt) || 0);
-      const failCount = Number((cached && cached.failCount) || 0);
-      const backoff = Math.min(
-        7 * 24 * 60 * 60 * 1000,
-        30 * 60 * 1000 * Math.pow(2, Math.min(failCount, 8))
-      );
-
-      if (failedAt && now - failedAt < backoff) {
-        if (cached) applyPlotMetaToRooms(canonicalId, cached);
-        continue;
-      }
-
-      targets.push({ plotId, originatedId, canonicalId });
+  function roomCollectionScrollHost() {
+    const first = roomItemsFromDocument(document)[0];
+    let node = first && first.parentElement;
+    while (node && node !== document.body && node !== document.documentElement) {
+      const style = getComputedStyle(node);
+      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 20) return node;
+      node = node.parentElement;
     }
 
-    let nextIndex = 0;
-    let stop = false;
-
-    const worker = async () => {
-      while (!stop) {
-        const index = nextIndex++;
-        if (index >= targets.length) return;
-
-        const target = targets[index];
-        // 내 플롯(plot.id)을 먼저 조회한다. 원본이 삭제돼 있어도 이쪽은 살아있다.
-        const candidates = uniqueTexts([
-          target.plotId,
-          target.originatedId
-        ]);
-
-        let meta = null;
-        let sawGone = false;
-        let sawLive = false;
-
-        for (const candidate of candidates) {
-          const result = await apiRequest('/v1/plots/' + encodeURIComponent(candidate));
-
-          // 404/410은 "삭제된 플롯"이라는 확실한 신호다. 통신 실패와 구분한다.
-          if (result.status === 404 || result.status === 410) {
-            sawGone = true;
-            continue;
-          }
-          if (!result.ok) {
-            if (Date.now() < apiUnavailableUntil) {
-              stop = true;
-              break;
-            }
-            continue;
-          }
-
-          const plot = unwrapApi(result.data);
-          if (!plot || typeof plot !== 'object') continue;
-          if (!plot.id && !plot.name && !plot.title && !plot.characters && !plot.chatProfiles) continue;
-          sawLive = true;
-
-          meta = ingestPlotMeta(
-            plot,
-            target.plotId,
-            target.originatedId || plot.originatedId || plot.originalId,
-            { detailFetched: true }
-          );
-          if (meta) break;
-        }
-
-        if (meta) {
-          applyPlotMetaToRooms(target.canonicalId, meta);
-        } else if (sawGone && !sawLive && !stop) {
-          markPlotMissing(target);
-        } else if (!stop) {
-          const previous = state.plotMeta[target.canonicalId]
-            || (target.plotId ? state.plotMeta[target.plotId] : null)
-            || {};
-          state.plotMeta[target.canonicalId] = {
-            ...previous,
-            canonicalId: target.canonicalId,
-            plotId: target.plotId || previous.plotId || '',
-            originatedId: target.originatedId || previous.originatedId || '',
-            characterNames: previous.characterNames || [],
-            creatorNames: previous.creatorNames || [],
-            failedAt: Date.now(),
-            failCount: Number(previous.failCount || 0) + 1
-          };
-        }
-
-        if (index % 10 === 0) {
-          saveState();
-          scheduleRefresh();
-        }
-        await sleep(80);
-      }
-    };
-
-    await Promise.all([worker(), worker(), worker()]);
-    saveState();
-    scheduleRefresh();
-  }
-
-  async function harvestScrappedPlots() {
-    let cursor = '';
-    const seen = new Set();
-
-    for (let page = 0; page < 40; page++) {
-      const payload = await apiGet('/v1/plots/scrapped', {
-        limit: 30,
-        cursor: cursor || undefined
+    const roomList = document.querySelector('[data-sentry-component="RoomList"]');
+    if (roomList) {
+      const candidates = Array.from(roomList.querySelectorAll('*')).filter(el => {
+        const style = getComputedStyle(el);
+        return /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 20;
       });
-      if (!payload) return;
-
-      const body = unwrapApi(payload);
-      const plots = Array.isArray(body && body.plots)
-        ? body.plots
-        : Array.isArray(body && body.items)
-          ? body.items
-          : Array.isArray(body && body.contents)
-            ? body.contents
-            : [];
-
-      for (const plot of plots) {
-        const plotId = normalizeText(plot && (plot.id || plot.plotId));
-        const originatedId = normalizeText(plot && (plot.originatedId || plot.originalId));
-        const canonicalId = canonicalPlotId(plotId, originatedId);
-        const meta = ingestPlotMeta(plot, plotId, originatedId);
-        if (canonicalId && meta) applyPlotMetaToRooms(canonicalId, meta);
-      }
-
-      const next = normalizeText(
-        (body && (body.nextCursor || body.next_cursor)) ||
-        (payload && (payload.nextCursor || payload.next_cursor))
-      );
-      if (!next || seen.has(next)) break;
-      seen.add(next);
-      cursor = next;
+      candidates.sort((x, y) => y.scrollHeight - x.scrollHeight);
+      if (candidates[0]) return candidates[0];
     }
-
-    saveState();
-    scheduleRefresh();
+    return document.scrollingElement || document.documentElement;
   }
 
-  async function buildFullRoomIndexInBackground(force) {
-    if (currentSection() !== 'room') return false;
-
-    // 화면 스크롤은 절대 건드리지 않는다.
-    harvestRoomDocument(document);
-
-    const last = Number(localStorage.getItem(BACKGROUND_INDEX_STAMP_KEY) || 0);
-    if (!force && Date.now() - last < 5 * 60 * 1000) return true;
-
-    const sweep = await fetchAllRoomsFromApi();
-    if (!sweep.gotAny) {
-      saveState();
-      scheduleRefresh();
+  async function collectAllRoomsByScrolling() {
+    if (currentSection() !== 'room') {
+      alert('대화방 목록에서 실행해 주세요.');
       return false;
     }
+    if (roomCollectionPromise) return roomCollectionPromise;
 
-    if (sweep.complete) pruneVanishedRooms(sweep.roomIds);
+    roomCollectionPromise = (async () => {
+      roomCollectionProgress = { running: true, count: roomCollectionCount() };
+      renderCollectionTools();
 
-    await harvestScrappedPlots();
-    await enrichMissingPlotMeta();
+      const host = roomCollectionScrollHost();
+      const originalTop = scrollMetrics(host).top;
+      let lastHeight = 0;
+      let lastCount = roomCollectionCount();
+      let stableRounds = 0;
 
-    localStorage.setItem(BACKGROUND_INDEX_STAMP_KEY, String(Date.now()));
-    saveState();
-    scheduleRefresh();
-    return true;
+      setScrollTop(host, 0);
+      await sleep(450);
+      harvestRoomDocument(document);
+
+      for (let round = 0; round < 1600; round++) {
+        harvestRoomDocument(document);
+        const before = scrollMetrics(host);
+        const count = roomCollectionCount();
+        roomCollectionProgress.count = count;
+        renderCollectionTools();
+
+        const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
+        if (nearBottom) {
+          setScrollTop(host, before.height);
+          await sleep(700);
+          harvestRoomDocument(document);
+
+          const after = scrollMetrics(host);
+          const afterCount = roomCollectionCount();
+          if (after.height <= before.height + 2 && afterCount <= count) stableRounds++;
+          else stableRounds = 0;
+          if (stableRounds >= 4) break;
+        } else {
+          stableRounds = 0;
+          const step = Math.max(320, Math.floor(before.client * 0.78));
+          setScrollTop(host, Math.min(before.height, before.top + step));
+          await sleep(320);
+        }
+
+        const now = scrollMetrics(host);
+        const nowCount = roomCollectionCount();
+        if (now.height === lastHeight && nowCount === lastCount && nearBottom) stableRounds++;
+        lastHeight = now.height;
+        lastCount = nowCount;
+      }
+
+      harvestRoomDocument(document);
+      saveStateNow();
+      localStorage.setItem(ROOM_COLLECTION_STAMP_KEY, String(Date.now()));
+      setScrollTop(host, originalTop);
+      await sleep(100);
+
+      const total = roomCollectionCount();
+      roomCollectionProgress = { running: false, count: total };
+      renderCollectionTools();
+      alert('대화방 전체 수집 완료 · 저장된 방 ' + total + '개');
+      return true;
+    })().finally(() => {
+      roomCollectionPromise = null;
+      roomCollectionProgress.running = false;
+      renderCollectionTools();
+    });
+
+    return roomCollectionPromise;
   }
-
-  function ensureBackgroundRoomIndex(force) {
-    if (backgroundIndexPromise) return backgroundIndexPromise;
-    backgroundIndexPromise = buildFullRoomIndexInBackground(Boolean(force))
-      .finally(() => { backgroundIndexPromise = null; });
-    return backgroundIndexPromise;
-  }
-
 
   // ── 내 플롯 수동 전체 수집 / 백업 ───────────────────────────────────
   // Room Manager가 플롯 API를 직접 호출하지 않는다.
@@ -1097,7 +701,7 @@
 
     plotCollectionPromise = (async () => {
       plotCollectionProgress = { running: true, count: plotCollectionCount() };
-      renderPlotTools();
+      renderCollectionTools();
 
       const host = plotCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
@@ -1116,7 +720,7 @@
         const count = plotCollectionCount();
 
         plotCollectionProgress.count = count;
-        renderPlotTools();
+        renderCollectionTools();
 
         const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
         if (nearBottom) {
@@ -1154,13 +758,13 @@
 
       const total = plotCollectionCount();
       plotCollectionProgress = { running: false, count: total };
-      renderPlotTools();
+      renderCollectionTools();
       alert('전체 수집 완료 · 저장된 플롯 ' + total + '개');
       return true;
     })().finally(() => {
       plotCollectionPromise = null;
       plotCollectionProgress.running = false;
-      renderPlotTools();
+      renderCollectionTools();
     });
 
     return plotCollectionPromise;
@@ -1235,10 +839,10 @@
     return '';
   }
 
-  function renderPlotTools() {
+  function renderCollectionTools() {
     const section = currentSection();
     let tools = document.getElementById(PLOT_TOOLS_ID);
-    if (section !== 'plot' && section !== 'plot-search') {
+    if (!['room', 'plot', 'plot-search'].includes(section)) {
       tools?.remove();
       return;
     }
@@ -1252,19 +856,25 @@
         '<button type="button" data-zrm-action="import">불러오기</button>' +
         '<span data-zrm-count></span>';
 
-      tools.querySelector('[data-zrm-action="collect"]').addEventListener('click', () => collectAllPlotsByScrolling());
+      tools.querySelector('[data-zrm-action="collect"]').addEventListener('click', () => {
+        if (currentSection() === 'room') collectAllRoomsByScrolling();
+        else collectAllPlotsByScrolling();
+      });
       tools.querySelector('[data-zrm-action="export"]').addEventListener('click', exportRoomManagerData);
       tools.querySelector('[data-zrm-action="import"]').addEventListener('click', importRoomManagerData);
       document.body.appendChild(tools);
     }
 
+    const isRoom = section === 'room';
+    const progress = isRoom ? roomCollectionProgress : plotCollectionProgress;
+    const countValue = isRoom ? roomCollectionCount() : plotCollectionCount();
     const collect = tools.querySelector('[data-zrm-action="collect"]');
     if (collect) {
-      collect.disabled = plotCollectionProgress.running;
-      collect.textContent = plotCollectionProgress.running ? '수집 중…' : '전체 수집';
+      collect.disabled = progress.running;
+      collect.textContent = progress.running ? '수집 중…' : '전체 수집';
     }
     const count = tools.querySelector('[data-zrm-count]');
-    if (count) count.textContent = '저장 ' + plotCollectionCount() + '개';
+    if (count) count.textContent = (isRoom ? '방 ' : '플롯 ') + countValue + '개';
   }
 
   function extractId(href, type) {
@@ -1943,8 +1553,6 @@
     const deadCount = found.length - alive.length;
     const status = matches.length ? '' : indexStatusText();
 
-    if (status) ensureIndexForSearch();
-
     if (!matches.length && !deadCount && !status) {
       box?.remove();
       return;
@@ -2148,7 +1756,7 @@
     }
 
     injectStyle();
-    renderPlotTools();
+    renderCollectionTools();
     const records = renderedItems();
 
     for (const record of records) {
@@ -2236,6 +1844,7 @@
 
   function start() {
     cleanupLegacyState();
+    cleanupOldApiFlags();
     injectStyle();
 
     window.addEventListener('pagehide', saveStateNow);
@@ -2248,7 +1857,6 @@
     observer = new MutationObserver(scheduleRefresh);
     bindSwipeOpenLock();
     refresh();
-    ensureBackgroundRoomIndex();
 
     let lastUrl = location.href;
     setInterval(() => {
@@ -2256,7 +1864,6 @@
         lastUrl = location.href;
         scheduleRefresh();
         const section = currentSection();
-        if (section === 'room') ensureBackgroundRoomIndex();
       }
     }, 500);
   }
