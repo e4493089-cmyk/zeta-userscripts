@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.7.0
+// @version      0.7.1
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -60,8 +60,46 @@
     return `${type}:${id}`;
   }
 
+  // 0.7.0까지는 삭제된 원본(originatedId)을 캐시 키로 삼아, 내 플롯이 살아있어도
+  // 캐릭터명을 못 받는 방이 생겼다. 그 흔적을 한 번만 비워 다시 수집하게 한다.
+  const CLEANUP_STAMP_KEY = 'zeta-room-manager:cleanup:v071';
+  function cleanupLegacyState() {
+    if (localStorage.getItem(CLEANUP_STAMP_KEY)) return;
+
+    for (const [plotId, meta] of Object.entries(state.plotMeta || {})) {
+      if (!meta) continue;
+      const hasNames = (meta.characterNames || []).length || (meta.creatorNames || []).length;
+      if (meta.failedAt || meta.missing || !hasNames) delete state.plotMeta[plotId];
+    }
+
+    for (const [key, entry] of Object.entries(state.index || {})) {
+      if (!entry || entry.type !== 'room') continue;
+      delete entry.missingSince;
+      delete entry.plotMissing;
+    }
+
+    localStorage.setItem(CLEANUP_STAMP_KEY, String(Date.now()));
+    localStorage.removeItem('zeta-room-manager:last-full-index-at:v3');
+    saveStateNow();
+  }
+
+  // 전부 지우고 처음부터 다시 수집한다. 별명은 유지된다.
+  window.zrmResetIndex = function () {
+    state.index = {};
+    state.plotMeta = {};
+    localStorage.removeItem('zeta-room-manager:last-full-index-at:v3');
+    localStorage.removeItem(CLEANUP_STAMP_KEY);
+    saveStateNow();
+    try { ensureBackgroundRoomIndex(true); } catch (_) {}
+    return '인덱스를 비웠습니다. 방 목록에서 1~2분 기다리세요. (별명은 그대로입니다)';
+  };
+
   function normalizeText(value) {
-    return String(value || '').replace(/\s+/g, ' ').trim();
+    // 제타에서 제목이 빈 플롯은 한글 채움문자(ㅤ) 등으로 채워져 있다.
+    return String(value || '')
+      .replace(/[\u115F\u1160\u3164\u2800\uFFA0\u200B-\u200D\uFEFF]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   function collectSearchMeta(item, titleEl) {
@@ -265,7 +303,9 @@
   }
 
   function canonicalPlotId(plotId, originatedId) {
-    return normalizeText(originatedId) || normalizeText(plotId);
+    // 내 계정에 있는 실제 플롯(plot.id)을 우선한다.
+    // originatedId는 원본이며, 원본이 삭제된 경우 조회가 영구 실패한다.
+    return normalizeText(plotId) || normalizeText(originatedId);
   }
 
   function plotMetaForEntry(entry) {
@@ -273,6 +313,7 @@
     const canonical = canonicalPlotId(entry.plotId, entry.originatedId);
     return (canonical && state.plotMeta[canonical])
       || (entry.plotId && state.plotMeta[entry.plotId])
+      || (entry.originatedId && state.plotMeta[entry.originatedId])
       || null;
   }
 
@@ -785,9 +826,10 @@
         if (index >= targets.length) return;
 
         const target = targets[index];
+        // 내 플롯(plot.id)을 먼저 조회한다. 원본이 삭제돼 있어도 이쪽은 살아있다.
         const candidates = uniqueTexts([
-          target.originatedId,
-          target.plotId
+          target.plotId,
+          target.originatedId
         ]);
 
         let meta = null;
@@ -1689,6 +1731,7 @@
   }
 
   function start() {
+    cleanupLegacyState();
     injectStyle();
 
     window.addEventListener('pagehide', saveStateNow);
