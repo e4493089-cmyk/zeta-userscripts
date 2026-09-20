@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.9.5
+// @version      0.9.6
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -397,6 +397,7 @@
       normalizeText(meta.originatedId)
     ].filter(Boolean));
     const metaName = normalizeText(meta.name).toLocaleLowerCase('ko-KR');
+    const metaImage = imageKeyOf(meta.image);
 
     for (const entry of Object.values(state.index || {})) {
       if (!entry || typeof entry !== 'object') continue;
@@ -409,7 +410,10 @@
       const linkedByName = !linkedById
         && metaName
         && normalizeText(entry.original).toLocaleLowerCase('ko-KR') === metaName;
-      if (!linkedById && !linkedByName) continue;
+      const linkedByImage = !linkedById && !linkedByName
+        && metaImage
+        && imageKeyOf(entry.image) === metaImage;
+      if (!linkedById && !linkedByName && !linkedByImage) continue;
 
       entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
       entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
@@ -559,26 +563,54 @@
   // 방 목록 데이터에는 플롯 ID가 없는 경우가 많다. 그러면 내 플롯에서 모은
   // 캐릭터·제작자명이 방으로 흘러가지 못한다. ID가 없을 때는 이름으로 잇는다.
   // 같은 이름의 플롯이 둘 이상이면 어느 쪽인지 알 수 없으므로 잇지 않는다.
-  let plotNameIndex = null;
-  let plotNameIndexAt = 0;
+  // 썸네일 주소는 플롯마다 고유한 UUID 경로다.
+  //   https://image.zeta-ai.io/plot-cover-image/<uuid>/<uuid>.png?w=96&q=75&f=webp
+  // 표시 크기에 따라 쿼리만 달라지므로 경로만 비교하면 같은 플롯인지 알 수 있다.
+  function imageKeyOf(value) {
+    const text = normalizeText(value).split('?')[0];
+    if (!text) return '';
+    const match = text.match(/^https?:\/\/[^/]+\/(.+)$/);
+    const path = match ? match[1] : text;
+    return path.length < 8 ? '' : path.toLocaleLowerCase('ko-KR');
+  }
+
+  let plotLookup = null;
+  let plotLookupDirty = true;
+
+  function plotLookupTables() {
+    if (plotLookup && !plotLookupDirty) return plotLookup;
+
+    const byName = new Map();
+    const byImage = new Map();
+    const add = (map, key, meta) => {
+      if (!key) return;
+      if (map.has(key) && map.get(key) !== meta) map.set(key, 'ambiguous');
+      else map.set(key, meta);
+    };
+
+    for (const meta of Object.values(state.plotMeta || {})) {
+      if (!meta) continue;
+      add(byName, normalizeText(meta.name).toLocaleLowerCase('ko-KR'), meta);
+      add(byImage, imageKeyOf(meta.image), meta);
+    }
+
+    plotLookup = { byName, byImage };
+    plotLookupDirty = false;
+    return plotLookup;
+  }
 
   function plotMetaByName(name) {
     const wanted = normalizeText(name).toLocaleLowerCase('ko-KR');
     if (!wanted) return null;
+    const hit = plotLookupTables().byName.get(wanted);
+    return hit && hit !== 'ambiguous' ? hit : null;
+  }
 
-    const metaCount = Object.keys(state.plotMeta || {}).length;
-    if (!plotNameIndex || plotNameIndexAt !== metaCount) {
-      plotNameIndex = new Map();
-      for (const meta of Object.values(state.plotMeta || {})) {
-        const key = normalizeText(meta && meta.name).toLocaleLowerCase('ko-KR');
-        if (!key) continue;
-        if (plotNameIndex.has(key)) plotNameIndex.set(key, 'ambiguous');
-        else plotNameIndex.set(key, meta);
-      }
-      plotNameIndexAt = metaCount;
-    }
-
-    const hit = plotNameIndex.get(wanted);
+  // 방 제목을 바꿨거나 플롯명과 달라도, 썸네일이 같으면 같은 플롯이다.
+  function plotMetaByImage(image) {
+    const wanted = imageKeyOf(image);
+    if (!wanted) return null;
+    const hit = plotLookupTables().byImage.get(wanted);
     return hit && hit !== 'ambiguous' ? hit : null;
   }
 
@@ -589,6 +621,7 @@
       || (entry.plotId && state.plotMeta[entry.plotId])
       || (entry.originatedId && state.plotMeta[entry.originatedId])
       || plotMetaByName(entry.original)
+      || plotMetaByImage(entry.image)
       || null;
   }
 
@@ -735,6 +768,7 @@
     delete next.emptyDetail;
 
     state.plotMeta[canonicalId] = next;
+    plotLookupDirty = true;
     if (plotId && plotId !== canonicalId && state.plotMeta[plotId]) delete state.plotMeta[plotId];
     return next;
   }
