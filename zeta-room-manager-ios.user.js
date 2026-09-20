@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.5.8
+// @version      0.5.9
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -949,7 +949,8 @@
     if (section === 'plot') {
       const search = creatorCenterSearchLink();
       if (search && search.parentElement) {
-        return { host: search.parentElement, before: search };
+        const host = search.parentElement;
+        return { host, before: host.firstElementChild || search };
       }
     }
 
