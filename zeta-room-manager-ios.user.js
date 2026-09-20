@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.5.9
+// @version      0.6.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -937,15 +937,6 @@
       if (host) return { host, before: host.firstElementChild || null };
     }
 
-    if (section === 'plot-search') {
-      const input = nativePlotSearchInput();
-      const field = input && input.closest('label, [data-sentry-component="Input"]');
-      const row = field && field.parentElement;
-      // 중요: 도구를 검색 필드(label) 안에 넣으면 flex-1 입력창 크기가 변한다.
-      // 반드시 검색 필드의 형제 요소로 삽입한다.
-      if (field && row) return { host: row, before: null };
-    }
-
     if (section === 'plot') {
       const search = creatorCenterSearchLink();
       if (search && search.parentElement) {
@@ -965,7 +956,7 @@
     closeCollectionPopup();
 
     const section = currentSection();
-    if (!['room', 'plot', 'plot-search'].includes(section)) return;
+    if (!['room', 'plot'].includes(section)) return;
 
     const isRoom = section === 'room';
     const progress = isRoom ? roomCollectionProgress : plotCollectionProgress;
@@ -1018,7 +1009,7 @@
   function renderCollectionTools() {
     const section = currentSection();
     let tools = document.getElementById(PLOT_TOOLS_ID);
-    if (!['room', 'plot', 'plot-search'].includes(section)) {
+    if (!['room', 'plot'].includes(section)) {
       tools?.remove();
       closeCollectionPopup();
       return;
@@ -1041,8 +1032,6 @@
         openCollectionPopup();
       });
     }
-
-    tools.classList.toggle('zrm-tools-search-row', section === 'plot-search');
 
     const anchor = collectionToolsAnchor();
     if (anchor && anchor.host) {
@@ -1245,10 +1234,6 @@
         position: fixed;
         top: 14px;
         right: 88px;
-      }
-      #${PLOT_TOOLS_ID}.zrm-tools-search-row {
-        margin-left: 8px;
-        flex: 0 0 34px;
       }
       #${PLOT_TOOLS_ID} .zrm-tools-trigger {
         display: inline-flex;
