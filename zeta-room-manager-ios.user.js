@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.0
+// @version      0.20.1
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -38,6 +38,9 @@
   let plotCollectionProgress = { running: false, count: 0 };
   let roomCollectionPromise = null;
   let roomCollectionProgress = { running: false, count: 0 };
+  // iOS에서는 목록 스크롤 때 MutationObserver가 매 프레임 refresh()를 다시 불러
+  // 수집기가 같은 방을 두 번 분석하기 쉽다. 수집 중에는 수동 harvest만 사용한다.
+  let suspendObserverRefresh = false;
 
   function loadState() {
     try {
@@ -1377,6 +1380,10 @@
     roomCollectionPromise = (async () => {
       collectionAborted = false;
       void holdScreenAwake();
+      // PC판과 같은 수집 흐름은 유지하되, iOS WebKit에서만 발생하는
+      // MutationObserver → refresh → renderedItems 중복 분석을 막는다.
+      suspendObserverRefresh = true;
+      observer?.disconnect();
       roomCollectionProgress = { running: true, count: roomCollectionCount(), phase: '목록 수집' };
       renderCollectionTools();
 
@@ -1469,8 +1476,11 @@
     })().finally(() => {
       roomCollectionPromise = null;
       roomCollectionProgress.running = false;
+      suspendObserverRefresh = false;
       void releaseScreenAwake();
       renderCollectionTools();
+      // 수집 중 미뤘던 별명/검색 UI 갱신은 마지막에 한 번만 한다.
+      scheduleRefresh();
     });
 
     return roomCollectionPromise;
@@ -3227,6 +3237,7 @@
   }
 
   function scheduleRefresh() {
+    if (suspendObserverRefresh) return;
     if (rafPending) return;
     rafPending = true;
     requestAnimationFrame(() => {
