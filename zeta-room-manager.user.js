@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.7.2
+// @version      0.7.3
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -372,8 +372,14 @@
     return searchValues(entry).some(value => value.toLocaleLowerCase('ko-KR').includes(query));
   }
 
+  // 제타에는 제목이 공백인 플롯·방이 실제로 존재한다.
+  // 숨기면 영영 찾을 수 없으므로, 플롯명 → 대체 표기 순으로 보여준다.
   function entryTitle(entry) {
-    return normalizeText(entry?.alias) || normalizeText(entry?.original);
+    const meta = plotMetaForEntry(entry);
+    return normalizeText(entry?.alias)
+      || normalizeText(entry?.original)
+      || normalizeText(meta && meta.name)
+      || '(제목 없음)';
   }
 
   // 플롯이 삭제됐거나 제타 목록에서 사라진 방은 눌러도 "없는 페이지"로 간다.
@@ -1531,7 +1537,6 @@
     );
     const found = Object.values(state.index)
       .filter(entry => entry?.type === 'room' && entry.href)
-      .filter(entry => entryTitle(entry))
       .filter(entry => matchesSearch(entry, q))
       .filter(entry => !nativeIds.has(entry.id));
 
@@ -1662,7 +1667,6 @@
     );
     const matches = Object.values(state.index)
       .filter(entry => entry?.type === 'plot' && entry.href)
-      .filter(entry => entryTitle(entry))
       .filter(entry => matchesSearch(entry, q))
       .filter(entry => !nativeIds.has(entry.id))
       .filter(entry => !isDeadEntry(entry))
