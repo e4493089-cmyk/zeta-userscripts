@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.4.4
+// @version      0.4.5
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1041,6 +1041,41 @@
   // 제목도 이미지도 없으면 항목을 구분할 근거가 없다.
   // 그래도 해시를 만들면 빈 항목이 전부 같은 키로 뭉쳐서, 서로 무관한
   // (예: 탈퇴한 제작자의) 캐릭터명이 한 항목에 계속 쌓인다.
+  // 항목의 ID와 일치하는 객체만 골라낸다.
+  // ID로 못을 박으므로 조상까지 넉넉히 올라가도 남의 항목이나
+  // 페이지 전역 정보(로그인한 나·페르소나)가 섞일 수 없다.
+  function reactEntityForId(item, wantedId) {
+    const id = normalizeText(wantedId);
+    if (!id || id.startsWith('local-')) return null;
+
+    const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber$'));
+    let fiber = fiberKey ? item[fiberKey] : null;
+
+    const isMatch = value => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+      return [value.id, value.plotId, value.originatedId, value.originalId]
+        .some(candidate => normalizeText(candidate) === id);
+    };
+
+    for (let depth = 0; fiber && depth < 16; depth++, fiber = fiber.return) {
+      for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
+        if (!props || typeof props !== 'object' || Array.isArray(props)) continue;
+        if (isMatch(props)) return props;
+
+        for (const value of Object.values(props)) {
+          if (isMatch(value)) return value;
+          if (value && typeof value === 'object' && isMatch(value.plot)) return value.plot;
+          // 목록 배열이 걸리면 그 안에서 이 항목에 해당하는 것만 꺼낸다.
+          if (Array.isArray(value)) {
+            const hit = value.find(isMatch);
+            if (hit) return hit;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   function localFallbackId(original, image) {
     const title = normalizeText(original);
     const picture = normalizeText(image).split('?')[0];
@@ -1258,7 +1293,17 @@
     // 제타가 실제로 그려준 방이면 사라진 방이 아니다.
     delete previous.missingSince;
     const searchMeta = collectSearchMeta(item, titleEl);
-    const roomPlot = type === 'room' ? reactRoomPlotMeta(item) : null;
+    // 플롯 목록 항목은 API 보강 대상이 아니라 화면 데이터가 유일한 출처다.
+    const ownEntity = reactEntityForId(item, id);
+    const roomPlot = type === 'room' ? (reactRoomPlotMeta(item) || ownEntity) : null;
+    const plotEntity = type === 'plot' ? ownEntity : null;
+    const plotEntityMeta = plotEntity
+      ? ingestPlotMeta(
+          plotEntity,
+          id,
+          plotEntity.originatedId || plotEntity.originalId
+        )
+      : null;
     const roomPlotId = normalizeText((roomPlot && (roomPlot.id || roomPlot.plotId)) || previous.plotId);
     const roomOriginatedId = normalizeText(
       (roomPlot && (roomPlot.originatedId || roomPlot.originalId)) ||
@@ -1278,12 +1323,26 @@
       original: original,
       alias: alias,
       image: image || previous.image || '',
-      plotId: type === 'room' ? (roomPlotId || previous.plotId || '') : (previous.plotId || ''),
+      plotId: type === 'room'
+        ? (roomPlotId || previous.plotId || '')
+        : (previous.plotId || (id.startsWith('local-') ? '' : id)),
       originatedId: type === 'room'
         ? (roomOriginatedId || previous.originatedId || '')
         : (previous.originatedId || ''),
-      characterNames: uniqueTexts(searchMeta.characterNames, roomMeta && roomMeta.characterNames, previous.characterNames),
-      creatorNames: uniqueTexts(searchMeta.creatorNames, roomMeta && roomMeta.creatorNames, previous.creatorNames)
+      characterNames: uniqueTexts(
+        searchMeta.characterNames,
+        plotEntity && plotCharacterNames(plotEntity),
+        plotEntityMeta && plotEntityMeta.characterNames,
+        roomMeta && roomMeta.characterNames,
+        previous.characterNames
+      ),
+      creatorNames: uniqueTexts(
+        searchMeta.creatorNames,
+        plotEntity && plotCreatorNames(plotEntity),
+        plotEntityMeta && plotEntityMeta.creatorNames,
+        roomMeta && roomMeta.creatorNames,
+        previous.creatorNames
+      )
     };
 
     return { key, type, id, item, link, titleEl, original, alias };
