@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.8.1
+// @version      0.8.2
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -23,11 +23,15 @@
   const MODAL_ID = 'zeta-room-manager-modal';
   const NATIVE_RESULTS_ID = 'zeta-room-manager-native-results';
   const PLOT_NATIVE_RESULTS_ID = 'zeta-room-manager-plot-native-results';
+  const PLOT_TOOLS_ID = 'zeta-room-manager-plot-tools';
+  const PLOT_COLLECTION_STAMP_KEY = 'zeta-room-manager:plot-collection-at:v1';
 
   const state = loadState();
   let observer = null;
   let rafPending = false;
   let lastRoomContextRecord = null;
+  let plotCollectionPromise = null;
+  let plotCollectionProgress = { running: false, count: 0 };
 
   function loadState() {
     try {
@@ -109,11 +113,11 @@
     localStorage.removeItem('zeta-room-manager:last-full-index-at:v3');
     localStorage.removeItem('zeta-room-manager:last-plot-index-at:v1');
     localStorage.removeItem('zeta-room-manager:last-plot-index-at:v2');
+    localStorage.removeItem(PLOT_COLLECTION_STAMP_KEY);
     localStorage.removeItem(CLEANUP_STAMP_KEY);
     saveStateNow();
     try { ensureBackgroundRoomIndex(true); } catch (_) {}
-    try { ensureMyPlotIndex(true); } catch (_) {}
-    return '인덱스를 비웠습니다. 방 목록에서 1~2분 기다리세요. (별명은 그대로입니다)';
+    return '인덱스를 비웠습니다. 별명은 그대로입니다. 비공개 플롯은 제작자센터에서 전체 수집을 다시 실행해 주세요.';
   };
 
   function normalizeText(value) {
@@ -1023,134 +1027,243 @@
   }
 
 
-  // ── 내 플롯 전체 인덱싱 ──────────────────────────────────────────────
-  // 제타 Creator Center가 실제로 사용하는 API.
-  // 공개/비공개 플롯을 각각 끝까지 페이지네이션해서, 화면에 아직 로딩되지 않은
-  // 플롯도 검색할 수 있도록 로컬 인덱스에 저장한다.
-  const MY_PLOTS_STAMP_KEY = 'zeta-room-manager:last-plot-index-at:v2';
-  const MY_PLOTS_API_PATH = '/v1/plots/creator';
-  let plotIndexPromise = null;
+  // ── 내 플롯 수동 전체 수집 / 백업 ───────────────────────────────────
+  // Room Manager가 플롯 API를 직접 호출하지 않는다.
+  // 사용자가 '전체 수집'을 눌렀을 때 Creator Center 목록을 실제로 스크롤하고,
+  // 제타가 화면에 렌더링한 항목만 로컬 인덱스에 누적 저장한다.
 
-  function plotListFromPayload(payload) {
-    const body = unwrapApi(payload);
-    for (const source of [body, payload]) {
-      if (!source || typeof source !== 'object') continue;
-      if (Array.isArray(source)) return source;
-      for (const key of ['plots', 'items', 'contents', 'results', 'data', 'list']) {
-        if (Array.isArray(source[key])) return source[key];
-      }
+  function plotCollectionCount() {
+    return Object.values(state.index).filter(entry => entry && entry.type === 'plot' && entry.id).length;
+  }
+
+  function collectRenderedPlots() {
+    let seen = 0;
+    const items = document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]');
+    for (const item of items) {
+      const record = parseItem(item, 'plot');
+      if (!record) continue;
+      applyAlias(record);
+      seen++;
     }
-    return [];
+    if (seen) saveState();
+    return seen;
   }
 
-  function ingestApiPlot(plot) {
-    if (!plot || typeof plot !== 'object') return null;
-    const plotId = normalizeText(plot.id || plot.plotId);
-    if (!plotId) return null;
+  function plotCollectionScrollHost() {
+    const first = document.querySelector('[data-sentry-component="CreatorCenterMyPlotListItem"]');
+    let node = first && first.parentElement;
+    while (node && node !== document.body && node !== document.documentElement) {
+      const style = getComputedStyle(node);
+      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 20) return node;
+      node = node.parentElement;
+    }
 
-    const originatedId = normalizeText(plot.originatedId || plot.originalId);
-    const meta = ingestPlotMeta(plot, plotId, originatedId);
-    const key = keyOf('plot', plotId);
-    const previous = state.index[key] || {};
-
-    state.index[key] = {
-      ...previous,
-      type: 'plot',
-      id: plotId,
-      href: previous.href || '/' + localePrefix() + '/plots/' + plotId + '/profile',
-      original: normalizeText(plot.name || plot.title || previous.original),
-      alias: normalizeText(state.aliases[key]),
-      image: normalizeText(plot.imageUrl || plot.initialRoomImageUrl || previous.image),
-      plotId: plotId,
-      originatedId: originatedId || previous.originatedId || '',
-      characterNames: uniqueTexts(plotCharacterNames(plot), meta && meta.characterNames, previous.characterNames),
-      creatorNames: uniqueTexts(plotCreatorNames(plot), meta && meta.creatorNames, previous.creatorNames),
-      isPrivate: typeof plot.isPrivate === 'boolean' ? plot.isPrivate : previous.isPrivate
-    };
-    return state.index[key];
-  }
-
-  async function fetchCreatorPlotsVisibility(isPrivate) {
-    let cursor = '';
-    const seen = new Set();
-    let got = 0;
-    let complete = false;
-
-    for (let page = 0; page < 300; page++) {
-      const result = await apiRequest(MY_PLOTS_API_PATH, {
-        limit: 15,
-        isPrivate: isPrivate ? 'true' : 'false',
-        'orderBy.property': 'UPDATED_AT',
-        'orderBy.direction': 'DESC',
-        status: 'RELEASE',
-        modes: 'STORY_CHAT,VISUAL_NOVEL',
-        cursor: cursor || undefined
+    const main = document.querySelector('main#contents, main, [role="main"]');
+    if (main) {
+      const candidates = Array.from(main.querySelectorAll('*')).filter(el => {
+        const style = getComputedStyle(el);
+        return /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 20;
       });
-      if (!result.ok) return { got, complete: false };
-
-      const plots = plotListFromPayload(result.data);
-      for (const plot of plots) {
-        if (ingestApiPlot(plot)) got++;
-      }
-
-      saveState();
-      scheduleRefresh();
-
-      const body = unwrapApi(result.data);
-      const next = normalizeText(
-        (body && (body.nextCursor || body.next_cursor)) ||
-        (result.data && (result.data.nextCursor || result.data.next_cursor))
-      );
-
-      if (!next || seen.has(next)) {
-        complete = true;
-        break;
-      }
-      seen.add(next);
-      cursor = next;
+      candidates.sort((x, y) => y.scrollHeight - x.scrollHeight);
+      if (candidates[0]) return candidates[0];
     }
-
-    return { got, complete };
+    return document.scrollingElement || document.documentElement;
   }
 
-  async function buildMyPlotIndexInBackground(force) {
+  function scrollMetrics(host) {
+    const root = host === document.scrollingElement || host === document.documentElement || host === document.body;
+    return {
+      root,
+      top: root ? (window.scrollY || document.documentElement.scrollTop || 0) : host.scrollTop,
+      height: root ? Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) : host.scrollHeight,
+      client: root ? window.innerHeight : host.clientHeight
+    };
+  }
+
+  function setScrollTop(host, value) {
+    const root = host === document.scrollingElement || host === document.documentElement || host === document.body;
+    if (root) window.scrollTo(0, value);
+    else host.scrollTop = value;
+  }
+
+  async function collectAllPlotsByScrolling() {
     const section = currentSection();
-    if (section !== 'plot' && section !== 'plot-search') return false;
-
-    const stamp = Number(localStorage.getItem(MY_PLOTS_STAMP_KEY) || 0);
-    if (!force && Date.now() - stamp < 5 * 60 * 1000) return true;
-
-    // 비공개를 먼저 받는다. 사용자가 비공개 목록에서 검색할 때 바로 결과가 붙도록 한다.
-    const privateSweep = await fetchCreatorPlotsVisibility(true);
-    if (Date.now() < apiUnavailableUntil) {
-      saveState();
-      scheduleRefresh();
-      return privateSweep.got > 0;
+    if (section !== 'plot' && section !== 'plot-search') {
+      alert('제작자센터의 플롯 목록에서 실행해 주세요.');
+      return false;
     }
+    if (plotCollectionPromise) return plotCollectionPromise;
 
-    const publicSweep = await fetchCreatorPlotsVisibility(false);
-    const got = privateSweep.got + publicSweep.got;
+    plotCollectionPromise = (async () => {
+      plotCollectionProgress = { running: true, count: plotCollectionCount() };
+      renderPlotTools();
 
-    if (privateSweep.complete && publicSweep.complete) {
-      localStorage.setItem(MY_PLOTS_STAMP_KEY, String(Date.now()));
-    }
+      const host = plotCollectionScrollHost();
+      const originalTop = scrollMetrics(host).top;
+      let lastHeight = 0;
+      let lastCount = plotCollectionCount();
+      let stableRounds = 0;
 
-    saveState();
-    scheduleRefresh();
-    return got > 0;
+      // 처음부터 훑어야 가상 목록에서 빠지는 항목이 없다.
+      setScrollTop(host, 0);
+      await sleep(450);
+      collectRenderedPlots();
+
+      for (let round = 0; round < 1600; round++) {
+        collectRenderedPlots();
+        const before = scrollMetrics(host);
+        const count = plotCollectionCount();
+
+        plotCollectionProgress.count = count;
+        renderPlotTools();
+
+        const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
+        if (nearBottom) {
+          setScrollTop(host, before.height);
+          await sleep(700);
+          collectRenderedPlots();
+
+          const after = scrollMetrics(host);
+          const afterCount = plotCollectionCount();
+          if (after.height <= before.height + 2 && afterCount <= count) stableRounds++;
+          else stableRounds = 0;
+
+          if (stableRounds >= 4) break;
+        } else {
+          stableRounds = 0;
+          const step = Math.max(320, Math.floor(before.client * 0.78));
+          setScrollTop(host, Math.min(before.height, before.top + step));
+          await sleep(320);
+        }
+
+        const now = scrollMetrics(host);
+        const nowCount = plotCollectionCount();
+        if (now.height === lastHeight && nowCount === lastCount && nearBottom) stableRounds++;
+        lastHeight = now.height;
+        lastCount = nowCount;
+      }
+
+      collectRenderedPlots();
+      saveStateNow();
+      localStorage.setItem(PLOT_COLLECTION_STAMP_KEY, String(Date.now()));
+
+      // 사용자가 보던 위치로 돌아간다.
+      setScrollTop(host, originalTop);
+      await sleep(100);
+
+      const total = plotCollectionCount();
+      plotCollectionProgress = { running: false, count: total };
+      renderPlotTools();
+      alert('전체 수집 완료 · 저장된 플롯 ' + total + '개');
+      return true;
+    })().finally(() => {
+      plotCollectionPromise = null;
+      plotCollectionProgress.running = false;
+      renderPlotTools();
+    });
+
+    return plotCollectionPromise;
   }
 
-  function ensureMyPlotIndex(force) {
-    if (plotIndexPromise) return plotIndexPromise;
-    plotIndexPromise = buildMyPlotIndexInBackground(Boolean(force))
-      .finally(() => { plotIndexPromise = null; });
-    return plotIndexPromise;
+  function exportRoomManagerData() {
+    saveStateNow();
+    const payload = {
+      format: 'zeta-room-manager-backup',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      state: {
+        version: STATE_VERSION,
+        aliases: state.aliases,
+        index: state.index,
+        plotMeta: state.plotMeta
+      }
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = 'zeta-room-manager-' + date + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function importRoomManagerData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.style.display = 'none';
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      if (!file) return input.remove();
+      try {
+        const parsed = JSON.parse(await file.text());
+        const incoming = parsed && parsed.format === 'zeta-room-manager-backup' ? parsed.state : parsed;
+        if (!incoming || typeof incoming !== 'object') throw new Error('올바른 Room Manager 백업 파일이 아닙니다.');
+
+        const aliases = incoming.aliases && typeof incoming.aliases === 'object' ? incoming.aliases : {};
+        const index = incoming.index && typeof incoming.index === 'object' ? incoming.index : {};
+        const plotMeta = incoming.plotMeta && typeof incoming.plotMeta === 'object' ? incoming.plotMeta : {};
+
+        Object.assign(state.aliases, aliases);
+        Object.assign(state.index, index);
+        Object.assign(state.plotMeta, plotMeta);
+        saveStateNow();
+        localStorage.setItem(PLOT_COLLECTION_STAMP_KEY, String(Date.now()));
+        scheduleRefresh();
+        alert('불러오기 완료 · 저장된 플롯 ' + plotCollectionCount() + '개');
+      } catch (error) {
+        alert('불러오기 실패: ' + (error && error.message ? error.message : error));
+      } finally {
+        input.remove();
+      }
+    }, { once: true });
+    document.body.appendChild(input);
+    input.click();
   }
 
   function plotIndexStatusText() {
-    if (Date.now() < apiUnavailableUntil) return indexStatusText();
-    if (plotIndexPromise) return '내 플롯 전체 목록을 불러오는 중이에요. 잠시 후 다시 검색해 주세요.';
+    if (plotCollectionProgress.running) {
+      return '전체 수집 중 · 현재 ' + plotCollectionProgress.count + '개 저장됨';
+    }
+    if (!Number(localStorage.getItem(PLOT_COLLECTION_STAMP_KEY) || 0)) {
+      return '캐릭터명·제작자명 전체 검색은 먼저 Room Manager의 ‘전체 수집’을 한 번 실행해 주세요.';
+    }
     return '';
+  }
+
+  function renderPlotTools() {
+    const section = currentSection();
+    let tools = document.getElementById(PLOT_TOOLS_ID);
+    if (section !== 'plot' && section !== 'plot-search') {
+      tools?.remove();
+      return;
+    }
+
+    if (!tools) {
+      tools = document.createElement('div');
+      tools.id = PLOT_TOOLS_ID;
+      tools.innerHTML =
+        '<button type="button" data-zrm-action="collect">전체 수집</button>' +
+        '<button type="button" data-zrm-action="export">내보내기</button>' +
+        '<button type="button" data-zrm-action="import">불러오기</button>' +
+        '<span data-zrm-count></span>';
+
+      tools.querySelector('[data-zrm-action="collect"]').addEventListener('click', () => collectAllPlotsByScrolling());
+      tools.querySelector('[data-zrm-action="export"]').addEventListener('click', exportRoomManagerData);
+      tools.querySelector('[data-zrm-action="import"]').addEventListener('click', importRoomManagerData);
+      document.body.appendChild(tools);
+    }
+
+    const collect = tools.querySelector('[data-zrm-action="collect"]');
+    if (collect) {
+      collect.disabled = plotCollectionProgress.running;
+      collect.textContent = plotCollectionProgress.running ? '수집 중…' : '전체 수집';
+    }
+    const count = tools.querySelector('[data-zrm-count]');
+    if (count) count.textContent = '저장 ' + plotCollectionCount() + '개';
   }
 
   function extractId(href, type) {
@@ -1301,6 +1414,39 @@
         white-space: nowrap;
       }
       .zrm-plot-rename:hover { background: rgba(255,255,255,.12); color: #fff; }
+
+      #${PLOT_TOOLS_ID} {
+        position: fixed;
+        right: 12px;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        z-index: 2147483000;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 12px;
+        background: rgba(28,28,31,.94);
+        box-shadow: 0 8px 28px rgba(0,0,0,.28);
+        backdrop-filter: blur(12px);
+      }
+      #${PLOT_TOOLS_ID} button {
+        height: 30px;
+        padding: 0 9px;
+        border: 0;
+        border-radius: 8px;
+        background: rgba(255,255,255,.08);
+        color: #fff;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      #${PLOT_TOOLS_ID} button:disabled { opacity: .45; }
+      #${PLOT_TOOLS_ID} [data-zrm-count] {
+        padding: 0 4px;
+        color: rgba(255,255,255,.5);
+        font-size: 10px;
+        white-space: nowrap;
+      }
 
       #${MODAL_ID} {
         position: fixed;
@@ -1876,7 +2022,6 @@
       .slice(0, 20);
 
     const status = matches.length ? '' : plotIndexStatusText();
-    if (status) ensureMyPlotIndex();
 
     if (!matches.length && !status) {
       box?.remove();
@@ -1949,10 +2094,12 @@
     if (!section) {
       document.getElementById(NATIVE_RESULTS_ID)?.remove();
       document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
+      document.getElementById(PLOT_TOOLS_ID)?.remove();
       return;
     }
 
     injectStyle();
+    renderPlotTools();
     const records = renderedItems();
 
     for (const record of records) {
@@ -1996,7 +2143,6 @@
     observer = new MutationObserver(scheduleRefresh);
     refresh();
     ensureBackgroundRoomIndex();
-    ensureMyPlotIndex();
 
     let lastUrl = location.href;
     setInterval(() => {
@@ -2005,7 +2151,6 @@
         scheduleRefresh();
         const section = currentSection();
         if (section === 'room') ensureBackgroundRoomIndex();
-        if (section === 'plot' || section === 'plot-search') ensureMyPlotIndex();
       }
     }, 500);
   }
