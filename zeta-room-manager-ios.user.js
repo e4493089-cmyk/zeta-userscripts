@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.5.0
+// @version      0.5.1
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -109,6 +109,7 @@
     state.plotMeta = {};
     localStorage.removeItem('zeta-room-manager:last-full-index-at:v3');
     localStorage.removeItem('zeta-room-manager:last-plot-index-at:v1');
+    localStorage.removeItem('zeta-room-manager:last-plot-index-at:v2');
     localStorage.removeItem(CLEANUP_STAMP_KEY);
     saveStateNow();
     try { ensureBackgroundRoomIndex(true); } catch (_) {}
@@ -1024,29 +1025,12 @@
 
 
   // ── 내 플롯 전체 인덱싱 ──────────────────────────────────────────────
-  // 대화방과 달리 플롯은 목록 API 주소를 모른다. 후보를 한 번씩 던져보고,
-  // 응답에 "화면에서 실제로 확인한 내 플롯"이 들어 있을 때만 채택한다.
-  // (공개 피드 같은 걸 잘못 잡으면 남의 플롯이 인덱스에 섞인다)
-  const MY_PLOTS_ENDPOINT_KEY = 'zeta-room-manager:my-plots-endpoint:v1';
-  const MY_PLOTS_STAMP_KEY = 'zeta-room-manager:last-plot-index-at:v1';
-  const MY_PLOT_ENDPOINTS = [
-    '/v1/plots/mine',
-    '/v1/plots/my',
-    '/v1/users/me/plots',
-    '/v1/me/plots',
-    '/v1/creator-center/plots',
-    '/v2/plots/mine'
-  ];
+  // 제타 Creator Center가 실제로 사용하는 API.
+  // 공개/비공개 플롯을 각각 끝까지 페이지네이션해서, 화면에 아직 로딩되지 않은
+  // 플롯도 검색할 수 있도록 로컬 인덱스에 저장한다.
+  const MY_PLOTS_STAMP_KEY = 'zeta-room-manager:last-plot-index-at:v2';
+  const MY_PLOTS_API_PATH = '/v1/plots/creator';
   let plotIndexPromise = null;
-
-  function readEndpointCache() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(MY_PLOTS_ENDPOINT_KEY) || '{}');
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (_) {
-      return {};
-    }
-  }
 
   function plotListFromPayload(payload) {
     const body = unwrapApi(payload);
@@ -1058,16 +1042,6 @@
       }
     }
     return [];
-  }
-
-  function renderedPlotIds() {
-    const ids = new Set();
-    for (const el of document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]')) {
-      const link = el.querySelector('a[href*="/plots/"]');
-      const id = extractId(link && link.href, 'plot') || el.getAttribute('data-plot-id');
-      if (id) ids.add(normalizeText(id));
-    }
-    return ids;
   }
 
   function ingestApiPlot(plot) {
@@ -1091,28 +1065,53 @@
       plotId: plotId,
       originatedId: originatedId || previous.originatedId || '',
       characterNames: uniqueTexts(plotCharacterNames(plot), meta && meta.characterNames, previous.characterNames),
-      creatorNames: uniqueTexts(plotCreatorNames(plot), meta && meta.creatorNames, previous.creatorNames)
+      creatorNames: uniqueTexts(plotCreatorNames(plot), meta && meta.creatorNames, previous.creatorNames),
+      isPrivate: typeof plot.isPrivate === 'boolean' ? plot.isPrivate : previous.isPrivate
     };
     return state.index[key];
   }
 
-  async function discoverMyPlotsEndpoint(knownIds) {
-    if (!knownIds.size) return '';
+  async function fetchCreatorPlotsVisibility(isPrivate) {
+    let cursor = '';
+    const seen = new Set();
+    let got = 0;
+    let complete = false;
 
-    for (const path of MY_PLOT_ENDPOINTS) {
-      const result = await apiRequest(path, { limit: 30 });
-      if (!result.ok) {
-        if (Date.now() < apiUnavailableUntil) return '';
-        continue;
-      }
+    for (let page = 0; page < 300; page++) {
+      const result = await apiRequest(MY_PLOTS_API_PATH, {
+        limit: 15,
+        isPrivate: isPrivate ? 'true' : 'false',
+        'orderBy.property': 'UPDATED_AT',
+        'orderBy.direction': 'DESC',
+        status: 'RELEASE',
+        modes: 'STORY_CHAT,VISUAL_NOVEL',
+        cursor: cursor || undefined
+      });
+      if (!result.ok) return { got, complete: false };
 
       const plots = plotListFromPayload(result.data);
-      if (!plots.length) continue;
+      for (const plot of plots) {
+        if (ingestApiPlot(plot)) got++;
+      }
 
-      const mine = plots.some(plot => knownIds.has(normalizeText(plot && (plot.id || plot.plotId))));
-      if (mine) return path;
+      saveState();
+      scheduleRefresh();
+
+      const body = unwrapApi(result.data);
+      const next = normalizeText(
+        (body && (body.nextCursor || body.next_cursor)) ||
+        (result.data && (result.data.nextCursor || result.data.next_cursor))
+      );
+
+      if (!next || seen.has(next)) {
+        complete = true;
+        break;
+      }
+      seen.add(next);
+      cursor = next;
     }
-    return '';
+
+    return { got, complete };
   }
 
   async function buildMyPlotIndexInBackground(force) {
@@ -1122,46 +1121,21 @@
     const stamp = Number(localStorage.getItem(MY_PLOTS_STAMP_KEY) || 0);
     if (!force && Date.now() - stamp < 5 * 60 * 1000) return true;
 
-    const cached = readEndpointCache();
-    let path = normalizeText(cached.path);
-
-    if (!path) {
-      // 못 찾은 사실을 기억해 매번 헛방을 날리지 않는다(일주일에 한 번만 재시도).
-      const checkedAt = Number(cached.checkedAt || 0);
-      if (!force && checkedAt && Date.now() - checkedAt < 7 * 24 * 60 * 60 * 1000) return false;
-
-      path = await discoverMyPlotsEndpoint(renderedPlotIds());
-      try {
-        localStorage.setItem(MY_PLOTS_ENDPOINT_KEY, JSON.stringify({ path, checkedAt: Date.now() }));
-      } catch (_) {}
-      if (!path) return false;
-    }
-
-    let cursor = '';
-    const seen = new Set();
-    let got = 0;
-
-    for (let page = 0; page < 100; page++) {
-      const result = await apiRequest(path, { limit: 30, cursor: cursor || undefined });
-      if (!result.ok) break;
-
-      for (const plot of plotListFromPayload(result.data)) {
-        if (ingestApiPlot(plot)) got++;
-      }
+    // 비공개를 먼저 받는다. 사용자가 비공개 목록에서 검색할 때 바로 결과가 붙도록 한다.
+    const privateSweep = await fetchCreatorPlotsVisibility(true);
+    if (Date.now() < apiUnavailableUntil) {
       saveState();
       scheduleRefresh();
-
-      const body = unwrapApi(result.data);
-      const next = normalizeText(
-        (body && (body.nextCursor || body.next_cursor)) ||
-        (result.data && (result.data.nextCursor || result.data.next_cursor))
-      );
-      if (!next || seen.has(next)) break;
-      seen.add(next);
-      cursor = next;
+      return privateSweep.got > 0;
     }
 
-    if (got) localStorage.setItem(MY_PLOTS_STAMP_KEY, String(Date.now()));
+    const publicSweep = await fetchCreatorPlotsVisibility(false);
+    const got = privateSweep.got + publicSweep.got;
+
+    if (privateSweep.complete && publicSweep.complete) {
+      localStorage.setItem(MY_PLOTS_STAMP_KEY, String(Date.now()));
+    }
+
     saveState();
     scheduleRefresh();
     return got > 0;
@@ -1176,10 +1150,7 @@
 
   function plotIndexStatusText() {
     if (Date.now() < apiUnavailableUntil) return indexStatusText();
-    if (plotIndexPromise) return '내 플롯을 인덱싱하는 중이에요. 잠시 후 다시 검색해 주세요.';
-    if (!normalizeText(readEndpointCache().path)) {
-      return '내 플롯 전체 목록을 API로 받아오지 못했어요. 지금은 목록에서 한 번이라도 화면에 보인 플롯만 검색됩니다.';
-    }
+    if (plotIndexPromise) return '내 플롯 전체 목록을 불러오는 중이에요. 잠시 후 다시 검색해 주세요.';
     return '';
   }
 
