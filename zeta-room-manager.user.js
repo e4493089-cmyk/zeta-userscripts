@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.5.5
-// @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 전체 방 자동 인덱싱을 지원합니다.
+// @version      0.5.6
+// @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -32,10 +32,11 @@
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
       return {
         aliases: parsed.aliases && typeof parsed.aliases === 'object' ? parsed.aliases : {},
-        index: parsed.index && typeof parsed.index === 'object' ? parsed.index : {}
+        index: parsed.index && typeof parsed.index === 'object' ? parsed.index : {},
+        plotMeta: parsed.plotMeta && typeof parsed.plotMeta === 'object' ? parsed.plotMeta : {}
       };
     } catch (_) {
-      return { aliases: {}, index: {} };
+      return { aliases: {}, index: {}, plotMeta: {} };
     }
   }
 
@@ -152,6 +153,69 @@
     };
   }
 
+  function reactRoomPlotMeta(item) {
+    const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber$'));
+    const root = fiberKey ? item[fiberKey] : null;
+    if (!root) return null;
+
+    const queue = [root];
+    const seen = new Set();
+    let inspected = 0;
+
+    while (queue.length && inspected < 220) {
+      const fiber = queue.shift();
+      if (!fiber || seen.has(fiber)) continue;
+      seen.add(fiber);
+      inspected++;
+
+      for (const props of [fiber.pendingProps, fiber.memoizedProps]) {
+        const plot = props && props.plot;
+        if (plot && typeof plot === 'object' && normalizeText(plot.id || plot.plotId)) return plot;
+      }
+
+      if (fiber.child) queue.push(fiber.child);
+      if (fiber.sibling) queue.push(fiber.sibling);
+    }
+    return null;
+  }
+
+  function uniqueTexts() {
+    const out = [];
+    for (const list of arguments) {
+      for (const value of Array.isArray(list) ? list : []) {
+        const text = normalizeText(value);
+        if (text && !out.includes(text)) out.push(text);
+      }
+    }
+    return out;
+  }
+
+  function plotCharacterNames(plot) {
+    const names = [];
+    const first = normalizeText(plot && plot.firstCharacterName);
+    if (first) names.push(first);
+    for (const character of Array.isArray(plot && plot.characters) ? plot.characters : []) {
+      const name = normalizeText(character && (
+        character.name || character.nickname || character.displayName || character.display_name
+      ));
+      if (name && !names.includes(name)) names.push(name);
+    }
+    return names.slice(0, 20);
+  }
+
+  function plotCreatorNames(plot) {
+    const creator = plot && plot.creator;
+    if (!creator || typeof creator !== 'object') return [];
+    return uniqueTexts([
+      creator.name,
+      creator.nickname,
+      creator.displayName,
+      creator.display_name,
+      creator.username,
+      creator.handle
+    ]).slice(0, 10);
+  }
+
   function searchValues(entry) {
     const characters = Array.isArray(entry?.characterNames) ? entry.characterNames : [];
     const creators = Array.isArray(entry?.creatorNames) ? entry.creatorNames : [];
@@ -178,8 +242,11 @@
     return parts.join(' · ') || fallback;
   }
 
-  const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at:v2';
+  const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at:v3';
+  const API_BASE = 'https://api.zeta-ai.io';
+  const WEB_CLIENT_VERSION = '3.44.7';
   let backgroundIndexPromise = null;
+  let apiUnavailableUntil = 0;
 
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -189,7 +256,7 @@
     const roomItems = new Set(doc.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]'));
     doc.querySelectorAll('a[href*="/rooms/"]').forEach(link => {
       const item = link.closest('[data-sentry-component="SwipeableRoomListItem"], li, [role="listitem"]')
-        || link.parentElement?.parentElement;
+        || (link.parentElement && link.parentElement.parentElement);
       if (item) roomItems.add(item);
     });
     return Array.from(roomItems);
@@ -204,119 +271,308 @@
     return harvested;
   }
 
-  function findLiveRoomScrollHost() {
-    const firstRoom = document.querySelector('a[href*="/rooms/"]');
-    let node = firstRoom?.parentElement || null;
-
-    while (node && node !== document.body && node !== document.documentElement) {
-      try {
-        const style = getComputedStyle(node);
-        const overflow = style.overflowY || style.overflow;
-        if (/(auto|scroll)/i.test(overflow) && node.scrollHeight > node.clientHeight + 24) return node;
-      } catch (_) {}
-      node = node.parentElement;
-    }
-
-    const candidates = [
-      document.querySelector('[data-sentry-component="RoomList"] .overflow-y-auto'),
-      document.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]'),
-      document.querySelector('[data-sentry-component="RoomList"]'),
-      document.querySelector('.overflow-y-auto'),
-      document.scrollingElement,
-      document.documentElement
-    ].filter(Boolean);
-
-    return candidates.find(el => el.scrollHeight > el.clientHeight + 24)
-      || document.scrollingElement
-      || document.documentElement;
+  function readCookie(name) {
+    try {
+      const wanted = name + '=';
+      for (const part of String(document.cookie || '').split(';')) {
+        const text = part.trim();
+        if (text.startsWith(wanted)) return decodeURIComponent(text.slice(wanted.length));
+      }
+    } catch (_) {}
+    return '';
   }
 
-  async function buildFullRoomIndexInBackground(force = false) {
-    if (currentSection() !== 'room') return false;
-
-    const last = Number(localStorage.getItem(BACKGROUND_INDEX_STAMP_KEY) || 0);
-    if (!force && Date.now() - last < 2 * 60 * 1000) return true;
-
-    harvestRoomDocument(document);
-
-    const host = findLiveRoomScrollHost();
-    if (!host) {
-      saveState();
-      scheduleRefresh();
-      return false;
-    }
-
-    const isDocumentScroller =
-      host === document.scrollingElement ||
-      host === document.documentElement ||
-      host === document.body;
-
-    const originalTop = isDocumentScroller ? window.scrollY : host.scrollTop;
-    let stableRounds = 0;
-    let lastCount = -1;
-    let lastHeight = -1;
+  function tokenFromValue(value) {
+    let text = normalizeText(value);
+    if (!text) return '';
 
     try {
-      for (let round = 0; round < 180; round++) {
-        harvestRoomDocument(document);
+      const parsed = JSON.parse(text);
+      if (typeof parsed === 'string') text = parsed;
+      else if (parsed && typeof parsed === 'object') {
+        text = normalizeText(parsed.accessToken || parsed.access_token || parsed.token || parsed.TOKEN);
+      }
+    } catch (_) {}
 
-        const countBefore = Object.values(state.index)
-          .filter(entry => entry?.type === 'room' && entry.id)
-          .length;
-        const heightBefore = host.scrollHeight;
+    text = text.replace(/^Bearer\\s+/i, '');
+    const match = text.match(/eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+/);
+    return match ? match[0] : '';
+  }
 
-        const target = Math.max(0, host.scrollHeight - host.clientHeight);
-        if (isDocumentScroller) {
-          window.scrollTo(0, target);
-        } else {
-          host.scrollTop = target;
-          host.dispatchEvent(new Event('scroll', { bubbles: true }));
+  function findStorageToken() {
+    for (const storage of [localStorage, sessionStorage]) {
+      try {
+        for (let i = 0; i < storage.length; i++) {
+          const key = storage.key(i) || '';
+          if (!/token|auth|session/i.test(key)) continue;
+          const token = tokenFromValue(storage.getItem(key));
+          if (token) return token;
+        }
+      } catch (_) {}
+    }
+    return '';
+  }
+
+  function zetaAccessToken() {
+    return tokenFromValue(readCookie('TOKEN')) || findStorageToken();
+  }
+
+  function jwtPayload(token) {
+    try {
+      const part = token.split('.')[1];
+      if (!part) return {};
+      const padded = part.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - part.length % 4) % 4);
+      const binary = atob(padded);
+      const bytes = Array.from(binary, ch => '%' + ('00' + ch.charCodeAt(0).toString(16)).slice(-2)).join('');
+      return JSON.parse(decodeURIComponent(bytes));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function zetaDeviceId(token) {
+    const cookie = normalizeText(readCookie('DEVICE_ID'));
+    if (cookie) return cookie;
+
+    for (const storage of [localStorage, sessionStorage]) {
+      for (const key of ['DEVICE_ID', 'deviceId', 'device_id']) {
+        try {
+          const value = normalizeText(storage.getItem(key));
+          if (value) return value.replace(/^"|"$/g, '');
+        } catch (_) {}
+      }
+    }
+
+    return normalizeText(jwtPayload(token).did);
+  }
+
+  function apiHeaders() {
+    const token = zetaAccessToken();
+    const deviceId = zetaDeviceId(token);
+    const headers = {
+      Accept: 'application/json',
+      'X-Client-Version': WEB_CLIENT_VERSION,
+      'X-Client-Native-Version': WEB_CLIENT_VERSION,
+      'X-Client-Type': 'web',
+      'X-Device-Type': /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'web' : 'pc_web',
+      'X-User-Language': 'KOREAN'
+    };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    if (deviceId) headers['X-Sticky'] = deviceId;
+    return headers;
+  }
+
+  async function apiGet(path, params) {
+    if (Date.now() < apiUnavailableUntil) return null;
+    const url = new URL(path, API_BASE);
+    for (const [key, value] of Object.entries(params || {})) {
+      if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
+    }
+
+    try {
+      const response = await fetch(url.href, {
+        method: 'GET',
+        headers: apiHeaders(),
+        credentials: 'include',
+        cache: 'no-store'
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        apiUnavailableUntil = Date.now() + 60000;
+        return null;
+      }
+      if (response.status === 429) {
+        apiUnavailableUntil = Date.now() + 30000;
+        return null;
+      }
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (_) {
+      apiUnavailableUntil = Date.now() + 30000;
+      return null;
+    }
+  }
+
+  function unwrapApi(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) return payload.data;
+    return payload;
+  }
+
+  function localePrefix() {
+    const first = location.pathname.split('/').filter(Boolean)[0] || 'ko';
+    return /^[a-z]{2}(?:-[a-z]{2})?$/i.test(first) ? first : 'ko';
+  }
+
+  function ingestPlotMeta(plot, plotIdHint) {
+    if (!plot || typeof plot !== 'object') return null;
+    const plotId = normalizeText(plot.id || plot.plotId || plotIdHint);
+    if (!plotId) return null;
+
+    const previous = state.plotMeta[plotId] || {};
+    const characters = plotCharacterNames(plot);
+    const creators = plotCreatorNames(plot);
+
+    state.plotMeta[plotId] = {
+      plotId: plotId,
+      originatedId: normalizeText(plot.originatedId || plot.originalId || previous.originatedId),
+      name: normalizeText(plot.name || plot.title || previous.name),
+      image: normalizeText(plot.imageUrl || plot.initialRoomImageUrl || previous.image),
+      characterNames: characters.length ? characters : (previous.characterNames || []),
+      creatorNames: creators.length ? creators : (previous.creatorNames || []),
+      updatedAt: Date.now()
+    };
+    return state.plotMeta[plotId];
+  }
+
+  function applyPlotMetaToRooms(plotId, meta) {
+    if (!plotId || !meta) return;
+    for (const entry of Object.values(state.index)) {
+      if (!entry || entry.type !== 'room' || entry.plotId !== plotId) continue;
+      entry.originatedId = entry.originatedId || meta.originatedId || '';
+      entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
+      entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
+      if (!entry.image && meta.image) entry.image = meta.image;
+    }
+  }
+
+  function ingestApiRoom(room) {
+    if (!room || typeof room !== 'object') return null;
+    const roomId = normalizeText(room.id || room.roomId);
+    if (!roomId) return null;
+
+    const plot = room.plot && typeof room.plot === 'object' ? room.plot : {};
+    const plotId = normalizeText(room.plotId || plot.id || plot.plotId);
+    const meta = ingestPlotMeta(plot, plotId) || (plotId ? state.plotMeta[plotId] : null);
+    const key = keyOf('room', roomId);
+    const previous = state.index[key] || {};
+
+    state.index[key] = {
+      ...previous,
+      type: 'room',
+      id: roomId,
+      href: previous.href || '/' + localePrefix() + '/rooms/' + roomId,
+      original: normalizeText(plot.name || plot.title || previous.original),
+      alias: normalizeText(state.aliases[key]),
+      image: normalizeText(plot.imageUrl || plot.initialRoomImageUrl || previous.image),
+      plotId: plotId || previous.plotId || '',
+      originatedId: normalizeText(plot.originatedId || plot.originalId || previous.originatedId),
+      characterNames: uniqueTexts(previous.characterNames, meta && meta.characterNames),
+      creatorNames: uniqueTexts(previous.creatorNames, meta && meta.creatorNames)
+    };
+
+    if (plotId && meta) applyPlotMetaToRooms(plotId, meta);
+    return state.index[key];
+  }
+
+  async function fetchAllRoomsFromApi() {
+    let cursor = '';
+    const seen = new Set();
+    let gotAny = false;
+
+    for (let page = 0; page < 250; page++) {
+      const payload = await apiGet('/v2/rooms', { limit: 100, cursor: cursor || undefined });
+      if (!payload) return gotAny;
+
+      const body = unwrapApi(payload);
+      const rooms = Array.isArray(body && body.rooms)
+        ? body.rooms
+        : (Array.isArray(payload.rooms) ? payload.rooms : []);
+
+      for (const room of rooms) ingestApiRoom(room);
+      if (rooms.length) gotAny = true;
+
+      saveState();
+      scheduleRefresh();
+
+      const next = normalizeText(
+        (body && (body.nextCursor || body.next_cursor)) ||
+        payload.nextCursor ||
+        payload.next_cursor
+      );
+      if (!next || seen.has(next)) break;
+      seen.add(next);
+      cursor = next;
+    }
+    return gotAny;
+  }
+
+  async function enrichMissingPlotMeta() {
+    const ids = [];
+    const now = Date.now();
+
+    for (const entry of Object.values(state.index)) {
+      if (!entry || entry.type !== 'room') continue;
+      const plotId = normalizeText(entry.plotId);
+      if (!plotId || ids.includes(plotId)) continue;
+
+      const cached = state.plotMeta[plotId];
+      const hasCharacters = Array.isArray(cached && cached.characterNames) && cached.characterNames.length > 0;
+      const hasCreators = Array.isArray(cached && cached.creatorNames) && cached.creatorNames.length > 0;
+      const fresh = Number((cached && cached.updatedAt) || 0) > now - 7 * 24 * 60 * 60 * 1000;
+
+      if (fresh && hasCharacters && hasCreators) applyPlotMetaToRooms(plotId, cached);
+      else ids.push(plotId);
+    }
+
+    let nextIndex = 0;
+    let stop = false;
+
+    const worker = async () => {
+      while (!stop) {
+        const index = nextIndex++;
+        if (index >= ids.length) return;
+
+        const plotId = ids[index];
+        const payload = await apiGet('/v1/plots/' + encodeURIComponent(plotId));
+        if (!payload) {
+          if (Date.now() < apiUnavailableUntil) stop = true;
+          continue;
         }
 
-        await sleep(round < 10 ? 140 : 95);
-        harvestRoomDocument(document);
+        const plot = unwrapApi(payload);
+        const meta = ingestPlotMeta(plot, plotId);
+        if (meta) applyPlotMetaToRooms(plotId, meta);
 
-        const countAfter = Object.values(state.index)
-          .filter(entry => entry?.type === 'room' && entry.id)
-          .length;
-        const heightAfter = host.scrollHeight;
-
-        const unchanged =
-          countAfter === countBefore &&
-          countAfter === lastCount &&
-          heightAfter === heightBefore &&
-          heightAfter === lastHeight;
-
-        stableRounds = unchanged ? stableRounds + 1 : 0;
-        lastCount = countAfter;
-        lastHeight = heightAfter;
-
-        if (round % 4 === 0) {
+        if (index % 10 === 0) {
           saveState();
           scheduleRefresh();
         }
-
-        if (stableRounds >= 7) break;
+        await sleep(80);
       }
+    };
 
-      harvestRoomDocument(document);
-      saveState();
-      localStorage.setItem(BACKGROUND_INDEX_STAMP_KEY, String(Date.now()));
-      scheduleRefresh();
-      return true;
-    } catch (_) {
-      return false;
-    } finally {
-      try {
-        if (isDocumentScroller) window.scrollTo(0, originalTop);
-        else host.scrollTop = originalTop;
-      } catch (_) {}
-    }
+    await Promise.all([worker(), worker(), worker()]);
+    saveState();
+    scheduleRefresh();
   }
 
-  function ensureBackgroundRoomIndex(force = false) {
+  async function buildFullRoomIndexInBackground(force) {
+    if (currentSection() !== 'room') return false;
+
+    // 화면 스크롤은 절대 건드리지 않는다.
+    harvestRoomDocument(document);
+
+    const last = Number(localStorage.getItem(BACKGROUND_INDEX_STAMP_KEY) || 0);
+    if (!force && Date.now() - last < 5 * 60 * 1000) return true;
+
+    const gotRooms = await fetchAllRoomsFromApi();
+    if (!gotRooms) {
+      saveState();
+      scheduleRefresh();
+      return false;
+    }
+
+    await enrichMissingPlotMeta();
+    localStorage.setItem(BACKGROUND_INDEX_STAMP_KEY, String(Date.now()));
+    saveState();
+    scheduleRefresh();
+    return true;
+  }
+
+  function ensureBackgroundRoomIndex(force) {
     if (backgroundIndexPromise) return backgroundIndexPromise;
-    backgroundIndexPromise = buildFullRoomIndexInBackground(force)
+    backgroundIndexPromise = buildFullRoomIndexInBackground(Boolean(force))
       .finally(() => { backgroundIndexPromise = null; });
     return backgroundIndexPromise;
   }
@@ -476,7 +732,7 @@
   }
 
   function parseItem(item, type) {
-    if (item.closest?.(`#${NATIVE_RESULTS_ID}, #${PLOT_NATIVE_RESULTS_ID}`)) return null;
+    if (item.closest && item.closest('#' + NATIVE_RESULTS_ID + ', #' + PLOT_NATIVE_RESULTS_ID)) return null;
     const link = type === 'room'
       ? item.querySelector('a[href*="/rooms/"]')
       : item.querySelector('a[href*="/plots/"]');
@@ -487,33 +743,41 @@
       : titleElementForPlot(item, link || item);
     if (!titleEl) return null;
 
-    if (!titleEl.dataset.zrmOriginalTitle) {
-      titleEl.dataset.zrmOriginalTitle = normalizeText(titleEl.textContent);
-    }
+    if (!titleEl.dataset.zrmOriginalTitle) titleEl.dataset.zrmOriginalTitle = normalizeText(titleEl.textContent);
 
     const original = titleEl.dataset.zrmOriginalTitle;
     const image = (link || item).querySelector('img')?.src || '';
-    const id = extractId(link?.href, type)
+    const id = extractId(link && link.href, type)
       || item.getAttribute('data-plot-id')
       || (type === 'plot' ? reactPlotId(item) : null)
-      || stableLocalId(`${original}\n${image.split('?')[0]}`);
+      || stableLocalId(original + '\\n' + image.split('?')[0]);
     if (!id) return null;
 
     const key = keyOf(type, id);
     const alias = normalizeText(state.aliases[key]);
     const previous = state.index[key] || {};
-    const meta = collectSearchMeta(item, titleEl);
+    const searchMeta = collectSearchMeta(item, titleEl);
+    const roomPlot = type === 'room' ? reactRoomPlotMeta(item) : null;
+    const roomPlotId = normalizeText((roomPlot && (roomPlot.id || roomPlot.plotId)) || previous.plotId);
+    const roomMeta = roomPlot
+      ? ingestPlotMeta(roomPlot, roomPlotId)
+      : (roomPlotId ? state.plotMeta[roomPlotId] : null);
 
     state.index[key] = {
-      type,
-      id,
-      href: link?.href || previous.href
-        || (type === 'plot' && !id.startsWith('local-') ? `/ko/plots/${id}/edit` : ''),
-      original,
-      alias,
+      ...previous,
+      type: type,
+      id: id,
+      href: (link && link.href) || previous.href
+        || (type === 'plot' && !id.startsWith('local-') ? '/ko/plots/' + id + '/edit' : ''),
+      original: original,
+      alias: alias,
       image: image || previous.image || '',
-      characterNames: meta.characterNames.length ? meta.characterNames : (previous.characterNames || []),
-      creatorNames: meta.creatorNames.length ? meta.creatorNames : (previous.creatorNames || [])
+      plotId: type === 'room' ? (roomPlotId || previous.plotId || '') : (previous.plotId || ''),
+      originatedId: type === 'room'
+        ? normalizeText((roomPlot && (roomPlot.originatedId || roomPlot.originalId)) || previous.originatedId)
+        : (previous.originatedId || ''),
+      characterNames: uniqueTexts(searchMeta.characterNames, roomMeta && roomMeta.characterNames, previous.characterNames),
+      creatorNames: uniqueTexts(searchMeta.creatorNames, roomMeta && roomMeta.creatorNames, previous.creatorNames)
     };
 
     return { key, type, id, item, link, titleEl, original, alias };
