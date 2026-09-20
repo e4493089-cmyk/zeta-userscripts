@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.15.0
+// @version      0.16.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -918,12 +918,19 @@
       Array.from(root.querySelectorAll('a[href*="/creators/"][href*="/profile"]'))
         .map(a => a.querySelector('span.caption1:not([data-sentry-element="Span"])')?.textContent)
     );
-    if (!creators.length) return null;
 
     const characters = uniqueTexts(
       Array.from(root.querySelectorAll('img[alt^="Profile image of "]'))
         .map(img => normalizeText(img.getAttribute('alt')).slice('Profile image of '.length))
     );
+
+    // 제작자가 탈퇴하면 프로필 링크가 사라지고 "탈퇴한 계정"만 남는다.
+    // 링크가 있어야만 읽은 것으로 치면 캐릭터명까지 통째로 버리게 된다.
+    if (!creators.length && /탈퇴한 계정/.test(root.textContent || '')) {
+      creators.push('탈퇴한 계정');
+    }
+    if (!creators.length) return null;
+
     return { creators, characters, profileId: win.location.pathname.split('/')[3] || '' };
   }
 
@@ -978,20 +985,6 @@
     }
   }
 
-  // 가능하면 프로필로 바로, 안 되면 방을 거쳐서.
-  async function collectOneProfile(target) {
-    if (target.plotId) {
-      try {
-        return await visitPlotProfile(target.plotId);
-      } catch (_) {}
-    }
-    if (target.originatedId && target.originatedId !== target.plotId) {
-      try {
-        return await visitPlotProfile(target.originatedId);
-      } catch (_) {}
-    }
-    return await visitRoomProfile(target.roomId);
-  }
 
   function applyProfileResult(target, result) {
     const canonicalId = target.plotId || normalizeText(result.profileId) || target.originatedId;
@@ -1185,8 +1178,32 @@
           if (!result) {
             if (!frame) frame = hiddenFrame();
             frame.src = path;
-            result = await readProfileIn(frame, target.plotId, 18000);
-            booted = true;
+            try {
+              result = await readProfileIn(frame, target.plotId, 18000);
+              booted = true;
+            } catch (directError) {
+              // 비공개 플롯 등은 프로필 주소로 바로 갈 수 없다.
+              // 사람이 하듯 방을 열고 헤더의 프로필 버튼을 누른다.
+              dropFrame(frame);
+              frame = null;
+              booted = false;
+              used = 0;
+
+              if (target.originatedId && target.originatedId !== target.plotId) {
+                try {
+                  frame = hiddenFrame();
+                  frame.src = profilePath(target.originatedId);
+                  result = await readProfileIn(frame, target.originatedId, 15000);
+                  booted = true;
+                } catch (_) {
+                  dropFrame(frame);
+                  frame = null;
+                  booted = false;
+                }
+              }
+
+              if (!result) result = await visitRoomProfile(target.roomId);
+            }
           }
 
           used++;
