@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.6.1
-// @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
+// @version      0.6.2
+// @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -330,6 +330,10 @@
     push(plot && plot.chatProfiles);
     push(plot && plot.plotCharacters);
     push(plot && plot.about && plot.about.characters);
+    push(plot && plot.draft && plot.draft.characters);
+    push(plot && plot.draft && plot.draft.characterProfiles);
+    push(plot && plot.draft && plot.draft.chatProfiles);
+    push(plot && plot.draft && plot.draft.about && plot.draft.about.characters);
 
     return names.slice(0, 20);
   }
@@ -367,6 +371,178 @@
     addObject(plot && plot.creatorUser);
 
     return names.slice(0, 10);
+  }
+
+  function looksLikePlotData(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const id = normalizeText(value.id || value.plotId);
+    if (!id) return false;
+    return Boolean(
+      value.originatedId || value.originalId ||
+      value.creator || value.author || value.writer || value.creatorUser ||
+      value.creatorName || value.creatorNickname || value.authorName || value.writerName ||
+      Array.isArray(value.characters) || Array.isArray(value.characterProfiles) ||
+      Array.isArray(value.chatProfiles) || Array.isArray(value.plotCharacters) ||
+      value.draft || value.about ||
+      value.initialRoomImageUrl || value.shortDescription || value.longDescription ||
+      value.mode || value.status
+    );
+  }
+
+  function mergeMetaIntoIndex(meta) {
+    if (!meta) return;
+    const ids = new Set([
+      normalizeText(meta.canonicalId),
+      normalizeText(meta.plotId),
+      normalizeText(meta.sourcePlotId),
+      normalizeText(meta.originatedId)
+    ].filter(Boolean));
+
+    for (const entry of Object.values(state.index || {})) {
+      if (!entry || typeof entry !== 'object') continue;
+      const entryIds = [
+        normalizeText(entry.type === 'plot' ? entry.id : ''),
+        normalizeText(entry.plotId),
+        normalizeText(entry.originatedId)
+      ].filter(Boolean);
+      if (!entryIds.some(id => ids.has(id))) continue;
+      entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
+      entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
+    }
+  }
+
+  function harvestPlotDataTree(root, options = {}) {
+    if (!root || typeof root !== 'object') return 0;
+    const seen = new WeakSet();
+    const stack = [{ value: root, depth: 0 }];
+    const maxDepth = Number(options.maxDepth || 9);
+    const maxNodes = Number(options.maxNodes || 5000);
+    let nodes = 0;
+    let harvested = 0;
+
+    while (stack.length && nodes < maxNodes) {
+      const current = stack.pop();
+      const value = current.value;
+      if (!value || typeof value !== 'object' || seen.has(value)) continue;
+      seen.add(value);
+      nodes++;
+
+      if (looksLikePlotData(value)) {
+        const meta = ingestPlotMeta(value, value.id || value.plotId, value.originatedId || value.originalId);
+        if (meta) {
+          mergeMetaIntoIndex(meta);
+          harvested++;
+        }
+      }
+
+      if (current.depth >= maxDepth) continue;
+      if (Array.isArray(value)) {
+        for (let i = Math.min(value.length, 120) - 1; i >= 0; i--) {
+          const child = value[i];
+          if (child && typeof child === 'object') stack.push({ value: child, depth: current.depth + 1 });
+        }
+        continue;
+      }
+
+      for (const [key, child] of Object.entries(value)) {
+        if (['children', 'ref', '_owner', 'return', 'stateNode'].includes(key)) continue;
+        if (child && typeof child === 'object') stack.push({ value: child, depth: current.depth + 1 });
+      }
+    }
+
+    if (harvested) saveState();
+    return harvested;
+  }
+
+  function harvestReactPlotData(item) {
+    const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber$'));
+    let fiber = fiberKey ? item[fiberKey] : null;
+    if (!fiber) return 0;
+
+    let harvested = 0;
+    for (let depth = 0; fiber && depth < 10; depth++, fiber = fiber.return) {
+      for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
+        if (!props || typeof props !== 'object') continue;
+        harvested += harvestPlotDataTree(props, { maxDepth: 7, maxNodes: 1800 });
+      }
+      if (harvested > 6) break;
+    }
+    return harvested;
+  }
+
+  function shouldInspectNativeResponse(url) {
+    const text = String(url || '');
+    return /(?:api\.zeta-ai\.io|zeta-ai\.io).*\/(?:v1\/plots|v2\/rooms)(?:[/?#]|$)/i.test(text);
+  }
+
+  function inspectNativeResponsePayload(payload) {
+    const count = harvestPlotDataTree(payload, { maxDepth: 10, maxNodes: 12000 });
+    if (count) saveState();
+  }
+
+  function installPassiveNativeDataCapture() {
+    if (window.__zrmPassiveNativeCaptureInstalled) return;
+    window.__zrmPassiveNativeCaptureInstalled = true;
+
+    // 새 요청은 만들지 않는다. 제타 페이지가 원래 보내는 fetch/XHR 응답만 복사해 읽는다.
+    const originalFetch = window.fetch;
+    if (typeof originalFetch === 'function') {
+      window.fetch = async function () {
+        const response = await originalFetch.apply(this, arguments);
+        try {
+          const first = arguments[0];
+          const url = typeof first === 'string' ? first : first && first.url;
+          if (shouldInspectNativeResponse(url)) {
+            const clone = response.clone();
+            clone.json().then(inspectNativeResponsePayload).catch(() => {});
+          }
+        } catch (_) {}
+        return response;
+      };
+    }
+
+    const xhrOpen = XMLHttpRequest.prototype.open;
+    const xhrSend = XMLHttpRequest.prototype.send;
+    const xhrUrl = new WeakMap();
+
+    XMLHttpRequest.prototype.open = function (method, url) {
+      try { xhrUrl.set(this, String(url || '')); } catch (_) {}
+      return xhrOpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.send = function () {
+      const xhr = this;
+      const url = xhrUrl.get(xhr) || '';
+      if (shouldInspectNativeResponse(url)) {
+        xhr.addEventListener('load', () => {
+          try {
+            if (xhr.responseType === 'json' && xhr.response) {
+              inspectNativeResponsePayload(xhr.response);
+              return;
+            }
+            if (!xhr.responseType || xhr.responseType === 'text') {
+              const body = xhr.responseText;
+              if (body && /^[\s]*[\[{]/.test(body)) inspectNativeResponsePayload(JSON.parse(body));
+            }
+          } catch (_) {}
+        }, { once: true });
+      }
+      return xhrSend.apply(this, arguments);
+    };
+  }
+
+  function metadataCoverage(type) {
+    let total = 0;
+    let character = 0;
+    let creator = 0;
+    for (const entry of Object.values(state.index || {})) {
+      if (!entry || entry.type !== type) continue;
+      total++;
+      const meta = plotMetaForEntry(entry);
+      if (uniqueTexts(entry.characterNames, meta && meta.characterNames).length) character++;
+      if (uniqueTexts(entry.creatorNames, meta && meta.creatorNames).length) creator++;
+    }
+    return { total, character, creator };
   }
 
   function canonicalPlotId(plotId, originatedId) {
@@ -622,7 +798,11 @@
       const total = roomCollectionCount();
       roomCollectionProgress = { running: false, count: total };
       renderCollectionTools();
-      alert('대화방 전체 수집 완료 · 저장된 방 ' + total + '개');
+      const coverage = metadataCoverage('room');
+      alert(
+        '대화방 전체 수집 완료 · 저장된 방 ' + total + '개' +
+        '\n캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
+      );
       return true;
     })().finally(() => {
       roomCollectionPromise = null;
@@ -760,7 +940,11 @@
       const total = plotCollectionCount();
       plotCollectionProgress = { running: false, count: total };
       renderCollectionTools();
-      alert('전체 수집 완료 · 저장된 플롯 ' + total + '개');
+      const coverage = metadataCoverage('plot');
+      alert(
+        '전체 수집 완료 · 저장된 플롯 ' + total + '개' +
+        '\n캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
+      );
       return true;
     })().finally(() => {
       plotCollectionPromise = null;
@@ -1421,6 +1605,9 @@
       || (type === 'plot' ? reactPlotId(item) : null)
       || localFallbackId(original, image);
     if (!id) return null;
+
+    // 카드에 텍스트로 안 보여도 React props 안의 plot 데이터에서 이름을 보강한다.
+    harvestReactPlotData(item);
 
     const key = keyOf(type, id);
     const alias = normalizeText(state.aliases[key]);
@@ -2118,6 +2305,7 @@
   function start() {
     cleanupLegacyState();
     cleanupOldApiFlags();
+    installPassiveNativeDataCapture();
     injectStyle();
 
     window.addEventListener('pagehide', saveStateNow);
