@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.14.0
+// @version      0.15.0
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -812,6 +812,44 @@
   const PROFILE_PATH = /^\/(?:[^/]+\/)?plots\/[a-f\d-]{36}\/profile\/?$/i;
   const ROOM_UUID = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
   let collectionAborted = false;
+  let wakeLock = null;
+  let wakeStatus = '';
+
+  function collectionRunning() {
+    return Boolean(roomCollectionProgress.running || plotCollectionProgress.running);
+  }
+
+  // 모바일은 화면이 꺼지면 브라우저가 멈춘다. 수집 동안 화면을 붙잡는다.
+  async function holdScreenAwake() {
+    if (!navigator.wakeLock || !navigator.wakeLock.request) {
+      wakeStatus = '이 브라우저는 화면 꺼짐 방지를 지원하지 않아요. 화면이 꺼지면 멈춥니다.';
+      return;
+    }
+    if (wakeLock || document.visibilityState !== 'visible') return;
+
+    try {
+      const lock = await navigator.wakeLock.request('screen');
+      wakeLock = lock;
+      wakeStatus = '';
+      // 탭을 가리면 브라우저가 알아서 놓는다. 돌아오면 다시 잡는다.
+      lock.addEventListener('release', () => {
+        if (wakeLock !== lock) return;
+        wakeLock = null;
+      });
+    } catch (_) {
+      wakeStatus = '화면 꺼짐 방지를 켜지 못했어요. 화면이 꺼지면 멈춥니다.';
+    }
+    renderCollectionBanner();
+  }
+
+  async function releaseScreenAwake() {
+    const lock = wakeLock;
+    wakeLock = null;
+    wakeStatus = '';
+    if (lock) {
+      try { await lock.release(); } catch (_) {}
+    }
+  }
 
   // 현재 주소의 언어 구간(/ko/...)을 그대로 쓴다.
   function localeSegment() {
@@ -1017,6 +1055,7 @@
 
     roomCollectionPromise = (async () => {
       collectionAborted = false;
+      void holdScreenAwake();
       roomCollectionProgress = { running: true, count: roomCollectionCount(), phase: '목록 수집' };
       renderCollectionTools();
 
@@ -1087,6 +1126,7 @@
     })().finally(() => {
       roomCollectionPromise = null;
       roomCollectionProgress.running = false;
+      void releaseScreenAwake();
       renderCollectionTools();
     });
 
@@ -1161,7 +1201,9 @@
     if (plotCollectionPromise) return plotCollectionPromise;
 
     plotCollectionPromise = (async () => {
-      plotCollectionProgress = { running: true, count: plotCollectionCount() };
+      collectionAborted = false;
+      void holdScreenAwake();
+      plotCollectionProgress = { running: true, count: plotCollectionCount(), phase: '플롯 목록 수집' };
       renderCollectionTools();
 
       const host = plotCollectionScrollHost();
@@ -1232,6 +1274,7 @@
     })().finally(() => {
       plotCollectionPromise = null;
       plotCollectionProgress.running = false;
+      void releaseScreenAwake();
       renderCollectionTools();
     });
 
@@ -1530,6 +1573,18 @@
     banner.querySelector('.zrm-banner-count').textContent = progress.total
       ? progress.current + ' / ' + progress.total
       : (progress.count || 0) + '개';
+
+    let warn = banner.querySelector('.zrm-banner-warn');
+    if (wakeStatus) {
+      if (!warn) {
+        warn = document.createElement('div');
+        warn.className = 'zrm-banner-warn';
+        banner.querySelector('.zrm-banner-note').after(warn);
+      }
+      warn.textContent = wakeStatus;
+    } else if (warn) {
+      warn.remove();
+    }
   }
 
   function renderCollectionTools() {
@@ -1765,6 +1820,15 @@
         color: #6d52ff;
       }
       #${COLLECTION_BANNER_ID} .zrm-banner-note { color: #6b6b74; font-size: 11px; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-warn {
+        margin-top: 8px;
+        padding: 7px 9px;
+        border-radius: 8px;
+        background: #fff1f1;
+        color: #b4232a;
+        font-size: 11px;
+        line-height: 1.45;
+      }
       #${COLLECTION_BANNER_ID} .zrm-banner-stop {
         width: 100%;
         height: 40px;
@@ -2701,6 +2765,10 @@
 
     window.addEventListener('pagehide', saveStateNow);
     window.addEventListener('beforeunload', saveStateNow);
+
+    document.addEventListener('visibilitychange', () => {
+      if (collectionRunning() && document.visibilityState === 'visible') void holdScreenAwake();
+    });
 
     document.addEventListener('pointerdown', rememberRoomContextTarget, true);
     document.addEventListener('contextmenu', rememberRoomContextTarget, true);
