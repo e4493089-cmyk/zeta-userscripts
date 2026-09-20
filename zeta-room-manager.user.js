@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.22.0
+// @version      0.23.0
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -16,7 +16,7 @@
   if (window.top !== window.self) return;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
-  const STATE_VERSION = 2;
+  const STATE_VERSION = 3;
   const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at:v3';
   const STYLE_ID = 'zeta-room-manager-style';
   const PANEL_ID = 'zeta-room-manager-panel';
@@ -51,6 +51,22 @@
       // v1 인덱스에는 화면에서 긁어온 캐릭터·제작자 이름이 섞여 있다.
       // 페이지 전역 정보가 모든 항목에 붙어 검색이 전부 매칭되므로 한 번 비우고
       // API 기반 정보(plotMeta)로 다시 채운다. 별명은 그대로 둔다.
+      // v3: 제작자명이 "@" 한 글자로만 저장된 항목이 있다. 쓸모없는 조각을 지운다.
+      if (Number(parsed.version || 1) < 3) {
+        const clean = list => Array.isArray(list)
+          ? list.filter(value => {
+              const text = String(value || '').trim();
+              return text && text !== '@' && /[0-9A-Za-z가-힣]/.test(text.replace(/^@/, ''));
+            })
+          : list;
+        for (const entry of Object.values(loaded.index)) {
+          if (entry && typeof entry === 'object') entry.creatorNames = clean(entry.creatorNames);
+        }
+        for (const meta of Object.values(loaded.plotMeta)) {
+          if (meta && typeof meta === 'object') meta.creatorNames = clean(meta.creatorNames);
+        }
+      }
+
       if (Number(parsed.version || 1) < 2) {
         for (const entry of Object.values(loaded.index)) {
           if (!entry || typeof entry !== 'object') continue;
@@ -875,6 +891,13 @@
       const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
       if (characters.length && creators.length) continue;
 
+      // 제작자명이 프로필에 아예 없는 플롯은 캐릭터명만으로 충분하다.
+      if (characters.length && meta && meta.creatorUnavailable) continue;
+
+      // 두 번 넘게 못 연 플롯은 일주일 동안 건너뛴다.
+      if (meta && Number(meta.profileFailCount || 0) >= 2 &&
+        Date.now() - Number(meta.profileFailedAt || 0) < 7 * 24 * 60 * 60 * 1000) continue;
+
       const keys = [normalizeText(entry.plotId), normalizeText(entry.originatedId)].filter(Boolean);
       if (keys.length) {
         if (keys.some(key => handledPlots.has(key))) continue;
@@ -909,14 +932,26 @@
     throw new Error('시간 초과');
   }
 
+  // "@" 처럼 쪼개진 조각이나 지나치게 긴 글자는 제작자명이 아니다.
+  function usefulCreatorName(text) {
+    const value = normalizeText(text);
+    if (!value || value.length > 40) return false;
+    return /[0-9A-Za-z가-힣]/.test(value.replace(/^@/, ''));
+  }
+
   function readPlotProfile(win) {
     const root = win.document.querySelector('[data-sentry-component="PlotProfile"]');
     if (!root) return null;
 
+    // 이름이 여러 span으로 쪼개진 경우(@ 와 아이디가 따로)를 대비해 링크 전체 글자도 본다.
     const creators = uniqueTexts(
       Array.from(root.querySelectorAll('a[href*="/creators/"][href*="/profile"]'))
-        .map(a => a.querySelector('span.caption1:not([data-sentry-element="Span"])')?.textContent)
-    );
+        .reduce((out, a) => {
+          out.push(a.querySelector('span.caption1:not([data-sentry-element="Span"])')?.textContent);
+          out.push(a.textContent);
+          return out;
+        }, [])
+    ).filter(usefulCreatorName);
 
     const characters = uniqueTexts(
       Array.from(root.querySelectorAll('img[alt^="Profile image of "]'))
@@ -939,9 +974,13 @@
     if (!creators.length && /탈퇴한 계정/.test(root.textContent || '')) {
       creators.push('탈퇴한 계정');
     }
-    if (!creators.length) return null;
+    const profileId = win.location.pathname.split('/')[3] || '';
+    if (creators.length) return { creators, characters, profileId };
 
-    return { creators, characters, profileId: win.location.pathname.split('/')[3] || '' };
+    // 제작자를 끝내 못 읽어도 캐릭터명까지 버릴 이유는 없다.
+    // 다만 그리는 중일 수 있으므로 화면이 안정된 뒤에만 받는다(readProfileIn이 판단).
+    if (characters.length) return { creators: [], characters, profileId, partial: true };
+    return null;
   }
 
   function hiddenFrame() {
@@ -1011,9 +1050,33 @@
       updatedAt: Date.now()
     };
 
+    if (result.partial) meta.creatorUnavailable = true;
+    else delete meta.creatorUnavailable;
+    delete meta.profileFailCount;
+
     state.plotMeta[canonicalId] = meta;
     plotLookupDirty = true;
     mergeMetaIntoIndex(meta);
+  }
+
+  // 프로필을 아예 못 연 플롯(삭제된 플롯 등)은 몇 번 시도한 뒤 접어둔다.
+  // 매번 되풀이하면 시간만 쓴다.
+  function notePlotProfileFailure(target) {
+    const canonicalId = target.plotId || target.originatedId;
+    if (!canonicalId) return;
+
+    const previous = state.plotMeta[canonicalId] || {};
+    state.plotMeta[canonicalId] = {
+      ...previous,
+      canonicalId,
+      plotId: target.plotId || previous.plotId || '',
+      originatedId: target.originatedId || previous.originatedId || '',
+      characterNames: previous.characterNames || [],
+      creatorNames: previous.creatorNames || [],
+      profileFailCount: Number(previous.profileFailCount || 0) + 1,
+      profileFailedAt: Date.now()
+    };
+    plotLookupDirty = true;
   }
 
   // 플롯마다 iframe을 새로 띄우면 제타 앱을 매번 처음부터 부팅한다.
@@ -1121,16 +1184,19 @@
           if (trace.path.includes(plotId)) {
             const root = win.document.querySelector('[data-sentry-component="PlotProfile"]');
             trace.root = Boolean(root);
-            if (root) {
-              const result = readPlotProfile(win);
-              if (result) return result;
-            }
+
+            let result = root ? readPlotProfile(win) : null;
+            if (result && !result.partial) return result;
 
             // 주소도 맞고 문서도 다 불렸는데 없으면 오래 기다릴 이유가 없다.
             // 실패 하나가 제한 시간을 다 쓰면 전체가 크게 느려진다.
             if (win.document.readyState === 'complete') {
               if (!settledAt) settledAt = Date.now();
-              else if (Date.now() - settledAt > 3500) break;
+              else if (Date.now() - settledAt > 2000) {
+                // 제작자가 끝내 안 나오면 캐릭터명만이라도 챙긴다.
+                if (result && result.partial) return result;
+                if (Date.now() - settledAt > 3500) break;
+              }
             }
           }
         }
@@ -1261,6 +1327,7 @@
         const reason = normalizeText((error && error.message) || error) || '알 수 없는 오류';
         const record = describeFailure(target, reason);
         failures.push(record);
+        notePlotProfileFailure(target);
         try { console.warn('[zrm] 이름 수집 실패 ·', record.name, '·', record.url, '·', reason); } catch (_) {}
       }
 
