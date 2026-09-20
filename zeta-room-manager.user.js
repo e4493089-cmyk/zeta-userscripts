@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.8.3
+// @version      0.8.4
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -838,6 +838,89 @@
     return '';
   }
 
+  function visibleControl(el) {
+    if (!el || !el.getBoundingClientRect) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 18 || rect.height < 18) return false;
+    if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
+    const style = getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  }
+
+  function roomHeaderActionHost() {
+    if (currentSection() !== 'room') return null;
+
+    const title = Array.from(document.querySelectorAll('h1,h2,h3,div,span'))
+      .find(el => el.children.length <= 2 && normalizeText(el.textContent) === '대화' && visibleControl(el));
+    if (!title) return null;
+
+    const titleRect = title.getBoundingClientRect();
+    let row = title.parentElement;
+
+    for (let depth = 0; row && depth < 6; depth++, row = row.parentElement) {
+      const rect = row.getBoundingClientRect();
+      if (rect.height > 120 || rect.width < 180) continue;
+
+      const controls = Array.from(row.querySelectorAll('button, a'))
+        .filter(visibleControl)
+        .filter(el => {
+          const r = el.getBoundingClientRect();
+          const cy = r.top + r.height / 2;
+          const ty = titleRect.top + titleRect.height / 2;
+          return Math.abs(cy - ty) < 40 && r.left > titleRect.right;
+        })
+        .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+
+      if (controls.length) {
+        const parent = controls[0].parentElement;
+        if (parent && parent !== row && parent.children.length <= 8) return parent;
+        return row;
+      }
+    }
+    return null;
+  }
+
+  function collectionToolsAnchor() {
+    const section = currentSection();
+
+    if (section === 'room') {
+      const host = roomHeaderActionHost();
+      if (host) return { host, before: host.firstElementChild || null };
+    }
+
+    if (section === 'plot-search') {
+      const input = nativePlotSearchInput();
+      const row = input && input.parentElement;
+      if (row) return { host: row, before: null };
+    }
+
+    if (section === 'plot') {
+      const main = document.querySelector('main#contents, main, [role="main"]');
+      if (main) {
+        const controls = Array.from(main.querySelectorAll('button, a'))
+          .filter(visibleControl)
+          .filter(el => {
+            const r = el.getBoundingClientRect();
+            return r.top < 120 && r.right > window.innerWidth * 0.62;
+          })
+          .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+        if (controls.length) {
+          const host = controls[0].parentElement;
+          if (host) return { host, before: host.firstElementChild || null };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function closeCollectionMenu(tools) {
+    const menu = tools && tools.querySelector('.zrm-tools-menu');
+    const trigger = tools && tools.querySelector('.zrm-tools-trigger');
+    if (menu) menu.hidden = true;
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  }
+
   function renderCollectionTools() {
     const section = currentSection();
     let tools = document.getElementById(PLOT_TOOLS_ID);
@@ -850,18 +933,51 @@
       tools = document.createElement('div');
       tools.id = PLOT_TOOLS_ID;
       tools.innerHTML =
-        '<button type="button" data-zrm-action="collect">전체 수집</button>' +
-        '<button type="button" data-zrm-action="export">내보내기</button>' +
-        '<button type="button" data-zrm-action="import">불러오기</button>' +
-        '<span data-zrm-count></span>';
+        '<button type="button" class="zrm-tools-trigger" aria-label="Room Manager 메뉴" aria-expanded="false">⋯</button>' +
+        '<div class="zrm-tools-menu" hidden>' +
+          '<div class="zrm-tools-count" data-zrm-count></div>' +
+          '<button type="button" data-zrm-action="collect">전체 수집</button>' +
+          '<button type="button" data-zrm-action="export">내보내기</button>' +
+          '<button type="button" data-zrm-action="import">불러오기</button>' +
+        '</div>';
+
+      const trigger = tools.querySelector('.zrm-tools-trigger');
+      const menu = tools.querySelector('.zrm-tools-menu');
+
+      trigger.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const open = menu.hidden;
+        menu.hidden = !open;
+        trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
 
       tools.querySelector('[data-zrm-action="collect"]').addEventListener('click', () => {
+        closeCollectionMenu(tools);
         if (currentSection() === 'room') collectAllRoomsByScrolling();
         else collectAllPlotsByScrolling();
       });
-      tools.querySelector('[data-zrm-action="export"]').addEventListener('click', exportRoomManagerData);
-      tools.querySelector('[data-zrm-action="import"]').addEventListener('click', importRoomManagerData);
-      document.body.appendChild(tools);
+      tools.querySelector('[data-zrm-action="export"]').addEventListener('click', () => {
+        closeCollectionMenu(tools);
+        exportRoomManagerData();
+      });
+      tools.querySelector('[data-zrm-action="import"]').addEventListener('click', () => {
+        closeCollectionMenu(tools);
+        importRoomManagerData();
+      });
+    }
+
+    const anchor = collectionToolsAnchor();
+    if (anchor && anchor.host) {
+      tools.classList.remove('zrm-tools-fallback');
+      if (tools.parentElement !== anchor.host) {
+        anchor.host.insertBefore(tools, anchor.before || null);
+      } else if (anchor.before && tools.nextElementSibling !== anchor.before) {
+        anchor.host.insertBefore(tools, anchor.before);
+      }
+    } else {
+      tools.classList.add('zrm-tools-fallback');
+      if (tools.parentElement !== document.body) document.body.appendChild(tools);
     }
 
     const isRoom = section === 'room';
@@ -873,7 +989,7 @@
       collect.textContent = progress.running ? '수집 중…' : '전체 수집';
     }
     const count = tools.querySelector('[data-zrm-count]');
-    if (count) count.textContent = (isRoom ? '방 ' : '플롯 ') + countValue + '개';
+    if (count) count.textContent = (isRoom ? '저장된 대화방 ' : '저장된 플롯 ') + countValue + '개';
   }
 
   function extractId(href, type) {
@@ -1026,36 +1142,77 @@
       .zrm-plot-rename:hover { background: rgba(255,255,255,.12); color: #fff; }
 
       #${PLOT_TOOLS_ID} {
-        position: fixed;
-        right: 12px;
-        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        position: relative;
         z-index: 2147483000;
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
+        flex: 0 0 auto;
+      }
+      #${PLOT_TOOLS_ID}.zrm-tools-fallback {
+        position: fixed;
+        top: 14px;
+        right: 88px;
+      }
+      #${PLOT_TOOLS_ID} .zrm-tools-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: rgba(255,255,255,.92);
+        font-size: 23px;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: 1px;
+        cursor: pointer;
+      }
+      #${PLOT_TOOLS_ID} .zrm-tools-trigger:hover,
+      #${PLOT_TOOLS_ID} .zrm-tools-trigger[aria-expanded="true"] {
+        background: rgba(255,255,255,.08);
+      }
+      #${PLOT_TOOLS_ID} .zrm-tools-menu {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        width: 172px;
         padding: 7px;
         border: 1px solid rgba(255,255,255,.10);
         border-radius: 12px;
-        background: rgba(28,28,31,.94);
-        box-shadow: 0 8px 28px rgba(0,0,0,.28);
-        backdrop-filter: blur(12px);
+        background: rgba(28,28,31,.98);
+        box-shadow: 0 10px 34px rgba(0,0,0,.38);
+        backdrop-filter: blur(14px);
       }
-      #${PLOT_TOOLS_ID} button {
-        height: 30px;
-        padding: 0 9px;
+      #${PLOT_TOOLS_ID} .zrm-tools-menu[hidden] { display: none !important; }
+      #${PLOT_TOOLS_ID} .zrm-tools-count {
+        padding: 5px 7px 8px;
+        color: rgba(255,255,255,.50);
+        font-size: 11px;
+        line-height: 1.3;
+        white-space: nowrap;
+      }
+      #${PLOT_TOOLS_ID} .zrm-tools-menu button {
+        display: flex;
+        width: 100%;
+        height: 36px;
+        align-items: center;
+        padding: 0 10px;
         border: 0;
         border-radius: 8px;
-        background: rgba(255,255,255,.08);
+        background: transparent;
         color: #fff;
-        font-size: 11px;
+        font-size: 12px;
+        text-align: left;
         white-space: nowrap;
       }
-      #${PLOT_TOOLS_ID} button:disabled { opacity: .45; }
-      #${PLOT_TOOLS_ID} [data-zrm-count] {
-        padding: 0 4px;
-        color: rgba(255,255,255,.5);
-        font-size: 10px;
-        white-space: nowrap;
+      #${PLOT_TOOLS_ID} .zrm-tools-menu button:hover {
+        background: rgba(255,255,255,.08);
+      }
+      #${PLOT_TOOLS_ID} .zrm-tools-menu button:disabled {
+        opacity: .45;
       }
 
       #${MODAL_ID} {
@@ -1748,6 +1905,13 @@
     document.addEventListener('pointerdown', rememberRoomContextTarget, true);
     document.addEventListener('contextmenu', rememberRoomContextTarget, true);
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
+    if (!document.documentElement.dataset.zrmToolsOutsideBound) {
+      document.documentElement.dataset.zrmToolsOutsideBound = '1';
+      document.addEventListener('pointerdown', event => {
+        const tools = document.getElementById(PLOT_TOOLS_ID);
+        if (tools && !tools.contains(event.target)) closeCollectionMenu(tools);
+      }, true);
+    }
 
     observer = new MutationObserver(scheduleRefresh);
     refresh();
