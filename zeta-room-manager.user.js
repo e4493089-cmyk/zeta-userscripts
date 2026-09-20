@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.8.7
+// @version      0.8.8
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1026,7 +1026,13 @@
       tools = document.createElement('div');
       tools.id = PLOT_TOOLS_ID;
       tools.innerHTML =
-        '<button type="button" class="zrm-tools-trigger" aria-label="Room Manager 메뉴">⋯</button>';
+        '<button type="button" class="zrm-tools-trigger" aria-label="Room Manager 메뉴">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+            '<circle cx="5" cy="12" r="1.7" fill="currentColor"></circle>' +
+            '<circle cx="12" cy="12" r="1.7" fill="currentColor"></circle>' +
+            '<circle cx="19" cy="12" r="1.7" fill="currentColor"></circle>' +
+          '</svg>' +
+        '</button>';
       tools.querySelector('.zrm-tools-trigger').addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
@@ -1234,6 +1240,12 @@
         line-height: 1;
         letter-spacing: 1px;
         cursor: pointer;
+      }
+      #${PLOT_TOOLS_ID} .zrm-tools-trigger svg {
+        display: block;
+        width: 24px;
+        height: 24px;
+        flex: 0 0 24px;
       }
       #${PLOT_TOOLS_ID} .zrm-tools-trigger:hover {
         background: rgba(255,255,255,.08);
