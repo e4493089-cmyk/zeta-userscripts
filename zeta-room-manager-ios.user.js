@@ -2,7 +2,7 @@
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
 // @version      0.3.6
-// @description  iPhone/iPad용. 대화방을 밀어 별명을 바꾸고 기본 검색창에서 별명도 검색합니다.
+// @description  iOS/Stay용. 대화방/플롯 별명과 플롯명·캐릭터명·제작자명 검색을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -50,6 +50,899 @@
 
   function normalizeText(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function collectSearchMeta(item, titleEl) {
+    const characterNames = new Set();
+    const creatorNames = new Set();
+    const originalTitle = normalizeText(titleEl?.dataset?.zrmOriginalTitle || titleEl?.textContent);
+
+    const add = (set, value) => {
+      const text = normalizeText(value);
+      if (!text || text === originalTitle || text.length > 100) return;
+      if (/^(?:이미지|썸네일|프로필|avatar|image|thumbnail)$/i.test(text)) return;
+      set.add(text);
+    };
+
+    const elements = [item, ...Array.from(item?.querySelectorAll?.('*') || []).slice(0, 140)];
+    for (const el of elements) {
+      if (!el) continue;
+      for (const [key, value] of Object.entries(el.dataset || {})) {
+        const k = key.toLowerCase();
+        if (k.includes('character') && k.includes('name')) add(characterNames, value);
+        if ((k.includes('creator') || k.includes('author') || k.includes('writer')) && (k.includes('name') || k.includes('nickname'))) {
+          add(creatorNames, value);
+        }
+      }
+
+      if (el.matches?.('img[alt]')) add(characterNames, el.getAttribute('alt'));
+      if (el.matches?.('a[href*="/character/"], a[href*="/characters/"]')) add(characterNames, el.textContent);
+      if (el.matches?.('a[href*="/creator/"], a[href*="/creators/"], a[href*="/author/"], a[href*="/authors/"]')) {
+        add(creatorNames, el.textContent);
+      }
+    }
+
+    const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber
+  function extractId(href, type) {
+    if (!href) return null;
+    const re = type === 'room'
+      ? /\/rooms\/([^/?#]+)/i
+      : /\/plots\/([^/?#]+)(?:\/|$)/i;
+    return href.match(re)?.[1] || null;
+  }
+
+  function stableLocalId(value) {
+    let hash = 2166136261;
+    const text = String(value || '');
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `local-${(hash >>> 0).toString(36)}`;
+  }
+
+  function reactPlotId(item) {
+    const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber$'));
+    let fiber = fiberKey ? item[fiberKey] : null;
+    const uuid = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i;
+    for (let depth = 0; fiber && depth < 18; depth++, fiber = fiber.return) {
+      const props = fiber.memoizedProps || fiber.pendingProps;
+      for (const candidate of [props?.plotId, props?.plot_id, props?.id, props?.plot?.id, props?.plot?.plotId]) {
+        if (typeof candidate === 'string' && uuid.test(candidate)) return candidate;
+      }
+    }
+    return null;
+  }
+
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      #${NATIVE_RESULTS_ID} {
+        flex: 0 0 auto;
+      }
+      #${NATIVE_RESULTS_ID}:empty { display: none; }
+      #${NATIVE_RESULTS_ID} .zrm-native-avatar {
+        width: 42px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 7px;
+        background: #2a2a2e;
+      }
+      #${NATIVE_RESULTS_ID} .zrm-native-avatar-placeholder {
+        width: 42px;
+        height: 56px;
+        border-radius: 7px;
+        background: #2a2a2e;
+      }
+      #${PLOT_NATIVE_RESULTS_ID} { flex: 0 0 auto; padding: 0 16px; }
+      #${PLOT_NATIVE_RESULTS_ID}:empty { display: none; }
+      #${PLOT_NATIVE_RESULTS_ID} .zrm-plot-avatar,
+      #${PLOT_NATIVE_RESULTS_ID} .zrm-plot-avatar-placeholder {
+        width: 39px;
+        height: 52px;
+        flex: 0 0 auto;
+        border-radius: 6px;
+        object-fit: cover;
+        background: #2a2a2e;
+      }
+
+      /* 제타 기본 모션으로 열린 뒤 스크롤 재렌더링에도 168px 상태를 유지한다. */
+      .zrm-room-item > a[href*="/rooms/"] { padding-right: 16px !important; }
+      .zrm-room-item.zrm-swipe-open {
+        transform: translateX(-168px) !important;
+      }
+      .zrm-room-actions > button {
+        width: 56px !important;
+        min-width: 56px !important;
+        gap: 6px !important;
+      }
+      .zrm-room-actions > button > span {
+        font-size: 10px !important;
+        white-space: nowrap;
+      }
+      .zrm-room-rename {
+        display: flex !important;
+        width: 56px !important;
+        min-width: 56px !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 0;
+        background: #6957d9;
+        color: #fff;
+      }
+      .zrm-room-rename svg { width: 16px; height: 16px; flex: 0 0 auto; }
+      .zrm-room-rename span { font-size: 10px; white-space: nowrap; }
+      .zrm-context-rename svg { flex: 0 0 auto; }
+      .zrm-plot-rename {
+        height: 30px;
+        padding: 0 8px;
+        border: 0;
+        border-radius: 7px;
+        background: rgba(255,255,255,.07);
+        color: rgba(255,255,255,.64);
+        cursor: pointer;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .zrm-plot-rename:hover { background: rgba(255,255,255,.12); color: #fff; }
+
+      #${MODAL_ID} {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483646;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(0,0,0,.58);
+        box-sizing: border-box;
+      }
+      #${MODAL_ID} .zrm-dialog {
+        width: min(360px, 100%);
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 16px;
+        background: #202023;
+        color: #fff;
+        box-shadow: 0 20px 60px rgba(0,0,0,.35);
+        overflow: hidden;
+      }
+      #${MODAL_ID} .zrm-dialog-body { padding: 18px; }
+      #${MODAL_ID} h3 { margin: 0 0 6px; font-size: 17px; }
+      #${MODAL_ID} p { margin: 0 0 13px; color: rgba(255,255,255,.55); font-size: 12px; line-height: 1.5; }
+      #${MODAL_ID} input {
+        width: 100%;
+        height: 42px;
+        box-sizing: border-box;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 10px;
+        background: #2a2a2e;
+        color: #fff;
+        padding: 0 12px;
+        outline: none;
+        font: inherit;
+      }
+      #${MODAL_ID} input:focus { border-color: #7c67ff; }
+      #${MODAL_ID} .zrm-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        padding: 0 18px 18px;
+      }
+      #${MODAL_ID} button {
+        height: 38px;
+        border: 0;
+        border-radius: 9px;
+        cursor: pointer;
+        font: inherit;
+      }
+      #${MODAL_ID} .zrm-cancel { background: #343438; color: #ddd; }
+      #${MODAL_ID} .zrm-reset { background: #3a3030; color: #ffaaaa; }
+      #${MODAL_ID} .zrm-save { background: #6d52ff; color: #fff; font-weight: 700; }
+
+    `;
+    document.documentElement.appendChild(style);
+  }
+
+  function titleElementForRoom(item, link) {
+    return link?.querySelector('span.body1.font-medium')
+      || link?.querySelector('.body1.font-medium')
+      || link?.querySelector('[class*="line-clamp"]')
+      || Array.from(link?.querySelectorAll('span, div') || []).find(el => !el.children.length && normalizeText(el.textContent))
+      || null;
+  }
+
+  function titleElementForPlot(item, link) {
+    const candidates = Array.from(link?.querySelectorAll('div.body1.font-medium') || []);
+    return candidates.find(el => !el.querySelector('*'))
+      || link?.querySelector('.line-clamp-1.body1.font-medium')
+      || null;
+  }
+
+  function parseItem(item, type) {
+    if (item.closest?.(`#${NATIVE_RESULTS_ID}, #${PLOT_NATIVE_RESULTS_ID}`)) return null;
+    const link = type === 'room'
+      ? item.querySelector('a[href*="/rooms/"]')
+      : item.querySelector('a[href*="/plots/"]');
+    if (type === 'room' && !link) return null;
+
+    const titleEl = type === 'room'
+      ? titleElementForRoom(item, link)
+      : titleElementForPlot(item, link || item);
+    if (!titleEl) return null;
+
+    if (!titleEl.dataset.zrmOriginalTitle) {
+      titleEl.dataset.zrmOriginalTitle = normalizeText(titleEl.textContent);
+    }
+
+    const original = titleEl.dataset.zrmOriginalTitle;
+    const image = (link || item).querySelector('img')?.src || '';
+    const id = extractId(link?.href, type)
+      || item.getAttribute('data-plot-id')
+      || (type === 'plot' ? reactPlotId(item) : null)
+      || stableLocalId(`${original}\n${image.split('?')[0]}`);
+    if (!id) return null;
+
+    const key = keyOf(type, id);
+    const alias = normalizeText(state.aliases[key]);
+    const previous = state.index[key] || {};
+    const meta = collectSearchMeta(item, titleEl);
+
+    state.index[key] = {
+      type,
+      id,
+      href: link?.href || previous.href
+        || (type === 'plot' && !id.startsWith('local-') ? `/ko/plots/${id}/edit` : ''),
+      original,
+      alias,
+      image: image || previous.image || '',
+      characterNames: meta.characterNames.length ? meta.characterNames : (previous.characterNames || []),
+      creatorNames: meta.creatorNames.length ? meta.creatorNames : (previous.creatorNames || [])
+    };
+
+    return { key, type, id, item, link, titleEl, original, alias };
+  }
+
+  function renderedItems() {
+    const out = [];
+    const roomItems = new Set(document.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]'));
+    document.querySelectorAll('a[href*="/rooms/"]').forEach(link => {
+      const item = link.closest('[data-sentry-component="SwipeableRoomListItem"], li, [role="listitem"]') || link.parentElement?.parentElement;
+      if (item) roomItems.add(item);
+    });
+    roomItems.forEach(el => {
+      const x = parseItem(el, 'room');
+      if (x) out.push(x);
+    });
+    document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]').forEach(el => {
+      const x = parseItem(el, 'plot');
+      if (x) out.push(x);
+    });
+    return out;
+  }
+
+  function applyAlias(record) {
+    const alias = normalizeText(state.aliases[record.key]);
+    record.alias = alias;
+    const nextTitle = alias || record.original;
+    if (normalizeText(record.titleEl.textContent) !== nextTitle) record.titleEl.textContent = nextTitle;
+    record.titleEl.classList.toggle('zrm-has-alias', !!alias);
+
+    const indexed = state.index[record.key] || {};
+    state.index[record.key] = {
+      ...indexed,
+      type: record.type,
+      id: record.id,
+      href: record.link?.href || indexed.href || '',
+      original: record.original,
+      alias,
+      image: (record.link || record.item).querySelector('img')?.src || indexed.image || ''
+    };
+  }
+
+  function makeRenameButton(record) {
+    if (record.type === 'room') {
+      record.item.classList.add('zrm-room-item');
+      const actions = record.item.querySelector(
+        '[data-sentry-element="RoomListItemRightActions"], ' +
+        '[data-sentry-source-file="SwipeableRoomListItem.tsx"].absolute.translate-x-full'
+      );
+      if (!actions) return;
+      actions.classList.add('zrm-room-actions');
+      if (actions.querySelector('.zrm-room-rename')) return;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'zrm-room-rename';
+      btn.setAttribute('aria-label', `${record.original} 별명 편집`);
+      btn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor" d="M21.675 7.905c.433-.433.433-1.155 0-1.566l-4.014-4.014c-.41-.433-1.133-.433-1.566 0L14.05 4.358l5.58 5.58M2.293 16.127a1 1 0 0 0-.293.707V21a1 1 0 0 0 1 1h4.166a1 1 0 0 0 .707-.293l10.58-10.591-5.58-5.58z"/>
+        </svg>
+        <span>별명</span>
+      `;
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        openRenameModal(snapshotRecord(record));
+      }, true);
+      actions.prepend(btn);
+      return;
+    }
+
+    if (record.item.querySelector(`.zrm-${record.type}-rename`)) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `zrm-${record.type}-rename`;
+    btn.textContent = '별명';
+    btn.setAttribute('aria-label', `${record.original} 별명 편집`);
+
+    btn.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      openRenameModal(record);
+    }, true);
+
+    const row = record.link?.parentElement
+      || record.item.querySelector(':scope > div.flex.flex-row.items-center')
+      || record.item.firstElementChild;
+    const actions = row?.lastElementChild;
+    if (actions && actions !== record.link && actions !== row) actions.insertBefore(btn, actions.firstChild);
+    else record.item.appendChild(btn);
+  }
+
+  function snapshotRecord(record) {
+    if (!record) return null;
+    return {
+      key: record.key,
+      type: record.type,
+      id: record.id,
+      item: record.item,
+      link: record.link,
+      titleEl: record.titleEl,
+      original: record.original,
+      alias: normalizeText(state.aliases[record.key])
+    };
+  }
+
+  function rememberRoomContextTarget(event) {
+    const link = event.target?.closest?.('a[href*="/rooms/"]');
+    const target = event.target?.closest?.('[data-sentry-component="SwipeableRoomListItem"], li, [role="listitem"]') || link?.parentElement?.parentElement;
+    if (!target) return;
+    const record = parseItem(target, 'room');
+    if (record) lastRoomContextRecord = snapshotRecord(record);
+  }
+
+  function closeNativeRoomContextMenu(menu) {
+    const layer = menu?.closest?.('[data-sentry-component="KeyboardAvoidingView"]');
+    const backdrop = layer?.querySelector?.('[role="presentation"]');
+    if (backdrop) {
+      try { backdrop.click(); } catch (_) {}
+    }
+  }
+
+  function injectRoomContextMenu() {
+    const menus = new Set(document.querySelectorAll('[data-sentry-source-file="RoomListItemContextMenu.tsx"]'));
+    document.querySelectorAll('[role="dialog"], [role="menu"]').forEach(menu => {
+      if (Array.from(menu.querySelectorAll('button')).some(btn => normalizeText(btn.textContent) === '나가기')) menus.add(menu);
+    });
+    for (const menu of menus) {
+      if (menu.querySelector('.zrm-context-rename')) continue;
+      if (!lastRoomContextRecord) continue;
+
+      const nativeButtons = Array.from(menu.querySelectorAll(':scope > button'));
+      const template = nativeButtons[0];
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = template?.className
+        || 'group flex flex-row gap-2.5 bg-gray-sub2 p-[18px] active:bg-gray-900 disabled:bg-gray-900 rounded-t-lg rounded-b-lg';
+      button.classList.add('zrm-context-rename');
+      button.setAttribute('aria-label', '별명 변경');
+      button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             class="size-4 text-white group-disabled:text-white/20" aria-hidden="true">
+          <path fill="currentColor"
+                d="M21.675 7.905c.433-.433.433-1.155 0-1.566l-4.014-4.014c-.41-.433-1.133-.433-1.566 0L14.05 4.358l5.58 5.58M2.293 16.127a1 1 0 0 0-.293.707V21a1 1 0 0 0 1 1h4.166a1 1 0 0 0 .707-.293l10.58-10.591-5.58-5.58z"/>
+        </svg>
+        <span class="body14 font-medium text-white group-disabled:text-white/20">별명 변경</span>
+      `;
+
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const record = lastRoomContextRecord;
+        if (!record) return;
+        closeNativeRoomContextMenu(menu);
+        setTimeout(() => openRenameModal(record), 30);
+      }, true);
+
+      const leaveButton = nativeButtons.find(btn => normalizeText(btn.textContent) === '나가기');
+      menu.insertBefore(button, leaveButton || null);
+    }
+  }
+
+  function openRenameModal(record) {
+    document.getElementById(MODAL_ID)?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = MODAL_ID;
+    overlay.innerHTML = `
+      <div class="zrm-dialog" role="dialog" aria-modal="true" aria-label="별명 편집">
+        <div class="zrm-dialog-body">
+          <h3>별명 바꾸기</h3>
+          <p>원래 이름: <strong></strong><br>제타 서버의 실제 이름은 바뀌지 않고 이 브라우저에서만 보여요.</p>
+          <input type="text" maxlength="80" placeholder="별명을 입력하세요">
+        </div>
+        <div class="zrm-actions">
+          <button type="button" class="zrm-cancel">취소</button>
+          <button type="button" class="zrm-reset">원래 이름</button>
+          <button type="button" class="zrm-save">저장</button>
+        </div>
+      </div>
+    `;
+
+    const input = overlay.querySelector('input');
+    overlay.querySelector('strong').textContent = record.original;
+    input.value = normalizeText(state.aliases[record.key]);
+
+    const close = () => overlay.remove();
+    const commit = value => {
+      const alias = normalizeText(value);
+      if (alias) state.aliases[record.key] = alias;
+      else delete state.aliases[record.key];
+      saveState();
+      close();
+      refresh();
+    };
+
+    overlay.querySelector('.zrm-cancel').addEventListener('click', close);
+    overlay.querySelector('.zrm-reset').addEventListener('click', () => commit(''));
+    overlay.querySelector('.zrm-save').addEventListener('click', () => commit(input.value));
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') commit(input.value);
+      if (e.key === 'Escape') close();
+    });
+
+    document.body.appendChild(overlay);
+    setTimeout(() => { input.focus(); input.select(); }, 0);
+  }
+
+  function currentSection() {
+    if (/^\/(?:[^/]+\/)?rooms\/?$/i.test(location.pathname)) return 'room';
+    if (/^\/(?:[^/]+\/)?creator-center\/search\/?$/i.test(location.pathname)) return 'plot-search';
+    if (/^\/(?:[^/]+\/)?creator-center(?:\/|$)/i.test(location.pathname)) return 'plot';
+    return null;
+  }
+
+  function removeLegacyPanel() {
+    // 이전 버전에서 삽입했던 별도 검색 패널이 남아 있으면 제거한다.
+    document.getElementById(PANEL_ID)?.remove();
+  }
+
+  function nativeRoomSearchInput() {
+    return document.querySelector('input[name="room-list-search-input"]');
+  }
+
+  function nativeRoomQuery() {
+    const input = nativeRoomSearchInput();
+    if (input) return input.value;
+    try {
+      return new URL(location.href).searchParams.get('query') || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function nativeRoomListHost() {
+    const roomList = document.querySelector('[data-sentry-component="RoomList"]');
+    if (!roomList) return null;
+    const input = nativeRoomSearchInput();
+    return input?.closest('.flex.flex-col.grow')
+      || roomList.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]')
+      || roomList.querySelector('.overflow-y-auto')
+      || null;
+  }
+
+  function renderNativeAliasResults(query) {
+    const q = normalizeText(query).toLocaleLowerCase('ko-KR');
+    let box = document.getElementById(NATIVE_RESULTS_ID);
+
+    if (!q || currentSection() !== 'room') {
+      box?.remove();
+      return;
+    }
+
+    const nativeIds = new Set(
+      Array.from(document.querySelectorAll('a[href*="/rooms/"]'))
+        .filter(link => !link.closest(`#${NATIVE_RESULTS_ID}`))
+        .map(link => extractId(link.href, 'room'))
+        .filter(Boolean)
+    );
+    const matches = Object.values(state.index)
+      .filter(entry => entry?.type === 'room' && entry.href)
+      .filter(entry => matchesSearch(entry, q))
+      .filter(entry => !nativeIds.has(entry.id))
+      .slice(0, 20);
+
+    if (!matches.length) {
+      box?.remove();
+      return;
+    }
+
+    const host = nativeRoomListHost();
+    if (!host) return;
+
+    if (!box) {
+      box = document.createElement('div');
+      box.id = NATIVE_RESULTS_ID;
+    }
+    box.textContent = '';
+
+    for (const entry of matches) {
+      const row = document.createElement('div');
+      row.className = 'flex w-full min-w-0 flex-col';
+      row.dataset.zrmAliasResult = entry.id;
+
+      const item = document.createElement('div');
+      item.className = 'relative flex flex-col';
+
+      const link = document.createElement('a');
+      link.className = 'group flex min-w-[215px] flex-row items-center justify-between gap-3 px-4 py-2.5';
+      link.href = entry.href;
+      link.setAttribute('testid', `room-list-item-${entry.id}`);
+
+      const content = document.createElement('div');
+      content.className = 'flex flex-1 flex-row items-center gap-3';
+
+      const avatarWrap = document.createElement('div');
+      avatarWrap.className = 'relative shrink-0';
+      if (entry.image) {
+        const image = document.createElement('img');
+        image.className = 'zrm-native-avatar';
+        image.src = entry.image;
+        image.alt = '';
+        image.width = 42;
+        image.height = 56;
+        image.loading = 'lazy';
+        avatarWrap.appendChild(image);
+      } else {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'zrm-native-avatar-placeholder';
+        avatarWrap.appendChild(placeholder);
+      }
+
+      const text = document.createElement('div');
+      text.className = 'flex min-w-0 flex-1 flex-col';
+      const title = document.createElement('div');
+      title.className = 'body1 font-medium text-white line-clamp-1';
+      title.textContent = entry.alias || entry.original;
+      const original = document.createElement('div');
+      original.className = 'body12 text-white/50 line-clamp-1';
+      original.textContent = searchDetail(entry, '검색으로 찾은 대화방');
+      text.append(title, original);
+      content.append(avatarWrap, text);
+      link.appendChild(content);
+      item.appendChild(link);
+      row.appendChild(item);
+      box.appendChild(row);
+    }
+
+    const input = nativeRoomSearchInput();
+    const searchRow = input?.closest('.p-4');
+    const searchBlock = searchRow?.parentElement;
+    if (searchBlock?.parentElement === host) {
+      if (box.parentElement !== host || box.previousElementSibling !== searchBlock) {
+        searchBlock.after(box);
+      }
+    } else if (box.parentElement !== host) {
+      host.prepend(box);
+    }
+  }
+
+  function bindNativeRoomSearch() {
+    const input = nativeRoomSearchInput();
+    if (!input || input.dataset.zrmAliasSearchBound === '1') return;
+    input.dataset.zrmAliasSearchBound = '1';
+    const update = () => scheduleRefresh();
+    input.addEventListener('input', update);
+    input.addEventListener('search', update);
+    input.addEventListener('change', update);
+  }
+
+  function nativePlotSearchInput() {
+    if (currentSection() !== 'plot-search') return null;
+    return document.querySelector('input[type="search"], input[placeholder*="검색"], input');
+  }
+
+  function nativePlotResultsHost() {
+    const main = document.querySelector('main#contents, main, [role="main"]');
+    return main?.querySelector('[data-sentry-element="FlatList"], .overflow-y-auto') || main;
+  }
+
+  function renderNativePlotAliasResults(query) {
+    const q = normalizeText(query).toLocaleLowerCase('ko-KR');
+    let box = document.getElementById(PLOT_NATIVE_RESULTS_ID);
+    if (!q || currentSection() !== 'plot-search') {
+      box?.remove();
+      return;
+    }
+
+    const nativeIds = new Set(
+      Array.from(document.querySelectorAll('a[href*="/plots/"]'))
+        .filter(link => !link.closest(`#${PLOT_NATIVE_RESULTS_ID}`))
+        .map(link => extractId(link.href, 'plot'))
+        .filter(Boolean)
+    );
+    const matches = Object.values(state.index)
+      .filter(entry => entry?.type === 'plot' && entry.href)
+      .filter(entry => matchesSearch(entry, q))
+      .filter(entry => !nativeIds.has(entry.id))
+      .slice(0, 20);
+
+    if (!matches.length) {
+      box?.remove();
+      return;
+    }
+    const host = nativePlotResultsHost();
+    if (!host) return;
+    if (!box) {
+      box = document.createElement('div');
+      box.id = PLOT_NATIVE_RESULTS_ID;
+    }
+    box.textContent = '';
+
+    for (const entry of matches) {
+      const row = document.createElement('div');
+      row.className = 'flex flex-col gap-2 border-b border-b-white/[3%] py-3';
+      const line = document.createElement('div');
+      line.className = 'flex flex-row items-center';
+      const link = document.createElement('a');
+      link.className = 'flex flex-1 flex-row items-center gap-3 pr-2';
+      link.href = entry.href;
+
+      if (entry.image) {
+        const image = document.createElement('img');
+        image.className = 'zrm-plot-avatar';
+        image.src = entry.image;
+        image.alt = '';
+        image.width = 39;
+        image.height = 52;
+        link.appendChild(image);
+      } else {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'zrm-plot-avatar-placeholder';
+        link.appendChild(placeholder);
+      }
+
+      const text = document.createElement('div');
+      text.className = 'flex shrink flex-col';
+      const title = document.createElement('div');
+      title.className = 'line-clamp-1 shrink body1 font-medium text-ellipsis';
+      title.textContent = entry.alias || entry.original;
+      const original = document.createElement('div');
+      original.className = 'caption1 text-white/50';
+      original.textContent = searchDetail(entry, '검색으로 찾은 플롯');
+      text.append(title, original);
+      link.appendChild(text);
+      line.appendChild(link);
+      row.appendChild(line);
+      box.appendChild(row);
+    }
+    if (box.parentElement !== host) host.prepend(box);
+  }
+
+  function bindNativePlotSearch() {
+    const input = nativePlotSearchInput();
+    if (!input || input.dataset.zrmAliasSearchBound === '1') return;
+    input.dataset.zrmAliasSearchBound = '1';
+    const update = () => scheduleRefresh();
+    input.addEventListener('input', update);
+    input.addEventListener('search', update);
+    input.addEventListener('change', update);
+  }
+
+  function refresh() {
+    observer?.disconnect();
+    const section = currentSection();
+    removeLegacyPanel();
+
+    if (!section) {
+      document.getElementById(NATIVE_RESULTS_ID)?.remove();
+      document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
+      return;
+    }
+
+    injectStyle();
+    const records = renderedItems();
+
+    for (const record of records) {
+      applyAlias(record);
+      makeRenameButton(record);
+    }
+
+    injectRoomContextMenu();
+    saveState();
+
+    if (section === 'room') {
+      bindNativeRoomSearch();
+      renderNativeAliasResults(nativeRoomQuery());
+    } else if (section === 'plot-search') {
+      bindNativePlotSearch();
+      renderNativePlotAliasResults(nativePlotSearchInput()?.value || '');
+    }
+    observer?.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  function swipeX(item) {
+    const match = (item?.style?.transform || '').match(/translateX\((-?[\d.]+)px\)/);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function bindSwipeOpenLock() {
+    document.addEventListener('touchstart', event => {
+      const touch = event.touches?.[0];
+      const item = event.target?.closest?.('[data-sentry-component="SwipeableRoomListItem"]');
+      if (!touch || !item) {
+        swipeGesture = null;
+        return;
+      }
+      swipeGesture = { item, x: touch.clientX, y: touch.clientY, horizontal: false };
+    }, { capture: true, passive: true });
+
+    document.addEventListener('touchmove', event => {
+      if (!swipeGesture) return;
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      const dx = touch.clientX - swipeGesture.x;
+      const dy = touch.clientY - swipeGesture.y;
+      if (!swipeGesture.horizontal && Math.abs(dx) > Math.abs(dy) + 6) {
+        swipeGesture.horizontal = true;
+        swipeGesture.item.classList.remove('zrm-swipe-open');
+      }
+    }, { capture: true, passive: true });
+
+    document.addEventListener('touchend', event => {
+      const gesture = swipeGesture;
+      swipeGesture = null;
+      if (!gesture) return;
+
+      const touch = event.changedTouches?.[0];
+      const dx = touch ? touch.clientX - gesture.x : 0;
+      const dy = touch ? touch.clientY - gesture.y : 0;
+      const horizontal = gesture.horizontal || Math.abs(dx) > Math.abs(dy) + 6;
+      if (!horizontal) return;
+
+      // 오른쪽으로 닫는 동작이면 즉시 해제한다.
+      if (dx > 0) {
+        gesture.item.classList.remove('zrm-swipe-open');
+        return;
+      }
+
+      // 제타의 스프링 종료 시간이 기기마다 달라 여러 시점에서 열린 상태를 확인한다.
+      const lockIfOpen = () => {
+        if (swipeX(gesture.item) <= -90) gesture.item.classList.add('zrm-swipe-open');
+      };
+      lockIfOpen();
+      setTimeout(lockIfOpen, 160);
+      setTimeout(lockIfOpen, 320);
+      setTimeout(lockIfOpen, 520);
+    }, { capture: true, passive: true });
+  }
+
+  function scheduleRefresh() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      refresh();
+    });
+  }
+
+  function start() {
+    injectStyle();
+
+    document.addEventListener('pointerdown', rememberRoomContextTarget, true);
+    document.addEventListener('contextmenu', rememberRoomContextTarget, true);
+    document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
+
+    observer = new MutationObserver(scheduleRefresh);
+    bindSwipeOpenLock();
+    refresh();
+
+    let lastUrl = location.href;
+    setInterval(() => {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        scheduleRefresh();
+      }
+    }, 500);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  } else {
+    start();
+  }
+})();
+
+));
+    let fiber = fiberKey ? item[fiberKey] : null;
+    const seen = new WeakSet();
+    let inspected = 0;
+
+    const inspect = (value, path = [], depth = 0) => {
+      if (value == null || depth > 5 || inspected > 450) return;
+      if (typeof value === 'string') {
+        const key = String(path[path.length - 1] || '').toLowerCase().replace(/[_-]/g, '');
+        const full = path.join('.').toLowerCase().replace(/[_-]/g, '');
+        if (
+          /^(?:charactername|characterdisplayname|charname|charnickname)$/.test(key) ||
+          (full.includes('character') && /(?:name|nickname|displayname)$/.test(key))
+        ) add(characterNames, value);
+        if (
+          /^(?:creatorname|creatornickname|creatordisplayname|authorname|authornickname|writername|writernickname)$/.test(key) ||
+          (/(?:creator|author|writer)/.test(full) && /(?:name|nickname|displayname|username|handle)$/.test(key))
+        ) add(creatorNames, value);
+        return;
+      }
+      if (typeof value !== 'object' || seen.has(value)) return;
+      seen.add(value);
+      inspected++;
+
+      if (Array.isArray(value)) {
+        for (let i = 0; i < Math.min(value.length, 20); i++) inspect(value[i], path.concat(String(i)), depth + 1);
+        return;
+      }
+
+      for (const [key, child] of Object.entries(value)) {
+        if (['children', 'ref', '_owner', 'return', 'stateNode'].includes(key)) continue;
+        inspect(child, path.concat(key), depth + 1);
+        if (inspected > 450) break;
+      }
+    };
+
+    for (let depth = 0; fiber && depth < 16; depth++, fiber = fiber.return) {
+      inspect(fiber.memoizedProps, ['props'], 0);
+      inspect(fiber.pendingProps, ['pendingProps'], 0);
+      if (characterNames.size && creatorNames.size) break;
+    }
+
+    return {
+      characterNames: Array.from(characterNames).slice(0, 5),
+      creatorNames: Array.from(creatorNames).slice(0, 5)
+    };
+  }
+
+  function searchValues(entry) {
+    const chars = Array.isArray(entry?.characterNames) ? entry.characterNames : [entry?.characterName];
+    const creators = Array.isArray(entry?.creatorNames) ? entry.creatorNames : [entry?.creatorName];
+    return [entry?.alias, entry?.original, ...chars, ...creators]
+      .map(normalizeText)
+      .filter(Boolean);
+  }
+
+  function matchesSearch(entry, query) {
+    return searchValues(entry).some(value => value.toLocaleLowerCase('ko-KR').includes(query));
+  }
+
+  function searchDetail(entry, fallback) {
+    const parts = [];
+    if (normalizeText(entry?.alias) && normalizeText(entry?.original) && entry.alias !== entry.original) {
+      parts.push(entry.original);
+    }
+    const characterName = (Array.isArray(entry?.characterNames) ? entry.characterNames : [entry?.characterName])
+      .map(normalizeText).find(Boolean);
+    const creatorName = (Array.isArray(entry?.creatorNames) ? entry.creatorNames : [entry?.creatorName])
+      .map(normalizeText).find(Boolean);
+    if (characterName) parts.push(`캐릭터: ${characterName}`);
+    if (creatorName) parts.push(`제작자: ${creatorName}`);
+    return parts.join(' · ') || fallback;
   }
 
   function extractId(href, type) {
