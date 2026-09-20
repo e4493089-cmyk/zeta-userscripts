@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.17.0
+// @version      0.18.0
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1017,6 +1017,22 @@
   const PROFILE_WORKERS = 4;
   let lastProfileFailures = [];
 
+  // ID만으로는 어느 방인지 알 수 없다. 이름과 주소를 남겨 바로 열어볼 수 있게 한다.
+  function describeFailure(target, reason) {
+    const entry = state.index[keyOf('room', target.roomId)];
+    const meta = entry ? plotMetaForEntry(entry) : null;
+    const name = (entry ? entryTitle(entry) : '') || normalizeText(meta && meta.name) || '(제목 없음)';
+    const path = normalizeText(entry && entry.href) || ('/' + localeSegment() + '/rooms/' + target.roomId);
+
+    return {
+      name,
+      url: path.startsWith('http') ? path : location.origin + path,
+      plotId: target.plotId || '',
+      roomId: target.roomId,
+      reason
+    };
+  }
+
   // 실패 사유별로 묶는다. 같은 이유가 반복되는 경우가 대부분이다.
   function failureSummary(failures) {
     const counts = new Map();
@@ -1032,9 +1048,22 @@
 
     const lines = ['Zeta Room Manager 이름 수집 실패 목록', new Date().toISOString(), ''];
     for (const item of failureSummary(lastProfileFailures)) lines.push('- ' + item);
-    lines.push('', '방 ID · 플롯 ID · 사유');
+    lines.push('');
+
+    // 사유별로 묶어서, 각 항목은 플롯 이름과 대화방 주소로 적는다.
+    const groups = new Map();
     for (const item of lastProfileFailures) {
-      lines.push(item.roomId + ' · ' + (item.plotId || '(없음)') + ' · ' + item.reason);
+      if (!groups.has(item.reason)) groups.set(item.reason, []);
+      groups.get(item.reason).push(item);
+    }
+    for (const [reason, items] of groups) {
+      lines.push('════ ' + reason + ' (' + items.length + '건)', '');
+      for (const item of items) {
+        lines.push(item.name);
+        lines.push('  ' + item.url);
+        if (item.plotId) lines.push('  플롯 ' + item.plotId);
+        lines.push('');
+      }
     }
 
     const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
@@ -1202,8 +1231,9 @@
       } else {
         failed++;
         const reason = normalizeText((error && error.message) || error) || '알 수 없는 오류';
-        failures.push({ roomId: target.roomId, plotId: target.plotId, reason });
-        try { console.warn('[zrm] 이름 수집 실패', target.roomId, reason); } catch (_) {}
+        const record = describeFailure(target, reason);
+        failures.push(record);
+        try { console.warn('[zrm] 이름 수집 실패 ·', record.name, '·', record.url, '·', reason); } catch (_) {}
       }
 
       const completed = done + failed;
