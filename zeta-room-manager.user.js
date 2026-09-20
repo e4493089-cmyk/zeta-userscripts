@@ -294,8 +294,8 @@
       }
     } catch (_) {}
 
-    text = text.replace(/^Bearer\\s+/i, '');
-    const match = text.match(/eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+/);
+    text = text.replace(/^Bearer\s+/i, '');
+    const match = text.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
     return match ? match[0] : '';
   }
 
@@ -750,7 +750,7 @@
     const id = extractId(link && link.href, type)
       || item.getAttribute('data-plot-id')
       || (type === 'plot' ? reactPlotId(item) : null)
-      || stableLocalId(original + '\\n' + image.split('?')[0]);
+      || stableLocalId(original + '\n' + image.split('?')[0]);
     if (!id) return null;
 
     const key = keyOf(type, id);
