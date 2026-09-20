@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.9.2
+// @version      0.9.3
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -798,9 +798,12 @@
       roomCollectionProgress = { running: false, count: total };
       renderCollectionTools();
       const coverage = metadataCoverage('room');
+      const aliases = Object.values(state.index).filter(entry =>
+        entry && entry.type === 'room' && normalizeText(entry.alias)
+      ).length;
       alert(
         '대화방 전체 수집 완료 · 저장된 방 ' + total + '개' +
-        '\n캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
+        '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
       );
       return true;
     })().finally(() => {
@@ -940,9 +943,12 @@
       plotCollectionProgress = { running: false, count: total };
       renderCollectionTools();
       const coverage = metadataCoverage('plot');
+      const aliases = Object.values(state.index).filter(entry =>
+        entry && entry.type === 'plot' && normalizeText(entry.alias)
+      ).length;
       alert(
         '전체 수집 완료 · 저장된 플롯 ' + total + '개' +
-        '\n캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
+        '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
       );
       return true;
     })().finally(() => {
@@ -999,6 +1005,12 @@
         Object.assign(state.aliases, aliases);
         Object.assign(state.index, index);
         Object.assign(state.plotMeta, plotMeta);
+
+        // 예전/부분 백업에서 aliases 맵이 빠졌더라도 index.alias가 있으면 복구한다.
+        for (const [key, entry] of Object.entries(state.index)) {
+          const alias = normalizeText(entry && entry.alias);
+          if (alias && !normalizeText(state.aliases[key])) state.aliases[key] = alias;
+        }
         saveStateNow();
         localStorage.setItem(PLOT_COLLECTION_STAMP_KEY, String(Date.now()));
         scheduleRefresh();
@@ -1584,8 +1596,9 @@
     harvestReactPlotData(item);
 
     const key = keyOf(type, id);
-    const alias = normalizeText(state.aliases[key]);
     const previous = state.index[key] || {};
+    const alias = normalizeText(state.aliases[key] || previous.alias);
+    if (alias && state.aliases[key] !== alias) state.aliases[key] = alias;
     // 제타가 실제로 그려준 방이면 사라진 방이 아니다.
     delete previous.missingSince;
     const searchMeta = collectSearchMeta(item, titleEl);
@@ -1663,13 +1676,14 @@
   }
 
   function applyAlias(record) {
-    const alias = normalizeText(state.aliases[record.key]);
+    const indexed = state.index[record.key] || {};
+    const alias = normalizeText(state.aliases[record.key] || indexed.alias);
+    if (alias && state.aliases[record.key] !== alias) state.aliases[record.key] = alias;
     record.alias = alias;
     const nextTitle = alias || record.original;
     if (normalizeText(record.titleEl.textContent) !== nextTitle) record.titleEl.textContent = nextTitle;
     record.titleEl.classList.toggle('zrm-has-alias', !!alias);
 
-    const indexed = state.index[record.key] || {};
     const next = {
       ...indexed,
       type: record.type,
