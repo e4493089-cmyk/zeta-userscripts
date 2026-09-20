@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.5.4
+// @version      0.5.5
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 전체 방 자동 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -65,31 +65,26 @@
       if (!list.includes(text)) list.push(text);
     };
 
-    const addNamedObject = (list, value) => {
-      if (!value || typeof value !== 'object') return;
-      for (const field of ['name', 'nickname', 'displayName', 'display_name', 'username', 'handle']) {
-        addUnique(list, value[field]);
-      }
-    };
-
-    const elements = [item, ...Array.from(item?.querySelectorAll?.('*') || []).slice(0, 120)];
+    const elements = [item, ...Array.from(item?.querySelectorAll?.('*') || []).slice(0, 180)];
     for (const el of elements) {
       if (!el) continue;
 
       for (const [key, value] of Object.entries(el.dataset || {})) {
         const compact = key.toLowerCase().replace(/[_-]/g, '');
-        if (compact.includes('character') && compact.includes('name')) addUnique(characterNames, value);
+        if (compact.includes('character') && /(name|nickname|display)/.test(compact)) addUnique(characterNames, value);
         if (
           (compact.includes('creator') || compact.includes('author') || compact.includes('writer')) &&
-          (compact.includes('name') || compact.includes('nickname'))
+          /(name|nickname|display|username|handle)/.test(compact)
         ) addUnique(creatorNames, value);
       }
 
       const component = String(el.dataset?.sentryComponent || '').toLowerCase();
-      if (component.includes('character')) addUnique(characterNames, el.textContent);
-      if (component.includes('creator') || component.includes('author')) addUnique(creatorNames, el.textContent);
+      if (component.includes('character')) addUnique(characterNames, el.getAttribute?.('aria-label'));
+      if (component.includes('creator') || component.includes('author')) addUnique(creatorNames, el.getAttribute?.('aria-label'));
 
       if (el.matches?.('img[alt]')) addUnique(characterNames, el.getAttribute('alt'));
+      if (el.matches?.('[aria-label*="캐릭터"], [aria-label*="character" i]')) addUnique(characterNames, el.getAttribute('aria-label'));
+      if (el.matches?.('[aria-label*="제작자"], [aria-label*="creator" i], [aria-label*="author" i]')) addUnique(creatorNames, el.getAttribute('aria-label'));
       if (el.matches?.('a[href*="/character/"], a[href*="/characters/"]')) addUnique(characterNames, el.textContent);
       if (el.matches?.('a[href*="/creator/"], a[href*="/creators/"], a[href*="/author/"], a[href*="/authors/"]')) {
         addUnique(creatorNames, el.textContent);
@@ -99,48 +94,61 @@
     const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber'));
     let fiber = fiberKey ? item[fiberKey] : null;
     const seen = new WeakSet();
+    let inspected = 0;
 
-    const inspect = (value, parentKey = '', depth = 0) => {
-      if (!value || typeof value !== 'object' || depth > 3 || seen.has(value)) return;
-      seen.add(value);
+    const cleanKey = value => String(value || '').toLowerCase().replace(/[_-]/g, '');
 
-      for (const [key, child] of Object.entries(value)) {
-        const compact = key.toLowerCase().replace(/[_-]/g, '');
-        if (typeof child === 'string') {
-          if (/^(?:charactername|charname|characternickname|characterdisplayname)$/.test(compact)) {
-            addUnique(characterNames, child);
-          }
-          if (/^(?:creatorname|creatornickname|creatordisplayname|authorname|authornickname|writername|writernickname)$/.test(compact)) {
-            addUnique(creatorNames, child);
-          }
-          continue;
-        }
+    const inspect = (value, path = [], depth = 0) => {
+      if (value == null || depth > 7 || inspected > 1200) return;
 
-        if (!child || typeof child !== 'object') continue;
-
-        if (compact.includes('character')) addNamedObject(characterNames, child);
-        if (compact.includes('creator') || compact.includes('author') || compact.includes('writer')) {
-          addNamedObject(creatorNames, child);
-        }
+      if (typeof value === 'string') {
+        const leaf = cleanKey(path[path.length - 1]);
+        const context = path.map(cleanKey).join('.');
+        const charContext = /character|characters|charprofile|persona/.test(context);
+        const creatorContext = /creator|author|writer|owner/.test(context);
+        const nameLeaf = /^(?:name|nickname|displayname|username|handle|charactername|charname|characternickname|characterdisplayname)$/.test(leaf);
 
         if (
-          depth < 3 &&
-          /(?:room|plot|data|item|conversation|character|creator|author|writer)/.test(compact + parentKey)
-        ) {
-          inspect(child, compact, depth + 1);
+          /^(?:charactername|charname|characternickname|characterdisplayname)$/.test(leaf) ||
+          (charContext && nameLeaf)
+        ) addUnique(characterNames, value);
+
+        if (
+          /^(?:creatorname|creatornickname|creatordisplayname|authorname|authornickname|writername|writernickname)$/.test(leaf) ||
+          (creatorContext && nameLeaf)
+        ) addUnique(creatorNames, value);
+
+        return;
+      }
+
+      if (typeof value !== 'object' || seen.has(value)) return;
+      seen.add(value);
+      inspected++;
+
+      if (Array.isArray(value)) {
+        for (let i = 0; i < Math.min(value.length, 60); i++) {
+          inspect(value[i], path.concat(String(i)), depth + 1);
+          if (inspected > 1200) break;
         }
+        return;
+      }
+
+      for (const [key, child] of Object.entries(value)) {
+        if (['children', 'ref', '_owner', 'return', 'stateNode'].includes(key)) continue;
+        inspect(child, path.concat(key), depth + 1);
+        if (inspected > 1200) break;
       }
     };
 
-    for (let depth = 0; fiber && depth < 14; depth++, fiber = fiber.return) {
-      inspect(fiber.memoizedProps, 'props', 0);
-      inspect(fiber.pendingProps, 'pendingprops', 0);
+    for (let depth = 0; fiber && depth < 18; depth++, fiber = fiber.return) {
+      inspect(fiber.memoizedProps, ['props'], 0);
+      inspect(fiber.pendingProps, ['pendingProps'], 0);
       if (characterNames.length && creatorNames.length) break;
     }
 
     return {
-      characterNames: characterNames.slice(0, 5),
-      creatorNames: creatorNames.slice(0, 5)
+      characterNames: characterNames.slice(0, 10),
+      creatorNames: creatorNames.slice(0, 10)
     };
   }
 
@@ -170,18 +178,11 @@
     return parts.join(' · ') || fallback;
   }
 
-  const BACKGROUND_INDEX_FRAME_ID = 'zeta-room-manager-index-frame';
-  const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at';
+  const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at:v2';
   let backgroundIndexPromise = null;
 
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  function roomPathForCurrentLocale() {
-    const first = location.pathname.split('/').filter(Boolean)[0] || 'ko';
-    const locale = /^[a-z]{2}(?:-[a-z]{2})?$/i.test(first) ? first : 'ko';
-    return `/${locale}/rooms`;
   }
 
   function roomItemsFromDocument(doc) {
@@ -203,45 +204,31 @@
     return harvested;
   }
 
-  function findFrameScrollHost(doc, view) {
-    const firstRoom = doc.querySelector('a[href*="/rooms/"]');
+  function findLiveRoomScrollHost() {
+    const firstRoom = document.querySelector('a[href*="/rooms/"]');
     let node = firstRoom?.parentElement || null;
 
-    while (node && node !== doc.body && node !== doc.documentElement) {
+    while (node && node !== document.body && node !== document.documentElement) {
       try {
-        const style = view.getComputedStyle(node);
+        const style = getComputedStyle(node);
         const overflow = style.overflowY || style.overflow;
-        if (
-          /(auto|scroll)/i.test(overflow) &&
-          node.scrollHeight > node.clientHeight + 24
-        ) return node;
+        if (/(auto|scroll)/i.test(overflow) && node.scrollHeight > node.clientHeight + 24) return node;
       } catch (_) {}
       node = node.parentElement;
     }
 
     const candidates = [
-      doc.querySelector('[data-sentry-component="RoomList"] .overflow-y-auto'),
-      doc.querySelector('[data-sentry-component="RoomList"]'),
-      doc.querySelector('.overflow-y-auto'),
-      doc.scrollingElement,
-      doc.documentElement
+      document.querySelector('[data-sentry-component="RoomList"] .overflow-y-auto'),
+      document.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]'),
+      document.querySelector('[data-sentry-component="RoomList"]'),
+      document.querySelector('.overflow-y-auto'),
+      document.scrollingElement,
+      document.documentElement
     ].filter(Boolean);
 
     return candidates.find(el => el.scrollHeight > el.clientHeight + 24)
-      || doc.scrollingElement
-      || doc.documentElement;
-  }
-
-  async function waitForRoomFrame(frame, timeoutMs = 15000) {
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
-      try {
-        const doc = frame.contentDocument;
-        if (doc?.readyState !== 'loading' && doc.querySelector('a[href*="/rooms/"]')) return true;
-      } catch (_) {}
-      await sleep(180);
-    }
-    return false;
+      || document.scrollingElement
+      || document.documentElement;
   }
 
   async function buildFullRoomIndexInBackground(force = false) {
@@ -250,86 +237,69 @@
     const last = Number(localStorage.getItem(BACKGROUND_INDEX_STAMP_KEY) || 0);
     if (!force && Date.now() - last < 2 * 60 * 1000) return true;
 
-    document.getElementById(BACKGROUND_INDEX_FRAME_ID)?.remove();
+    harvestRoomDocument(document);
 
-    const frame = document.createElement('iframe');
-    frame.id = BACKGROUND_INDEX_FRAME_ID;
-    frame.setAttribute('aria-hidden', 'true');
-    frame.tabIndex = -1;
-    frame.style.cssText = [
-      'position:fixed',
-      'left:-12000px',
-      'top:0',
-      'width:430px',
-      'height:900px',
-      'opacity:0.001',
-      'pointer-events:none',
-      'border:0',
-      'z-index:-1'
-    ].join(';');
-    frame.src = location.origin + roomPathForCurrentLocale() + '?zrm_background_index=1';
-    document.documentElement.appendChild(frame);
+    const host = findLiveRoomScrollHost();
+    if (!host) {
+      saveState();
+      scheduleRefresh();
+      return false;
+    }
+
+    const isDocumentScroller =
+      host === document.scrollingElement ||
+      host === document.documentElement ||
+      host === document.body;
+
+    const originalTop = isDocumentScroller ? window.scrollY : host.scrollTop;
+    let stableRounds = 0;
+    let lastCount = -1;
+    let lastHeight = -1;
 
     try {
-      if (!await waitForRoomFrame(frame)) return false;
+      for (let round = 0; round < 180; round++) {
+        harvestRoomDocument(document);
 
-      const doc = frame.contentDocument;
-      const view = frame.contentWindow;
-      if (!doc || !view) return false;
-
-      let stableRounds = 0;
-      let lastRoomCount = -1;
-      let lastHeight = -1;
-      let lastTop = -1;
-
-      for (let round = 0; round < 140; round++) {
-        harvestRoomDocument(doc);
-
-        const roomCount = Object.values(state.index)
+        const countBefore = Object.values(state.index)
           .filter(entry => entry?.type === 'room' && entry.id)
           .length;
-
-        const host = findFrameScrollHost(doc, view);
-        if (!host) break;
-
         const heightBefore = host.scrollHeight;
-        const topBefore = host.scrollTop;
 
-        try {
-          host.scrollTop = host.scrollHeight;
-          host.dispatchEvent(new view.Event('scroll', { bubbles: true }));
-        } catch (_) {}
+        const target = Math.max(0, host.scrollHeight - host.clientHeight);
+        if (isDocumentScroller) {
+          window.scrollTo(0, target);
+        } else {
+          host.scrollTop = target;
+          host.dispatchEvent(new Event('scroll', { bubbles: true }));
+        }
 
-        await sleep(round < 8 ? 220 : 150);
-        harvestRoomDocument(doc);
+        await sleep(round < 10 ? 140 : 95);
+        harvestRoomDocument(document);
 
-        const heightAfter = host.scrollHeight;
-        const topAfter = host.scrollTop;
-        const newRoomCount = Object.values(state.index)
+        const countAfter = Object.values(state.index)
           .filter(entry => entry?.type === 'room' && entry.id)
           .length;
+        const heightAfter = host.scrollHeight;
 
         const unchanged =
-          newRoomCount === lastRoomCount &&
-          heightAfter === lastHeight &&
-          topAfter === lastTop &&
+          countAfter === countBefore &&
+          countAfter === lastCount &&
           heightAfter === heightBefore &&
-          topAfter === topBefore;
+          heightAfter === lastHeight;
 
         stableRounds = unchanged ? stableRounds + 1 : 0;
-        lastRoomCount = newRoomCount;
+        lastCount = countAfter;
         lastHeight = heightAfter;
-        lastTop = topAfter;
 
-        if (round % 5 === 0) {
+        if (round % 4 === 0) {
           saveState();
           scheduleRefresh();
         }
 
-        if (stableRounds >= 6) break;
+        if (stableRounds >= 7) break;
       }
 
-      harvestRoomDocument(doc);
+      harvestRoomDocument(document);
       saveState();
       localStorage.setItem(BACKGROUND_INDEX_STAMP_KEY, String(Date.now()));
       scheduleRefresh();
@@ -337,7 +307,10 @@
     } catch (_) {
       return false;
     } finally {
-      frame.remove();
+      try {
+        if (isDocumentScroller) window.scrollTo(0, originalTop);
+        else host.scrollTop = originalTop;
+      } catch (_) {}
     }
   }
 
@@ -778,6 +751,7 @@
     const nativeIds = new Set(
       Array.from(document.querySelectorAll('a[href*="/rooms/"]'))
         .filter(link => !link.closest(`#${NATIVE_RESULTS_ID}`))
+        .filter(link => normalizeText(link.textContent).toLocaleLowerCase('ko-KR').includes(q))
         .map(link => extractId(link.href, 'room'))
         .filter(Boolean)
     );
@@ -893,6 +867,7 @@
     const nativeIds = new Set(
       Array.from(document.querySelectorAll('a[href*="/plots/"]'))
         .filter(link => !link.closest(`#${PLOT_NATIVE_RESULTS_ID}`))
+        .filter(link => normalizeText(link.textContent).toLocaleLowerCase('ko-KR').includes(q))
         .map(link => extractId(link.href, 'plot'))
         .filter(Boolean)
     );
