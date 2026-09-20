@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.4.0
+// @version      0.4.1
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -16,6 +16,8 @@
   if (window.top !== window.self) return;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
+  const STATE_VERSION = 2;
+  const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at:v3';
   const STYLE_ID = 'zeta-room-manager-style';
   const PANEL_ID = 'zeta-room-manager-panel';
   const MODAL_ID = 'zeta-room-manager-modal';
@@ -31,13 +33,30 @@
   function loadState() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-      return {
+      const loaded = {
+        version: STATE_VERSION,
         aliases: parsed.aliases && typeof parsed.aliases === 'object' ? parsed.aliases : {},
         index: parsed.index && typeof parsed.index === 'object' ? parsed.index : {},
         plotMeta: parsed.plotMeta && typeof parsed.plotMeta === 'object' ? parsed.plotMeta : {}
       };
+
+      // v1 인덱스에는 화면에서 긁어온 캐릭터·제작자 이름이 섞여 있다.
+      // 페이지 전역 정보가 모든 항목에 붙어 검색이 전부 매칭되므로 한 번 비우고
+      // API 기반 정보(plotMeta)로 다시 채운다. 별명은 그대로 둔다.
+      if (Number(parsed.version || 1) < 2) {
+        for (const entry of Object.values(loaded.index)) {
+          if (!entry || typeof entry !== 'object') continue;
+          delete entry.characterNames;
+          delete entry.creatorNames;
+        }
+        try {
+          localStorage.removeItem(BACKGROUND_INDEX_STAMP_KEY);
+        } catch (_) {}
+      }
+
+      return loaded;
     } catch (_) {
-      return { aliases: {}, index: {}, plotMeta: {} };
+      return { version: STATE_VERSION, aliases: {}, index: {}, plotMeta: {} };
     }
   }
 
@@ -116,8 +135,9 @@
       if (typeof value === 'string') {
         const leaf = cleanKey(path[path.length - 1]);
         const context = path.map(cleanKey).join('.');
-        const charContext = /character|characters|charprofile|persona/.test(context);
-        const creatorContext = /creator|author|writer|owner/.test(context);
+        // persona/user 는 "로그인한 나"를 가리키는 경우가 많아 캐릭터로 보지 않는다.
+        const charContext = /character|characters|charprofile|chatprofile/.test(context);
+        const creatorContext = /creator|author|writer/.test(context);
         const nameLeaf = /^(?:name|nickname|displayname|username|handle|charactername|charname|characternickname|characterdisplayname)$/.test(leaf);
 
         if (
@@ -152,9 +172,23 @@
       }
     };
 
-    for (let depth = 0; fiber && depth < 18; depth++, fiber = fiber.return) {
-      inspect(fiber.memoizedProps, ['props'], 0);
-      inspect(fiber.pendingProps, ['pendingProps'], 0);
+    // 이 항목 자체를 렌더한 컴포넌트의 props 중, 항목에 속한 값만 본다.
+    // 조상으로 멀리 올라가면 로그인 사용자·페르소나·목록 전체 데이터가 걸려서
+    // 모든 항목에 똑같은 캐릭터명이 붙고, 그 이름으로 검색하면 전부 매칭된다.
+    const ITEM_SCOPED = /^(?:plot|room|character|characters|chatprofile|chatprofiles|characterprofiles)$/;
+
+    for (let depth = 0; fiber && depth < 4; depth++, fiber = fiber.return) {
+      for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
+        if (!props || typeof props !== 'object' || Array.isArray(props)) continue;
+
+        // props 자체가 플롯/캐릭터 객체인 경우(펼쳐서 넘긴 경우)
+        if (props.characters || props.chatProfiles) inspect(props, ['props'], 0);
+
+        for (const [key, value] of Object.entries(props)) {
+          if (!ITEM_SCOPED.test(cleanKey(key))) continue;
+          inspect(value, ['props', key], 1);
+        }
+      }
       if (characterNames.length && creatorNames.length) break;
     }
 
@@ -298,9 +332,15 @@
     return searchValues(entry).some(value => value.toLocaleLowerCase('ko-KR').includes(query));
   }
 
+  function entryTitle(entry) {
+    return normalizeText(entry?.alias) || normalizeText(entry?.original);
+  }
+
   // 플롯이 삭제됐거나 제타 목록에서 사라진 방은 눌러도 "없는 페이지"로 간다.
   function isDeadEntry(entry) {
     if (!entry) return true;
+    // 크리에이터 센터의 내 플롯은 비공개라 API가 404를 줄 수 있으므로 숨기지 않는다.
+    if (entry.type !== 'room') return false;
     if (entry.missingSince) return true;
     if (entry.plotMissing) return true;
     const meta = plotMetaForEntry(entry);
@@ -364,7 +404,6 @@
     return parts.join(' · ') || fallback;
   }
 
-  const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at:v3';
   const API_BASE = 'https://api.zeta-ai.io';
   const WEB_CLIENT_VERSION = '3.44.7';
   let backgroundIndexPromise = null;
@@ -1499,6 +1538,7 @@
     );
     const found = Object.values(state.index)
       .filter(entry => entry?.type === 'room' && entry.href)
+      .filter(entry => entryTitle(entry))
       .filter(entry => matchesSearch(entry, q))
       .filter(entry => !nativeIds.has(entry.id));
 
@@ -1560,7 +1600,7 @@
       text.className = 'flex min-w-0 flex-1 flex-col';
       const title = document.createElement('div');
       title.className = 'body1 font-medium text-white line-clamp-1';
-      title.textContent = entry.alias || entry.original;
+      title.textContent = entryTitle(entry);
       const original = document.createElement('div');
       original.className = 'body12 text-white/50 line-clamp-1';
       original.textContent = searchDetail(entry, '검색으로 찾은 대화방');
@@ -1629,6 +1669,7 @@
     );
     const matches = Object.values(state.index)
       .filter(entry => entry?.type === 'plot' && entry.href)
+      .filter(entry => entryTitle(entry))
       .filter(entry => matchesSearch(entry, q))
       .filter(entry => !nativeIds.has(entry.id))
       .filter(entry => !isDeadEntry(entry))
@@ -1673,7 +1714,7 @@
       text.className = 'flex shrink flex-col';
       const title = document.createElement('div');
       title.className = 'line-clamp-1 shrink body1 font-medium text-ellipsis';
-      title.textContent = entry.alias || entry.original;
+      title.textContent = entryTitle(entry);
       const original = document.createElement('div');
       original.className = 'caption1 text-white/50';
       original.textContent = searchDetail(entry, '검색으로 찾은 플롯');
