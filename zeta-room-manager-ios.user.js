@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.16.0
+// @version      0.17.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -973,13 +973,13 @@
       const button = await readInFrame(frame, win => {
         if (!win.location.pathname.includes(roomId)) return null;
         return win.document.querySelector(PROFILE_BUTTON);
-      }, 18000);
+      }, 10000);
       button.click();
 
       return await readInFrame(frame, win => {
         if (!PROFILE_PATH.test(win.location.pathname)) return null;
         return readPlotProfile(win);
-      }, 18000);
+      }, 10000);
     } finally {
       dropFrame(frame);
     }
@@ -1307,6 +1307,9 @@
       let lastHeight = 0;
       let lastCount = roomCollectionCount();
       let stableRounds = 0;
+      let barrenRounds = 0;
+      let skippedKnown = false;
+      const knownAtStart = roomCollectionCount();
 
       setScrollTop(host, 0);
       await sleep(450);
@@ -1332,13 +1335,27 @@
           if (stableRounds >= 4) break;
         } else {
           stableRounds = 0;
-          const step = Math.max(320, Math.floor(before.client * 0.78));
+          // 이미 아는 방만 지나가는 구간은 크게 건너뛴다.
+          // 다시 수집할 때 목록 전체를 처음부터 훑는 시간을 줄인다.
+          const factor = barrenRounds >= 3 ? 2.6 : 0.78;
+          const step = Math.max(320, Math.floor(before.client * factor));
           setScrollTop(host, Math.min(before.height, before.top + step));
-          await sleep(320);
+          await sleep(barrenRounds >= 3 ? 170 : 320);
         }
 
         const now = scrollMetrics(host);
         const nowCount = roomCollectionCount();
+
+        if (nowCount > count) barrenRounds = 0;
+        else barrenRounds++;
+
+        // 새로 들어오는 방이 한참 없으면 나머지는 이미 수집된 구간이다.
+        // 제타는 최근 대화 순으로 정렬하므로 새 방은 위쪽에 있다.
+        if (knownAtStart > 0 && barrenRounds >= 14) {
+          skippedKnown = true;
+          break;
+        }
+
         if (now.height === lastHeight && nowCount === lastCount && nearBottom) stableRounds++;
         lastHeight = now.height;
         lastCount = nowCount;
@@ -1361,6 +1378,7 @@
       ).length;
       alert(
         (collectionAborted ? '대화방 수집 중지됨' : '대화방 전체 수집 완료') + ' · 저장된 방 ' + total + '개' +
+        (skippedKnown ? ' (이미 수집된 구간은 건너뜀)' : '') +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 플롯 ' + profiles.targets + '개 중 ' + profiles.done + '개 성공' +
         (profiles.failed ? ' · ' + profiles.failed + '개 실패' : '') +
