@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.9.4
+// @version      0.9.5
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -396,6 +396,7 @@
       normalizeText(meta.sourcePlotId),
       normalizeText(meta.originatedId)
     ].filter(Boolean));
+    const metaName = normalizeText(meta.name).toLocaleLowerCase('ko-KR');
 
     for (const entry of Object.values(state.index || {})) {
       if (!entry || typeof entry !== 'object') continue;
@@ -404,7 +405,12 @@
         normalizeText(entry.plotId),
         normalizeText(entry.originatedId)
       ].filter(Boolean);
-      if (!entryIds.some(id => ids.has(id))) continue;
+      const linkedById = entryIds.some(id => ids.has(id));
+      const linkedByName = !linkedById
+        && metaName
+        && normalizeText(entry.original).toLocaleLowerCase('ko-KR') === metaName;
+      if (!linkedById && !linkedByName) continue;
+
       entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
       entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
     }
@@ -550,12 +556,39 @@
     return normalizeText(plotId) || normalizeText(originatedId);
   }
 
+  // 방 목록 데이터에는 플롯 ID가 없는 경우가 많다. 그러면 내 플롯에서 모은
+  // 캐릭터·제작자명이 방으로 흘러가지 못한다. ID가 없을 때는 이름으로 잇는다.
+  // 같은 이름의 플롯이 둘 이상이면 어느 쪽인지 알 수 없으므로 잇지 않는다.
+  let plotNameIndex = null;
+  let plotNameIndexAt = 0;
+
+  function plotMetaByName(name) {
+    const wanted = normalizeText(name).toLocaleLowerCase('ko-KR');
+    if (!wanted) return null;
+
+    const metaCount = Object.keys(state.plotMeta || {}).length;
+    if (!plotNameIndex || plotNameIndexAt !== metaCount) {
+      plotNameIndex = new Map();
+      for (const meta of Object.values(state.plotMeta || {})) {
+        const key = normalizeText(meta && meta.name).toLocaleLowerCase('ko-KR');
+        if (!key) continue;
+        if (plotNameIndex.has(key)) plotNameIndex.set(key, 'ambiguous');
+        else plotNameIndex.set(key, meta);
+      }
+      plotNameIndexAt = metaCount;
+    }
+
+    const hit = plotNameIndex.get(wanted);
+    return hit && hit !== 'ambiguous' ? hit : null;
+  }
+
   function plotMetaForEntry(entry) {
     if (!entry) return null;
     const canonical = canonicalPlotId(entry.plotId, entry.originatedId);
     return (canonical && state.plotMeta[canonical])
       || (entry.plotId && state.plotMeta[entry.plotId])
       || (entry.originatedId && state.plotMeta[entry.originatedId])
+      || plotMetaByName(entry.original)
       || null;
   }
 
