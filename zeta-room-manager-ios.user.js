@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.6.9
+// @version      0.7.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1706,7 +1706,11 @@
     const searchMeta = collectSearchMeta(item, titleEl);
     // 플롯 목록 항목은 API 보강 대상이 아니라 화면 데이터가 유일한 출처다.
     const ownEntity = reactEntityForId(item, id);
-    const roomPlot = type === 'room' ? (reactRoomPlotMeta(item) || ownEntity) : null;
+    // 방 항목의 React 데이터는 조상 쪽에 room = {id, plot, ...} 형태로 있다.
+    // reactEntityForId가 돌려주는 건 room 자체이므로 plot을 꺼내 써야 한다.
+    // 그대로 쓰면 plotId 자리에 방 ID가 들어가 플롯 연결이 전부 어긋난다.
+    const ownPlot = ownEntity && typeof ownEntity.plot === 'object' ? ownEntity.plot : null;
+    const roomPlot = type === 'room' ? (reactRoomPlotMeta(item) || ownPlot) : null;
     const plotEntity = type === 'plot' ? ownEntity : null;
     const plotEntityMeta = plotEntity
       ? ingestPlotMeta(
