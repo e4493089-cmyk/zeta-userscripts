@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.5.3
-// @description  Android/PC용. 대화방/플롯 별명과 플롯명·캐릭터명·제작자명 검색을 지원합니다.
+// @version      0.5.4
+// @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 전체 방 자동 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -12,6 +12,8 @@
 
 (() => {
   'use strict';
+
+  if (window.top !== window.self) return;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
   const STYLE_ID = 'zeta-room-manager-style';
@@ -166,6 +168,184 @@
     if (characterName) parts.push('캐릭터: ' + characterName);
     if (creatorName) parts.push('제작자: ' + creatorName);
     return parts.join(' · ') || fallback;
+  }
+
+  const BACKGROUND_INDEX_FRAME_ID = 'zeta-room-manager-index-frame';
+  const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at';
+  let backgroundIndexPromise = null;
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function roomPathForCurrentLocale() {
+    const first = location.pathname.split('/').filter(Boolean)[0] || 'ko';
+    const locale = /^[a-z]{2}(?:-[a-z]{2})?$/i.test(first) ? first : 'ko';
+    return `/${locale}/rooms`;
+  }
+
+  function roomItemsFromDocument(doc) {
+    const roomItems = new Set(doc.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]'));
+    doc.querySelectorAll('a[href*="/rooms/"]').forEach(link => {
+      const item = link.closest('[data-sentry-component="SwipeableRoomListItem"], li, [role="listitem"]')
+        || link.parentElement?.parentElement;
+      if (item) roomItems.add(item);
+    });
+    return Array.from(roomItems);
+  }
+
+  function harvestRoomDocument(doc) {
+    let harvested = 0;
+    for (const item of roomItemsFromDocument(doc)) {
+      const record = parseItem(item, 'room');
+      if (record) harvested++;
+    }
+    return harvested;
+  }
+
+  function findFrameScrollHost(doc, view) {
+    const firstRoom = doc.querySelector('a[href*="/rooms/"]');
+    let node = firstRoom?.parentElement || null;
+
+    while (node && node !== doc.body && node !== doc.documentElement) {
+      try {
+        const style = view.getComputedStyle(node);
+        const overflow = style.overflowY || style.overflow;
+        if (
+          /(auto|scroll)/i.test(overflow) &&
+          node.scrollHeight > node.clientHeight + 24
+        ) return node;
+      } catch (_) {}
+      node = node.parentElement;
+    }
+
+    const candidates = [
+      doc.querySelector('[data-sentry-component="RoomList"] .overflow-y-auto'),
+      doc.querySelector('[data-sentry-component="RoomList"]'),
+      doc.querySelector('.overflow-y-auto'),
+      doc.scrollingElement,
+      doc.documentElement
+    ].filter(Boolean);
+
+    return candidates.find(el => el.scrollHeight > el.clientHeight + 24)
+      || doc.scrollingElement
+      || doc.documentElement;
+  }
+
+  async function waitForRoomFrame(frame, timeoutMs = 15000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      try {
+        const doc = frame.contentDocument;
+        if (doc?.readyState !== 'loading' && doc.querySelector('a[href*="/rooms/"]')) return true;
+      } catch (_) {}
+      await sleep(180);
+    }
+    return false;
+  }
+
+  async function buildFullRoomIndexInBackground(force = false) {
+    if (currentSection() !== 'room') return false;
+
+    const last = Number(localStorage.getItem(BACKGROUND_INDEX_STAMP_KEY) || 0);
+    if (!force && Date.now() - last < 2 * 60 * 1000) return true;
+
+    document.getElementById(BACKGROUND_INDEX_FRAME_ID)?.remove();
+
+    const frame = document.createElement('iframe');
+    frame.id = BACKGROUND_INDEX_FRAME_ID;
+    frame.setAttribute('aria-hidden', 'true');
+    frame.tabIndex = -1;
+    frame.style.cssText = [
+      'position:fixed',
+      'left:-12000px',
+      'top:0',
+      'width:430px',
+      'height:900px',
+      'opacity:0.001',
+      'pointer-events:none',
+      'border:0',
+      'z-index:-1'
+    ].join(';');
+    frame.src = location.origin + roomPathForCurrentLocale() + '?zrm_background_index=1';
+    document.documentElement.appendChild(frame);
+
+    try {
+      if (!await waitForRoomFrame(frame)) return false;
+
+      const doc = frame.contentDocument;
+      const view = frame.contentWindow;
+      if (!doc || !view) return false;
+
+      let stableRounds = 0;
+      let lastRoomCount = -1;
+      let lastHeight = -1;
+      let lastTop = -1;
+
+      for (let round = 0; round < 140; round++) {
+        harvestRoomDocument(doc);
+
+        const roomCount = Object.values(state.index)
+          .filter(entry => entry?.type === 'room' && entry.id)
+          .length;
+
+        const host = findFrameScrollHost(doc, view);
+        if (!host) break;
+
+        const heightBefore = host.scrollHeight;
+        const topBefore = host.scrollTop;
+
+        try {
+          host.scrollTop = host.scrollHeight;
+          host.dispatchEvent(new view.Event('scroll', { bubbles: true }));
+        } catch (_) {}
+
+        await sleep(round < 8 ? 220 : 150);
+        harvestRoomDocument(doc);
+
+        const heightAfter = host.scrollHeight;
+        const topAfter = host.scrollTop;
+        const newRoomCount = Object.values(state.index)
+          .filter(entry => entry?.type === 'room' && entry.id)
+          .length;
+
+        const unchanged =
+          newRoomCount === lastRoomCount &&
+          heightAfter === lastHeight &&
+          topAfter === lastTop &&
+          heightAfter === heightBefore &&
+          topAfter === topBefore;
+
+        stableRounds = unchanged ? stableRounds + 1 : 0;
+        lastRoomCount = newRoomCount;
+        lastHeight = heightAfter;
+        lastTop = topAfter;
+
+        if (round % 5 === 0) {
+          saveState();
+          scheduleRefresh();
+        }
+
+        if (stableRounds >= 6) break;
+      }
+
+      harvestRoomDocument(doc);
+      saveState();
+      localStorage.setItem(BACKGROUND_INDEX_STAMP_KEY, String(Date.now()));
+      scheduleRefresh();
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      frame.remove();
+    }
+  }
+
+  function ensureBackgroundRoomIndex(force = false) {
+    if (backgroundIndexPromise) return backgroundIndexPromise;
+    backgroundIndexPromise = buildFullRoomIndexInBackground(force)
+      .finally(() => { backgroundIndexPromise = null; });
+    return backgroundIndexPromise;
   }
 
   function extractId(href, type) {
@@ -834,12 +1014,14 @@
 
     observer = new MutationObserver(scheduleRefresh);
     refresh();
+    ensureBackgroundRoomIndex();
 
     let lastUrl = location.href;
     setInterval(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
         scheduleRefresh();
+        if (currentSection() === 'room') ensureBackgroundRoomIndex();
       }
     }, 500);
   }
