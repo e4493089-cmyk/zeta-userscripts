@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.6.8
+// @version      0.6.9
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1103,7 +1103,16 @@
     return '';
   }
 
+  // 다른 유저스크립트가 띄운 떠 있는 버튼(진단 런처 등)을 제타 헤더의
+  // 버튼으로 착각하면, 그 버튼의 부모 안에 룸매니저 ⋯ 이 들어가 버린다.
+  function foreignScriptUi(el) {
+    return Boolean(el && el.closest && el.closest(
+      '[id^="zrm-"], [id^="zeta-rm"], [id^="zeta-room-manager"], [id^="zeta-diag"], [id^="tm-"]'
+    ));
+  }
+
   function visibleControl(el) {
+    if (foreignScriptUi(el)) return false;
     if (!el || !el.getBoundingClientRect) return false;
     const rect = el.getBoundingClientRect();
     if (rect.width < 18 || rect.height < 18) return false;
