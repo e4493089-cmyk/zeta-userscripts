@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.8.5
+// @version      0.8.6
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -24,6 +24,7 @@
   const NATIVE_RESULTS_ID = 'zeta-room-manager-native-results';
   const PLOT_NATIVE_RESULTS_ID = 'zeta-room-manager-plot-native-results';
   const PLOT_TOOLS_ID = 'zeta-room-manager-plot-tools';
+  const COLLECTION_MODAL_ID = 'zeta-room-manager-collection-modal';
   const PLOT_COLLECTION_STAMP_KEY = 'zeta-room-manager:plot-collection-at:v1';
   const ROOM_COLLECTION_STAMP_KEY = 'zeta-room-manager:room-collection-at:v1';
 
@@ -954,11 +955,62 @@
     return null;
   }
 
-  function closeCollectionMenu(tools) {
-    const menu = tools && tools.querySelector('.zrm-tools-menu');
-    const trigger = tools && tools.querySelector('.zrm-tools-trigger');
-    if (menu) menu.hidden = true;
-    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  function closeCollectionPopup() {
+    document.getElementById(COLLECTION_MODAL_ID)?.remove();
+  }
+
+  function openCollectionPopup() {
+    closeCollectionPopup();
+
+    const section = currentSection();
+    if (!['room', 'plot', 'plot-search'].includes(section)) return;
+
+    const isRoom = section === 'room';
+    const progress = isRoom ? roomCollectionProgress : plotCollectionProgress;
+    const countValue = isRoom ? roomCollectionCount() : plotCollectionCount();
+
+    const modal = document.createElement('div');
+    modal.id = COLLECTION_MODAL_ID;
+    modal.innerHTML =
+      '<div class="zrm-collection-dialog" role="dialog" aria-modal="true" aria-label="Room Manager">' +
+        '<div class="zrm-collection-head">' +
+          '<div class="zrm-collection-title">Room Manager</div>' +
+          '<button type="button" class="zrm-collection-close" aria-label="닫기">×</button>' +
+        '</div>' +
+        '<div class="zrm-collection-count"></div>' +
+        '<div class="zrm-collection-actions">' +
+          '<button type="button" data-zrm-action="collect"></button>' +
+          '<button type="button" data-zrm-action="export">내보내기</button>' +
+          '<button type="button" data-zrm-action="import">불러오기</button>' +
+        '</div>' +
+      '</div>';
+
+    modal.querySelector('.zrm-collection-count').textContent =
+      (isRoom ? '저장된 대화방 ' : '저장된 플롯 ') + countValue + '개';
+
+    const collect = modal.querySelector('[data-zrm-action="collect"]');
+    collect.disabled = progress.running;
+    collect.textContent = progress.running ? '수집 중…' : '전체 수집';
+
+    modal.querySelector('.zrm-collection-close').addEventListener('click', closeCollectionPopup);
+    modal.addEventListener('click', event => {
+      if (event.target === modal) closeCollectionPopup();
+    });
+    collect.addEventListener('click', () => {
+      closeCollectionPopup();
+      if (isRoom) collectAllRoomsByScrolling();
+      else collectAllPlotsByScrolling();
+    });
+    modal.querySelector('[data-zrm-action="export"]').addEventListener('click', () => {
+      closeCollectionPopup();
+      exportRoomManagerData();
+    });
+    modal.querySelector('[data-zrm-action="import"]').addEventListener('click', () => {
+      closeCollectionPopup();
+      importRoomManagerData();
+    });
+
+    document.body.appendChild(modal);
   }
 
   function renderCollectionTools() {
@@ -966,6 +1018,7 @@
     let tools = document.getElementById(PLOT_TOOLS_ID);
     if (!['room', 'plot', 'plot-search'].includes(section)) {
       tools?.remove();
+      closeCollectionPopup();
       return;
     }
 
@@ -973,37 +1026,11 @@
       tools = document.createElement('div');
       tools.id = PLOT_TOOLS_ID;
       tools.innerHTML =
-        '<button type="button" class="zrm-tools-trigger" aria-label="Room Manager 메뉴" aria-expanded="false">⋯</button>' +
-        '<div class="zrm-tools-menu" hidden>' +
-          '<div class="zrm-tools-count" data-zrm-count></div>' +
-          '<button type="button" data-zrm-action="collect">전체 수집</button>' +
-          '<button type="button" data-zrm-action="export">내보내기</button>' +
-          '<button type="button" data-zrm-action="import">불러오기</button>' +
-        '</div>';
-
-      const trigger = tools.querySelector('.zrm-tools-trigger');
-      const menu = tools.querySelector('.zrm-tools-menu');
-
-      trigger.addEventListener('click', event => {
+        '<button type="button" class="zrm-tools-trigger" aria-label="Room Manager 메뉴">⋯</button>';
+      tools.querySelector('.zrm-tools-trigger').addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
-        const open = menu.hidden;
-        menu.hidden = !open;
-        trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-
-      tools.querySelector('[data-zrm-action="collect"]').addEventListener('click', () => {
-        closeCollectionMenu(tools);
-        if (currentSection() === 'room') collectAllRoomsByScrolling();
-        else collectAllPlotsByScrolling();
-      });
-      tools.querySelector('[data-zrm-action="export"]').addEventListener('click', () => {
-        closeCollectionMenu(tools);
-        exportRoomManagerData();
-      });
-      tools.querySelector('[data-zrm-action="import"]').addEventListener('click', () => {
-        closeCollectionMenu(tools);
-        importRoomManagerData();
+        openCollectionPopup();
       });
     }
 
@@ -1018,39 +1045,6 @@
     } else {
       tools.classList.add('zrm-tools-fallback');
       if (tools.parentElement !== document.body) document.body.appendChild(tools);
-    }
-
-    const isRoom = section === 'room';
-    const progress = isRoom ? roomCollectionProgress : plotCollectionProgress;
-    const countValue = isRoom ? roomCollectionCount() : plotCollectionCount();
-    const collect = tools.querySelector('[data-zrm-action="collect"]');
-    if (collect) {
-      collect.disabled = progress.running;
-      collect.textContent = progress.running ? '수집 중…' : '전체 수집';
-    }
-    const count = tools.querySelector('[data-zrm-count]');
-    if (count) count.textContent = (isRoom ? '저장된 대화방 ' : '저장된 플롯 ') + countValue + '개';
-  }
-
-  function repairCollectionTools() {
-    const section = currentSection();
-    if (!['room', 'plot', 'plot-search'].includes(section)) return;
-
-    const tools = document.getElementById(PLOT_TOOLS_ID);
-    const anchor = collectionToolsAnchor();
-
-    if (!tools || !document.documentElement.contains(tools)) {
-      renderCollectionTools();
-      return;
-    }
-
-    if (anchor && anchor.host && tools.parentElement !== anchor.host) {
-      renderCollectionTools();
-      return;
-    }
-
-    if (section === 'room' && anchor && anchor.before && tools.nextElementSibling !== anchor.before) {
-      renderCollectionTools();
     }
   }
 
@@ -1232,48 +1226,73 @@
         letter-spacing: 1px;
         cursor: pointer;
       }
-      #${PLOT_TOOLS_ID} .zrm-tools-trigger:hover,
-      #${PLOT_TOOLS_ID} .zrm-tools-trigger[aria-expanded="true"] {
+      #${PLOT_TOOLS_ID} .zrm-tools-trigger:hover {
         background: rgba(255,255,255,.08);
       }
-      #${PLOT_TOOLS_ID} .zrm-tools-menu {
-        position: absolute;
-        top: calc(100% + 8px);
-        right: 0;
-        width: 172px;
-        padding: 7px;
-        border: 1px solid rgba(255,255,255,.10);
-        border-radius: 12px;
-        background: rgba(28,28,31,.98);
-        box-shadow: 0 10px 34px rgba(0,0,0,.38);
-        backdrop-filter: blur(14px);
-      }
-      #${PLOT_TOOLS_ID} .zrm-tools-menu[hidden] { display: none !important; }
-      #${PLOT_TOOLS_ID} .zrm-tools-count {
-        padding: 5px 7px 8px;
-        color: rgba(255,255,255,.50);
-        font-size: 11px;
-        line-height: 1.3;
-        white-space: nowrap;
-      }
-      #${PLOT_TOOLS_ID} .zrm-tools-menu button {
+
+      #${COLLECTION_MODAL_ID} {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483645;
         display: flex;
-        width: 100%;
-        height: 36px;
         align-items: center;
-        padding: 0 10px;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(0,0,0,.58);
+        box-sizing: border-box;
+      }
+      #${COLLECTION_MODAL_ID} .zrm-collection-dialog {
+        width: min(330px, 100%);
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 16px;
+        background: #202023;
+        color: #fff;
+        box-shadow: 0 20px 60px rgba(0,0,0,.38);
+      }
+      #${COLLECTION_MODAL_ID} .zrm-collection-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 16px 10px;
+      }
+      #${COLLECTION_MODAL_ID} .zrm-collection-title {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      #${COLLECTION_MODAL_ID} .zrm-collection-close {
+        width: 32px;
+        height: 32px;
+        padding: 0;
         border: 0;
         border-radius: 8px;
         background: transparent;
-        color: #fff;
+        color: rgba(255,255,255,.7);
+        font-size: 22px;
+        line-height: 1;
+      }
+      #${COLLECTION_MODAL_ID} .zrm-collection-count {
+        padding: 0 16px 12px;
+        color: rgba(255,255,255,.5);
         font-size: 12px;
-        text-align: left;
-        white-space: nowrap;
       }
-      #${PLOT_TOOLS_ID} .zrm-tools-menu button:hover {
+      #${COLLECTION_MODAL_ID} .zrm-collection-actions {
+        display: grid;
+        gap: 7px;
+        padding: 0 16px 16px;
+      }
+      #${COLLECTION_MODAL_ID} .zrm-collection-actions button {
+        width: 100%;
+        height: 42px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 10px;
         background: rgba(255,255,255,.08);
+        color: #fff;
+        font-size: 13px;
+        text-align: left;
       }
-      #${PLOT_TOOLS_ID} .zrm-tools-menu button:disabled {
+      #${COLLECTION_MODAL_ID} .zrm-collection-actions button:disabled {
         opacity: .45;
       }
 
@@ -1922,6 +1941,7 @@
       document.getElementById(NATIVE_RESULTS_ID)?.remove();
       document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
       document.getElementById(PLOT_TOOLS_ID)?.remove();
+      closeCollectionPopup();
       return;
     }
 
@@ -1967,21 +1987,9 @@
     document.addEventListener('pointerdown', rememberRoomContextTarget, true);
     document.addEventListener('contextmenu', rememberRoomContextTarget, true);
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
-    if (!document.documentElement.dataset.zrmToolsOutsideBound) {
-      document.documentElement.dataset.zrmToolsOutsideBound = '1';
-      document.addEventListener('pointerdown', event => {
-        const tools = document.getElementById(PLOT_TOOLS_ID);
-        if (tools && !tools.contains(event.target)) closeCollectionMenu(tools);
-      }, true);
-    }
 
     observer = new MutationObserver(scheduleRefresh);
     refresh();
-
-    const zrmCollectionRepairTimer = setInterval(() => {
-      repairCollectionTools();
-    }, 800);
-    window.addEventListener('pagehide', () => clearInterval(zrmCollectionRepairTimer), { once: true });
 
     let lastUrl = location.href;
     setInterval(() => {
