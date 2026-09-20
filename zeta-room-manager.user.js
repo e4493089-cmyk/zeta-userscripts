@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.3
+// @version      0.23.4
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1289,7 +1289,7 @@
       roomCollectionProgress = {
         running: true,
         count: roomCollectionCount(),
-        phase: force ? '강제 이름 재수집' : '이름 수집',
+        phase: force ? '다시 이름 수집' : '이름 수집',
         current: completed,
         total: targets.length,
         note: remainingText(startedAt, completed, targets.length)
@@ -1302,7 +1302,7 @@
     roomCollectionProgress = {
       running: true,
       count: roomCollectionCount(),
-      phase: force ? '강제 이름 재수집' : '이름 수집',
+      phase: force ? '다시 이름 수집' : '이름 수집',
       current: 0,
       total: targets.length
     };
@@ -1335,7 +1335,7 @@
       roomCollectionProgress = {
         running: true,
         count: roomCollectionCount(),
-        phase: force ? '강제 목록 재수집' : '목록 수집',
+        phase: force ? '다시 목록 수집' : '목록 수집',
         force
       };
       renderCollectionTools();
@@ -1416,8 +1416,8 @@
       ).length;
       alert(
         (collectionAborted
-          ? (force ? '강제 대화방 재수집 중지됨' : '대화방 수집 중지됨')
-          : (force ? '강제 대화방 전체 재수집 완료' : '대화방 전체 수집 완료')) + ' · 저장된 방 ' + total + '개' +
+          ? (force ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨')
+          : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료')) + ' · 저장된 방 ' + total + '개' +
         (skippedKnown ? ' (이미 수집된 구간은 건너뜀)' : '') +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 플롯 ' + profiles.targets + '개 중 ' + profiles.done + '개 성공' +
