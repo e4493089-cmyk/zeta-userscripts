@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.12.0
+// @version      0.13.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -905,7 +905,7 @@
         if (error && error.name === 'SecurityError') throw new Error('숨김 화면 접근이 막혔습니다');
         throw error;
       }
-      await sleep(250);
+      await sleep(100);
     }
     throw new Error('시간 초과');
   }
@@ -1013,33 +1013,149 @@
     mergeMetaIntoIndex(meta);
   }
 
+  // 플롯마다 iframe을 새로 띄우면 제타 앱을 매번 처음부터 부팅한다.
+  // 손으로 할 때처럼, 앱은 한 번만 띄우고 그 안에서 화면만 바꾼다.
+  const PROFILE_WORKERS = 4;
+  // 한 화면을 계속 쓰면 메모리가 쌓여 느려진다. 일정 횟수마다 새로 띄운다.
+  const FRAME_RECYCLE = 20;
+
+  function profilePath(plotId) {
+    return '/' + localeSegment() + '/plots/' + plotId + '/profile';
+  }
+
+  function routeFrame(frame, path) {
+    const win = frame.contentWindow;
+    if (!win || !win.history) throw new Error('프레임을 쓸 수 없습니다');
+    win.history.pushState({}, '', path);
+    win.dispatchEvent(new win.PopStateEvent('popstate', { state: {} }));
+  }
+
+  async function readProfileIn(frame, plotId, timeoutMs) {
+    return await readInFrame(frame, win => {
+      if (!win.location.pathname.includes(plotId)) return null;
+      return readPlotProfile(win);
+    }, timeoutMs);
+  }
+
+  async function profileWorker(queue, onResult) {
+    let frame = null;
+    let booted = false;
+    let used = 0;
+
+    try {
+      for (;;) {
+        const target = queue.next();
+        if (!target) return;
+
+        try {
+          if (!target.plotId) {
+            onResult(target, await visitRoomProfile(target.roomId), null);
+            continue;
+          }
+
+          // 오래 쓴 화면은 버리고 새로 띄운다.
+          if (frame && used >= FRAME_RECYCLE) {
+            dropFrame(frame);
+            frame = null;
+            booted = false;
+            used = 0;
+            await sleep(200);
+          }
+
+          const path = profilePath(target.plotId);
+          let result = null;
+
+          if (booted && frame) {
+            try {
+              routeFrame(frame, path);
+              result = await readProfileIn(frame, target.plotId, 7000);
+            } catch (_) {
+              // 화면 안에서 이동이 안 되면 통째로 다시 띄운다.
+              dropFrame(frame);
+              frame = null;
+              booted = false;
+            }
+          }
+
+          if (!result) {
+            if (!frame) frame = hiddenFrame();
+            frame.src = path;
+            result = await readProfileIn(frame, target.plotId, 18000);
+            booted = true;
+          }
+
+          used++;
+          onResult(target, result, null);
+        } catch (error) {
+          onResult(target, null, error);
+        }
+      }
+    } finally {
+      dropFrame(frame);
+    }
+  }
+
+  function remainingText(startedAt, completed, total) {
+    if (completed < 3) return '';
+    const perItem = (Date.now() - startedAt) / completed;
+    const left = Math.round(perItem * (total - completed) / 1000);
+    if (left < 60) return '약 ' + left + '초 남음';
+    return '약 ' + Math.round(left / 60) + '분 남음';
+  }
+
   async function collectProfilesForEmptyPlots() {
     const targets = profileCollectionTargets();
+    if (!targets.length) return { targets: 0, done: 0, failed: 0 };
+
+    const startedAt = Date.now();
+    let cursor = 0;
     let done = 0;
     let failed = 0;
 
-    for (let i = 0; i < targets.length; i++) {
-      if (collectionAborted || currentSection() !== 'room') break;
+    const queue = {
+      next() {
+        if (collectionAborted || currentSection() !== 'room') return null;
+        return cursor < targets.length ? targets[cursor++] : null;
+      }
+    };
 
+    const onResult = (target, result, error) => {
+      if (result) {
+        applyProfileResult(target, result);
+        done++;
+      } else {
+        failed++;
+        try { console.warn('[zrm] 이름 수집 실패', target.roomId, String(error)); } catch (_) {}
+      }
+
+      const completed = done + failed;
       roomCollectionProgress = {
         running: true,
         count: roomCollectionCount(),
         phase: '이름 수집',
-        current: i + 1,
-        total: targets.length
+        current: completed,
+        total: targets.length,
+        note: remainingText(startedAt, completed, targets.length)
       };
       renderCollectionTools();
 
-      try {
-        applyProfileResult(targets[i], await collectOneProfile(targets[i]));
-        done++;
-      } catch (_) {
-        failed++;
-      }
+      if (completed % 10 === 0) saveStateNow();
+    };
 
-      if ((done + failed) % 5 === 0) saveStateNow();
-      await sleep(150);
+    roomCollectionProgress = {
+      running: true,
+      count: roomCollectionCount(),
+      phase: '이름 수집',
+      current: 0,
+      total: targets.length
+    };
+    renderCollectionTools();
+
+    const workers = [];
+    for (let i = 0; i < Math.min(PROFILE_WORKERS, targets.length); i++) {
+      workers.push(profileWorker(queue, onResult));
     }
+    await Promise.all(workers);
 
     saveStateNow();
     scheduleRefresh();
@@ -1574,6 +1690,19 @@
       ? progress.current + ' / ' + progress.total
       : (progress.count || 0) + '개';
 
+    const note = banner.querySelector('.zrm-banner-note');
+    let eta = banner.querySelector('.zrm-banner-eta');
+    if (progress.note) {
+      if (!eta) {
+        eta = document.createElement('div');
+        eta.className = 'zrm-banner-eta';
+        note.before(eta);
+      }
+      eta.textContent = progress.note;
+    } else if (eta) {
+      eta.remove();
+    }
+
     let warn = banner.querySelector('.zrm-banner-warn');
     if (wakeStatus) {
       if (!warn) {
@@ -1842,6 +1971,12 @@
         font-weight: 800;
         letter-spacing: -.02em;
         color: #6d52ff;
+      }
+      #${COLLECTION_BANNER_ID} .zrm-banner-eta {
+        margin: -6px 0 12px;
+        color: #45454e;
+        font-size: 12px;
+        font-weight: 600;
       }
       #${COLLECTION_BANNER_ID} .zrm-banner-note { color: #6b6b74; font-size: 11px; }
       #${COLLECTION_BANNER_ID} .zrm-banner-warn {
