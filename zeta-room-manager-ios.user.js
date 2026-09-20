@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.5.4
+// @version      0.5.5
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -848,6 +848,42 @@
     return style.display !== 'none' && style.visibility !== 'hidden';
   }
 
+  function roomSearchControl() {
+    if (currentSection() !== 'room') return null;
+
+    const controls = Array.from(document.querySelectorAll('button, a, [role="button"]'))
+      .filter(visibleControl)
+      .filter(el => !el.closest('#' + PLOT_TOOLS_ID));
+
+    const labeled = controls.find(el => {
+      const hint = [
+        el.getAttribute('aria-label'),
+        el.getAttribute('title'),
+        el.getAttribute('data-testid'),
+        el.getAttribute('testid'),
+        el.textContent
+      ].map(value => normalizeText(value)).join(' ');
+      return /검색|search/i.test(hint);
+    });
+    if (labeled) return labeled;
+
+    // 라벨이 없는 아이콘 버튼인 경우: '대화' 제목과 같은 상단 행의 우측 버튼 중
+    // 첫 번째를 검색 버튼으로 본다. 현재 제타 헤더에서 검색이 가장 왼쪽 액션이다.
+    const title = Array.from(document.querySelectorAll('h1,h2,h3,div,span'))
+      .find(el => el.children.length <= 2 && normalizeText(el.textContent) === '대화' && visibleControl(el));
+    if (!title) return null;
+
+    const titleRect = title.getBoundingClientRect();
+    return controls
+      .filter(el => {
+        const r = el.getBoundingClientRect();
+        const cy = r.top + r.height / 2;
+        const ty = titleRect.top + titleRect.height / 2;
+        return Math.abs(cy - ty) < 38 && r.left > titleRect.right && r.top < 140;
+      })
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0] || null;
+  }
+
   function roomHeaderActionHost() {
     if (currentSection() !== 'room') return null;
 
@@ -885,6 +921,10 @@
     const section = currentSection();
 
     if (section === 'room') {
+      const search = roomSearchControl();
+      if (search && search.parentElement) {
+        return { host: search.parentElement, before: search };
+      }
       const host = roomHeaderActionHost();
       if (host) return { host, before: host.firstElementChild || null };
     }
@@ -991,6 +1031,28 @@
     }
     const count = tools.querySelector('[data-zrm-count]');
     if (count) count.textContent = (isRoom ? '저장된 대화방 ' : '저장된 플롯 ') + countValue + '개';
+  }
+
+  function repairCollectionTools() {
+    const section = currentSection();
+    if (!['room', 'plot', 'plot-search'].includes(section)) return;
+
+    const tools = document.getElementById(PLOT_TOOLS_ID);
+    const anchor = collectionToolsAnchor();
+
+    if (!tools || !document.documentElement.contains(tools)) {
+      renderCollectionTools();
+      return;
+    }
+
+    if (anchor && anchor.host && tools.parentElement !== anchor.host) {
+      renderCollectionTools();
+      return;
+    }
+
+    if (section === 'room' && anchor && anchor.before && tools.nextElementSibling !== anchor.before) {
+      renderCollectionTools();
+    }
   }
 
   function extractId(href, type) {
@@ -2021,6 +2083,11 @@
     observer = new MutationObserver(scheduleRefresh);
     bindSwipeOpenLock();
     refresh();
+
+    const zrmCollectionRepairTimer = setInterval(() => {
+      repairCollectionTools();
+    }, 800);
+    window.addEventListener('pagehide', () => clearInterval(zrmCollectionRepairTimer), { once: true });
 
     let lastUrl = location.href;
     setInterval(() => {
