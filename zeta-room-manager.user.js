@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.8.6
+// @version      0.8.7
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -917,6 +917,13 @@
     return null;
   }
 
+  function creatorCenterSearchLink() {
+    return Array.from(document.querySelectorAll('a[href*="/creator-center/search"]'))
+      .filter(el => !el.closest('#' + PLOT_TOOLS_ID))
+      .filter(visibleControl)
+      .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0] || null;
+  }
+
   function collectionToolsAnchor() {
     const section = currentSection();
 
@@ -931,24 +938,17 @@
 
     if (section === 'plot-search') {
       const input = nativePlotSearchInput();
-      const row = input && input.parentElement;
-      if (row) return { host: row, before: null };
+      const field = input && input.closest('label, [data-sentry-component="Input"]');
+      const row = field && field.parentElement;
+      // 중요: 도구를 검색 필드(label) 안에 넣으면 flex-1 입력창 크기가 변한다.
+      // 반드시 검색 필드의 형제 요소로 삽입한다.
+      if (field && row) return { host: row, before: null };
     }
 
     if (section === 'plot') {
-      const main = document.querySelector('main#contents, main, [role="main"]');
-      if (main) {
-        const controls = Array.from(main.querySelectorAll('button, a'))
-          .filter(visibleControl)
-          .filter(el => {
-            const r = el.getBoundingClientRect();
-            return r.top < 120 && r.right > window.innerWidth * 0.62;
-          })
-          .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
-        if (controls.length) {
-          const host = controls[0].parentElement;
-          if (host) return { host, before: host.firstElementChild || null };
-        }
+      const search = creatorCenterSearchLink();
+      if (search && search.parentElement) {
+        return { host: search.parentElement, before: search };
       }
     }
 
@@ -1033,6 +1033,8 @@
         openCollectionPopup();
       });
     }
+
+    tools.classList.toggle('zrm-tools-search-row', section === 'plot-search');
 
     const anchor = collectionToolsAnchor();
     if (anchor && anchor.host) {
@@ -1199,6 +1201,9 @@
 
       #${PLOT_TOOLS_ID} {
         position: relative;
+        width: 34px;
+        min-width: 34px;
+        max-width: 34px;
         z-index: 2147483000;
         display: inline-flex;
         align-items: center;
@@ -1208,6 +1213,10 @@
         position: fixed;
         top: 14px;
         right: 88px;
+      }
+      #${PLOT_TOOLS_ID}.zrm-tools-search-row {
+        margin-left: 8px;
+        flex: 0 0 34px;
       }
       #${PLOT_TOOLS_ID} .zrm-tools-trigger {
         display: inline-flex;
