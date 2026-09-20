@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.9.1
+// @version      0.10.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -24,6 +24,7 @@
   const NATIVE_RESULTS_ID = 'zeta-room-manager-native-results';
   const PLOT_NATIVE_RESULTS_ID = 'zeta-room-manager-plot-native-results';
   const PLOT_TOOLS_ID = 'zeta-room-manager-plot-tools';
+  const COLLECTION_BANNER_ID = 'zeta-room-manager-collection-banner';
   const COLLECTION_MODAL_ID = 'zeta-room-manager-collection-modal';
   const PLOT_COLLECTION_STAMP_KEY = 'zeta-room-manager:plot-collection-at:v1';
   const ROOM_COLLECTION_STAMP_KEY = 'zeta-room-manager:room-collection-at:v1';
@@ -1490,6 +1491,41 @@
     document.body.appendChild(modal);
   }
 
+  // 수집은 이 화면에서 돈다. 닫으면 멈추므로 진행 중에는 크게 알린다.
+  function renderCollectionBanner() {
+    const progress = currentSection() === 'plot' ? plotCollectionProgress : roomCollectionProgress;
+    let banner = document.getElementById(COLLECTION_BANNER_ID);
+
+    if (!progress.running) {
+      banner?.remove();
+      return;
+    }
+
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = COLLECTION_BANNER_ID;
+      banner.innerHTML =
+        '<div class="zrm-banner-body">' +
+          '<div class="zrm-banner-title"></div>' +
+          '<div class="zrm-banner-note">이 화면을 닫거나 다른 곳으로 이동하면 멈춰요. 다시 실행하면 남은 것만 이어서 합니다.</div>' +
+        '</div>' +
+        '<button type="button" class="zrm-banner-stop">중지</button>';
+      banner.querySelector('.zrm-banner-stop').addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        abortCollection();
+        banner.querySelector('.zrm-banner-title').textContent = '중지하는 중…';
+      });
+      document.body.appendChild(banner);
+    }
+
+    if (banner.parentElement !== document.body) document.body.appendChild(banner);
+    const title = banner.querySelector('.zrm-banner-title');
+    if (!collectionAborted) {
+      title.textContent = 'Room Manager 수집 중 · ' + (progress.phase || '진행 중');
+    }
+  }
+
   function renderCollectionTools() {
     const section = currentSection();
     let tools = document.getElementById(PLOT_TOOLS_ID);
@@ -1517,18 +1553,7 @@
       });
     }
 
-    const progress = currentSection() === 'plot' ? plotCollectionProgress : roomCollectionProgress;
-    let badge = tools.querySelector('.zrm-tools-progress');
-    if (progress.running && progress.phase) {
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'zrm-tools-progress';
-        tools.appendChild(badge);
-      }
-      badge.textContent = progress.phase;
-    } else if (badge) {
-      badge.remove();
-    }
+    renderCollectionBanner();
 
     const anchor = collectionToolsAnchor();
     if (anchor && anchor.host) {
@@ -1727,21 +1752,35 @@
         align-items: center;
         flex: 0 0 auto;
       }
-      #${PLOT_TOOLS_ID} .zrm-tools-progress {
-        position: absolute;
-        top: 100%;
+      #${COLLECTION_BANNER_ID} {
+        position: fixed;
+        top: 0;
+        left: 0;
         right: 0;
-        margin-top: 2px;
-        padding: 2px 7px;
-        border-radius: 8px;
+        z-index: 2147483645;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
         background: #6d52ff;
         color: #fff;
-        font-size: 10px;
-        line-height: 1.6;
-        white-space: nowrap;
-        pointer-events: none;
+        font: 500 12px/1.45 system-ui, -apple-system, sans-serif;
+        box-shadow: 0 4px 14px rgba(0,0,0,.35);
       }
-      #${PLOT_TOOLS_ID} { position: relative; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-body { flex: 1; min-width: 0; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-title { font-weight: 700; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-note { margin-top: 2px; color: rgba(255,255,255,.82); font-size: 11px; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-stop {
+        flex: 0 0 auto;
+        height: 30px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 8px;
+        background: rgba(0,0,0,.28);
+        color: #fff;
+        font: 700 12px/1 system-ui, sans-serif;
+        cursor: pointer;
+      }
       #${PLOT_TOOLS_ID}.zrm-tools-fallback {
         position: fixed;
         top: 14px;
