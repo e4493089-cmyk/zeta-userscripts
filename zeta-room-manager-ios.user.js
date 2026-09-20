@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.6.0
+// @version      0.6.1
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1892,11 +1892,22 @@
 
   function nativePlotSearchInput() {
     if (currentSection() !== 'plot-search') return null;
-    const inputs = usableInputs(document);
+    const direct = document.querySelector('input[name="creator-center-search"]');
+    if (direct) return direct;
+    const page = document.querySelector('[data-sentry-component="CreatorCenterSearchPage"]');
+    const inputs = usableInputs(page || document);
     return inputs.find(looksLikeSearchInput) || inputs[0] || null;
   }
 
   function nativePlotResultsHost() {
+    const page = document.querySelector('[data-sentry-component="CreatorCenterSearchPage"]');
+    if (page) {
+      const scroll = page.querySelector('[data-sentry-component="WrappedDiv"], .overflow-y-auto');
+      if (scroll) {
+        return scroll.querySelector(':scope > .grow, :scope > div') || scroll;
+      }
+      return page;
+    }
     const main = document.querySelector('main#contents, main, [role="main"]');
     return main?.querySelector('[data-sentry-element="FlatList"], .overflow-y-auto') || main;
   }
@@ -1979,13 +1990,29 @@
   }
 
   function bindNativePlotSearch() {
-    const input = nativePlotSearchInput();
-    if (!input || input.dataset.zrmAliasSearchBound === '1') return;
-    input.dataset.zrmAliasSearchBound = '1';
-    const update = () => scheduleRefresh();
-    input.addEventListener('input', update);
-    input.addEventListener('search', update);
-    input.addEventListener('change', update);
+    if (document.documentElement.dataset.zrmPlotSearchDelegated === '1') return;
+    document.documentElement.dataset.zrmPlotSearchDelegated = '1';
+
+    const update = event => {
+      if (currentSection() !== 'plot-search') return;
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      const input = nativePlotSearchInput();
+      if (!input || target !== input) return;
+
+      // React가 입력 이벤트 직후 검색 결과 영역을 다시 그릴 수 있으므로
+      // 현재 입력값으로 즉시 그리고 다음 프레임에도 한 번 복구한다.
+      renderNativePlotAliasResults(input.value || '');
+      requestAnimationFrame(() => {
+        if (currentSection() === 'plot-search') {
+          renderNativePlotAliasResults(nativePlotSearchInput()?.value || '');
+        }
+      });
+    };
+
+    document.addEventListener('input', update, true);
+    document.addEventListener('search', update, true);
+    document.addEventListener('change', update, true);
   }
 
   function refresh() {
