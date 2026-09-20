@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.5
+// @version      0.20.6
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1092,7 +1092,12 @@
   // 플롯마다 iframe을 새로 띄우면 제타 앱을 매번 처음부터 부팅한다.
   // 손으로 할 때처럼, 앱은 한 번만 띄우고 그 안에서 화면만 바꾼다.
   const PROFILE_WORKERS = 4;
+  const MOBILE_FORCE_PROFILE_WORKERS = 3;
   let lastProfileFailures = [];
+
+  function isMobileProfileDevice() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  }
 
   // ID만으로는 어느 방인지 알 수 없다. 이름과 주소를 남겨 바로 열어볼 수 있게 한다.
   function describeFailure(target, reason) {
@@ -1207,7 +1212,8 @@
     throw new Error(profileFailureReason(new Error('시간 초과'), trace, plotId));
   }
 
-  async function profileWorker(queue, onResult) {
+  async function profileWorker(queue, onResult, options = {}) {
+    const slowMobileForce = Boolean(options.force && options.mobile);
     for (;;) {
       const target = queue.next();
       if (!target) return;
@@ -1248,6 +1254,10 @@
       } catch (error) {
         onResult(target, null, error);
       }
+
+      // 모바일에서 강제 재수집을 수백 개 연속 요청하면 같은 지점부터
+      // 프로필 로딩이 급격히 느려지는 경우가 있어 요청 사이에 짧게 쉰다.
+      if (slowMobileForce) await sleep(300);
     }
   }
 
@@ -1293,6 +1303,7 @@
       roomCollectionProgress = {
         running: true,
         count: roomCollectionCount(),
+        roomTotal: roomCollectionCount(),
         phase: force ? '다시 이름 수집' : '이름 수집',
         current: completed,
         total: targets.length,
@@ -1306,15 +1317,18 @@
     roomCollectionProgress = {
       running: true,
       count: roomCollectionCount(),
+      roomTotal: roomCollectionCount(),
       phase: force ? '다시 이름 수집' : '이름 수집',
       current: 0,
       total: targets.length
     };
     renderCollectionTools();
 
+    const mobileForce = Boolean(force && isMobileProfileDevice());
+    const workerLimit = mobileForce ? MOBILE_FORCE_PROFILE_WORKERS : PROFILE_WORKERS;
     const workers = [];
-    for (let i = 0; i < Math.min(PROFILE_WORKERS, targets.length); i++) {
-      workers.push(profileWorker(queue, onResult));
+    for (let i = 0; i < Math.min(workerLimit, targets.length); i++) {
+      workers.push(profileWorker(queue, onResult, { force, mobile: mobileForce }));
     }
     await Promise.all(workers);
 
@@ -1371,14 +1385,35 @@
         const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
         if (nearBottom) {
           setScrollTop(host, before.height);
-          await sleep(700);
+          await sleep(force ? 1200 : 700);
           harvestRoomDocument(document);
 
-          const after = scrollMetrics(host);
-          const afterCount = roomCollectionCount();
-          if (after.height <= before.height + 2 && afterCount <= count) stableRounds++;
-          else stableRounds = 0;
-          if (stableRounds >= 4) break;
+          let after = scrollMetrics(host);
+          let afterCount = roomCollectionCount();
+          if (after.height <= before.height + 2 && afterCount <= count) {
+            stableRounds++;
+
+            // 모바일 무한목록은 다음 묶음 로딩이 늦으면 중간 지점을 바닥처럼 보이게 한다.
+            // 강제 재수집에서는 위로 살짝 올렸다가 다시 바닥으로 내려 로딩 감지를 깨운다.
+            if (force && stableRounds % 2 === 0) {
+              const nudge = Math.max(240, Math.floor(after.client * 0.45));
+              setScrollTop(host, Math.max(0, after.top - nudge));
+              await sleep(250);
+              harvestRoomDocument(document);
+              const nudged = scrollMetrics(host);
+              setScrollTop(host, nudged.height);
+              await sleep(900);
+              harvestRoomDocument(document);
+              after = scrollMetrics(host);
+              afterCount = roomCollectionCount();
+              if (after.height > before.height + 2 || afterCount > count) stableRounds = 0;
+            }
+          } else {
+            stableRounds = 0;
+          }
+
+          // 일반 수집은 기존 판정을 유지하고, 다시 전체 수집은 훨씬 오래 확인한다.
+          if (stableRounds >= (force ? 12 : 4)) break;
         } else {
           stableRounds = 0;
           // 이미 아는 방만 지나가는 구간은 크게 건너뛴다.
@@ -1402,7 +1437,7 @@
           break;
         }
 
-        if (now.height === lastHeight && nowCount === lastCount && nearBottom) stableRounds++;
+        // nearBottom 안정 판정은 위 블록에서 한 번만 센다.
         lastHeight = now.height;
         lastCount = nowCount;
       }
@@ -1897,7 +1932,9 @@
       banner.querySelector('.zrm-banner-title').textContent = (progress.phase || '수집') + ' 중';
     }
     banner.querySelector('.zrm-banner-count').textContent = progress.total
-      ? progress.current + ' / ' + progress.total
+      ? (progress.roomTotal
+          ? '방 ' + progress.roomTotal + '개 · 플롯 ' + progress.current + ' / ' + progress.total
+          : progress.current + ' / ' + progress.total)
       : (progress.count || 0) + '개';
 
     const note = banner.querySelector('.zrm-banner-note');
