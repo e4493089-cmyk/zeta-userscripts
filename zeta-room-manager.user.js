@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.7.3
+// @version      0.7.4
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1037,6 +1037,16 @@
     return `local-${(hash >>> 0).toString(36)}`;
   }
 
+  // 제목도 이미지도 없으면 항목을 구분할 근거가 없다.
+  // 그래도 해시를 만들면 빈 항목이 전부 같은 키로 뭉쳐서, 서로 무관한
+  // (예: 탈퇴한 제작자의) 캐릭터명이 한 항목에 계속 쌓인다.
+  function localFallbackId(original, image) {
+    const title = normalizeText(original);
+    const picture = normalizeText(image).split('?')[0];
+    if (!title && !picture) return null;
+    return stableLocalId(title + '\n' + picture);
+  }
+
   function reactPlotId(item) {
     const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber$'));
     let fiber = fiberKey ? item[fiberKey] : null;
@@ -1213,7 +1223,7 @@
     const id = extractId(link && link.href, type)
       || item.getAttribute('data-plot-id')
       || (type === 'plot' ? reactPlotId(item) : null)
-      || stableLocalId(original + '\n' + image.split('?')[0]);
+      || localFallbackId(original, image);
     if (!id) return null;
 
     const key = keyOf(type, id);
