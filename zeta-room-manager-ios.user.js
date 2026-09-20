@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.6.3
+// @version      0.6.4
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1896,10 +1896,107 @@
     setTimeout(() => { input.focus(); input.select(); }, 0);
   }
 
+
+  // ── 대화창에서 수집 ──────────────────────────────────────────────────
+  // 대화방을 열어보는 것만으로 캐릭터명·제작자명이 쌓인다.
+  // 요청은 보내지 않고, 이미 화면에 그려진 것만 읽는다.
+  let lastChatHarvest = { roomId: '', at: 0 };
+
+  function currentRoomId() {
+    const match = location.pathname.match(/\/rooms\/([^/?#]+)/i);
+    return match ? match[1] : null;
+  }
+
+  // 말풍선 위의 발화자 이름이 곧 캐릭터명이다.
+  // 내 말풍선(RightTextContent)의 이름은 내 페르소나이므로 절대 넣지 않는다.
+  // 이 구분은 zeta-full-chat-export.user.js가 쓰던 것과 같다.
+  function bubbleCharacterNames() {
+    const names = [];
+    for (const el of document.querySelectorAll('[data-sentry-component="LeftTextContent"] .caption1')) {
+      const text = normalizeText(el.textContent).replace(/^@+/, '').replace(/[:：]+$/, '').trim();
+      if (!text || text.length > 40) continue;
+      if (!names.includes(text)) names.push(text);
+    }
+    return names.slice(0, 20);
+  }
+
+  function profileCardCreatorNames() {
+    const names = [];
+    const links = document.querySelectorAll([
+      '[data-sentry-component="PlotProfileCard"] a[href*="/profile"]',
+      '[data-sentry-component="PlotProfileCard"] a[href*="/users/"]',
+      '[data-sentry-component="ChatSidebar"] a[href*="/profile"]',
+      '[data-sentry-component="ChatSidebar"] a[href*="/users/"]',
+      'a[href*="/creator/"]',
+      'a[href*="/creators/"]'
+    ].join(','));
+
+    for (const link of links) {
+      const text = normalizeText(link.textContent).replace(/^@+/, '').trim();
+      if (!text || text.length > 40) continue;
+      if (!names.includes(text)) names.push(text);
+    }
+    return names.slice(0, 5);
+  }
+
+  function harvestChatRoom() {
+    const roomId = currentRoomId();
+    if (!roomId) return;
+
+    // 대화 중에는 DOM이 계속 바뀌므로 방당 4초에 한 번만 수집한다.
+    const now = Date.now();
+    if (lastChatHarvest.roomId === roomId && now - lastChatHarvest.at < 4000) return;
+    lastChatHarvest = { roomId, at: now };
+
+    const anchor = document.querySelector(
+      '[data-sentry-component="ChatMessageList"], [data-sentry-component="BodyView"], main#contents, main'
+    ) || document.body;
+
+    // 화면이 이미 들고 있는 플롯 데이터부터 줍는다(요청 아님).
+    harvestReactPlotData(anchor);
+
+    const roomEntity = reactEntityForId(anchor, roomId);
+    const plot = (roomEntity && roomEntity.plot) || reactRoomPlotMeta(anchor) || null;
+    const plotId = normalizeText(plot && (plot.id || plot.plotId));
+    const originatedId = normalizeText(plot && (plot.originatedId || plot.originalId));
+    const meta = plot ? ingestPlotMeta(plot, plotId, originatedId) : null;
+
+    const characters = uniqueTexts(
+      plot ? plotCharacterNames(plot) : [],
+      bubbleCharacterNames()
+    );
+    const creators = uniqueTexts(
+      plot ? plotCreatorNames(plot) : [],
+      profileCardCreatorNames()
+    );
+    if (!characters.length && !creators.length && !meta) return;
+
+    const key = keyOf('room', roomId);
+    const previous = state.index[key] || {};
+
+    state.index[key] = {
+      ...previous,
+      type: 'room',
+      id: roomId,
+      href: previous.href || location.pathname,
+      original: normalizeText(previous.original || (plot && (plot.name || plot.title))),
+      alias: normalizeText(state.aliases[key]),
+      image: previous.image || normalizeText(plot && (plot.imageUrl || plot.initialRoomImageUrl)) || '',
+      plotId: plotId || previous.plotId || '',
+      originatedId: originatedId || previous.originatedId || '',
+      characterNames: uniqueTexts(characters, meta && meta.characterNames, previous.characterNames),
+      creatorNames: uniqueTexts(creators, meta && meta.creatorNames, previous.creatorNames)
+    };
+
+    if (meta) mergeMetaIntoIndex(meta);
+    saveState();
+  }
+
   function currentSection() {
     if (/^\/(?:[^/]+\/)?rooms\/?$/i.test(location.pathname)) return 'room';
     if (/^\/(?:[^/]+\/)?creator-center\/search\/?$/i.test(location.pathname)) return 'plot-search';
     if (/^\/(?:[^/]+\/)?creator-center(?:\/|$)/i.test(location.pathname)) return 'plot';
+    if (currentRoomId()) return 'chat';
     return null;
   }
 
@@ -2221,11 +2318,16 @@
     const section = currentSection();
     removeLegacyPanel();
 
-    if (!section) {
+    if (!section || section === 'chat') {
       document.getElementById(NATIVE_RESULTS_ID)?.remove();
       document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
       document.getElementById(PLOT_TOOLS_ID)?.remove();
       closeCollectionPopup();
+
+      if (section === 'chat') {
+        harvestChatRoom();
+        observer?.observe(document.documentElement, { childList: true, subtree: true });
+      }
       return;
     }
 
