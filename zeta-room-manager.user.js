@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.5.6
+// @version      0.6.1
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, API 기반 전체 방 인덱싱을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -192,36 +192,95 @@
 
   function plotCharacterNames(plot) {
     const names = [];
-    const first = normalizeText(plot && plot.firstCharacterName);
-    if (first) names.push(first);
-    for (const character of Array.isArray(plot && plot.characters) ? plot.characters : []) {
-      const name = normalizeText(character && (
-        character.name || character.nickname || character.displayName || character.display_name
-      ));
-      if (name && !names.includes(name)) names.push(name);
-    }
+    const add = value => {
+      const text = normalizeText(value);
+      if (text && !names.includes(text)) names.push(text);
+    };
+    const push = list => {
+      for (const character of Array.isArray(list) ? list : []) {
+        add(character && (
+          character.name ||
+          character.nickname ||
+          character.displayName ||
+          character.display_name ||
+          character.characterName
+        ));
+      }
+    };
+
+    add(plot && plot.firstCharacterName);
+    add(plot && plot.characterName);
+    push(plot && plot.characters);
+    push(plot && plot.characterProfiles);
+    push(plot && plot.chatProfiles);
+    push(plot && plot.plotCharacters);
+    push(plot && plot.about && plot.about.characters);
+
     return names.slice(0, 20);
   }
 
   function plotCreatorNames(plot) {
-    const creator = plot && plot.creator;
-    if (!creator || typeof creator !== 'object') return [];
-    return uniqueTexts([
-      creator.name,
-      creator.nickname,
-      creator.displayName,
-      creator.display_name,
-      creator.username,
-      creator.handle
-    ]).slice(0, 10);
+    const names = [];
+    const add = value => {
+      const text = normalizeText(value);
+      if (text && !names.includes(text)) names.push(text);
+    };
+    const addObject = creator => {
+      if (!creator || typeof creator !== 'object') return;
+      add(creator.name);
+      add(creator.nickname);
+      add(creator.displayName);
+      add(creator.display_name);
+      add(creator.username);
+      add(creator.handle);
+      add(creator.creatorName);
+      if (creator.profile && typeof creator.profile === 'object') {
+        addObject(creator.profile);
+      }
+    };
+
+    add(plot && plot.creatorName);
+    add(plot && plot.creatorNickname);
+    add(plot && plot.authorName);
+    add(plot && plot.writerName);
+
+    addObject(plot && plot.creator);
+    addObject(plot && plot.author);
+    addObject(plot && plot.writer);
+    addObject(plot && plot.owner);
+    addObject(plot && plot.user);
+    addObject(plot && plot.creatorUser);
+
+    return names.slice(0, 10);
+  }
+
+  function canonicalPlotId(plotId, originatedId) {
+    return normalizeText(originatedId) || normalizeText(plotId);
+  }
+
+  function plotMetaForEntry(entry) {
+    if (!entry) return null;
+    const canonical = canonicalPlotId(entry.plotId, entry.originatedId);
+    return (canonical && state.plotMeta[canonical])
+      || (entry.plotId && state.plotMeta[entry.plotId])
+      || null;
   }
 
   function searchValues(entry) {
     const characters = Array.isArray(entry?.characterNames) ? entry.characterNames : [];
     const creators = Array.isArray(entry?.creatorNames) ? entry.creatorNames : [];
-    return [entry?.alias, entry?.original, ...characters, ...creators]
-      .map(normalizeText)
-      .filter(Boolean);
+    const meta = plotMetaForEntry(entry);
+    const metaCharacters = Array.isArray(meta?.characterNames) ? meta.characterNames : [];
+    const metaCreators = Array.isArray(meta?.creatorNames) ? meta.creatorNames : [];
+    return [
+      entry?.alias,
+      entry?.original,
+      meta?.name,
+      ...characters,
+      ...creators,
+      ...metaCharacters,
+      ...metaCreators
+    ].map(normalizeText).filter(Boolean);
   }
 
   function matchesSearch(entry, query) {
@@ -233,10 +292,9 @@
     if (normalizeText(entry?.alias) && normalizeText(entry?.original) && entry.alias !== entry.original) {
       parts.push(entry.original);
     }
-    const characterName = (Array.isArray(entry?.characterNames) ? entry.characterNames : [])
-      .map(normalizeText).find(Boolean);
-    const creatorName = (Array.isArray(entry?.creatorNames) ? entry.creatorNames : [])
-      .map(normalizeText).find(Boolean);
+    const meta = plotMetaForEntry(entry);
+    const characterName = uniqueTexts(entry?.characterNames, meta && meta.characterNames)[0];
+    const creatorName = uniqueTexts(entry?.creatorNames, meta && meta.creatorNames)[0];
     if (characterName) parts.push('캐릭터: ' + characterName);
     if (creatorName) parts.push('제작자: ' + creatorName);
     return parts.join(' · ') || fallback;
@@ -404,31 +462,60 @@
     return /^[a-z]{2}(?:-[a-z]{2})?$/i.test(first) ? first : 'ko';
   }
 
-  function ingestPlotMeta(plot, plotIdHint) {
+  function ingestPlotMeta(plot, plotIdHint, originatedIdHint, options) {
     if (!plot || typeof plot !== 'object') return null;
-    const plotId = normalizeText(plot.id || plot.plotId || plotIdHint);
-    if (!plotId) return null;
 
-    const previous = state.plotMeta[plotId] || {};
+    const plotId = normalizeText(plot.id || plot.plotId || plotIdHint);
+    const originatedId = normalizeText(
+      plot.originatedId ||
+      plot.originalId ||
+      originatedIdHint
+    );
+    const canonicalId = canonicalPlotId(plotIdHint || plotId, originatedId);
+    if (!canonicalId) return null;
+
+    const previous = state.plotMeta[canonicalId]
+      || (plotId && state.plotMeta[plotId])
+      || {};
     const characters = plotCharacterNames(plot);
     const creators = plotCreatorNames(plot);
+    const detailFetched = Boolean(options && options.detailFetched);
 
-    state.plotMeta[plotId] = {
-      plotId: plotId,
-      originatedId: normalizeText(plot.originatedId || plot.originalId || previous.originatedId),
+    const next = {
+      ...previous,
+      canonicalId,
+      plotId: normalizeText(plotIdHint || plotId || previous.plotId),
+      sourcePlotId: plotId || previous.sourcePlotId || '',
+      originatedId: originatedId || previous.originatedId || '',
       name: normalizeText(plot.name || plot.title || previous.name),
       image: normalizeText(plot.imageUrl || plot.initialRoomImageUrl || previous.image),
       characterNames: characters.length ? characters : (previous.characterNames || []),
       creatorNames: creators.length ? creators : (previous.creatorNames || []),
       updatedAt: Date.now()
     };
-    return state.plotMeta[plotId];
+
+    if (detailFetched) {
+      next.detailFetchedAt = Date.now();
+      delete next.failedAt;
+      next.failCount = 0;
+      next.emptyDetail = next.characterNames.length === 0 && next.creatorNames.length === 0;
+    }
+
+    state.plotMeta[canonicalId] = next;
+
+    if (plotId && plotId !== canonicalId && state.plotMeta[plotId]) {
+      delete state.plotMeta[plotId];
+    }
+
+    return next;
   }
 
-  function applyPlotMetaToRooms(plotId, meta) {
-    if (!plotId || !meta) return;
+  function applyPlotMetaToRooms(canonicalId, meta) {
+    if (!canonicalId || !meta) return;
     for (const entry of Object.values(state.index)) {
-      if (!entry || entry.type !== 'room' || entry.plotId !== plotId) continue;
+      if (!entry || entry.type !== 'room') continue;
+      if (canonicalPlotId(entry.plotId, entry.originatedId) !== canonicalId) continue;
+
       entry.originatedId = entry.originatedId || meta.originatedId || '';
       entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
       entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
@@ -443,7 +530,11 @@
 
     const plot = room.plot && typeof room.plot === 'object' ? room.plot : {};
     const plotId = normalizeText(room.plotId || plot.id || plot.plotId);
-    const meta = ingestPlotMeta(plot, plotId) || (plotId ? state.plotMeta[plotId] : null);
+    const originatedId = normalizeText(plot.originatedId || plot.originalId || room.originatedId);
+    const canonicalId = canonicalPlotId(plotId, originatedId);
+    const meta = ingestPlotMeta(plot, plotId, originatedId)
+      || (canonicalId ? state.plotMeta[canonicalId] : null);
+
     const key = keyOf('room', roomId);
     const previous = state.index[key] || {};
 
@@ -456,12 +547,12 @@
       alias: normalizeText(state.aliases[key]),
       image: normalizeText(plot.imageUrl || plot.initialRoomImageUrl || previous.image),
       plotId: plotId || previous.plotId || '',
-      originatedId: normalizeText(plot.originatedId || plot.originalId || previous.originatedId),
+      originatedId: originatedId || previous.originatedId || '',
       characterNames: uniqueTexts(previous.characterNames, meta && meta.characterNames),
       creatorNames: uniqueTexts(previous.creatorNames, meta && meta.creatorNames)
     };
 
-    if (plotId && meta) applyPlotMetaToRooms(plotId, meta);
+    if (canonicalId && meta) applyPlotMetaToRooms(canonicalId, meta);
     return state.index[key];
   }
 
@@ -498,21 +589,40 @@
   }
 
   async function enrichMissingPlotMeta() {
-    const ids = [];
+    const targets = [];
     const now = Date.now();
+    const seenCanonical = new Set();
 
     for (const entry of Object.values(state.index)) {
       if (!entry || entry.type !== 'room') continue;
+
       const plotId = normalizeText(entry.plotId);
-      if (!plotId || ids.includes(plotId)) continue;
+      const originatedId = normalizeText(entry.originatedId);
+      const canonicalId = canonicalPlotId(plotId, originatedId);
+      if (!canonicalId || seenCanonical.has(canonicalId)) continue;
+      seenCanonical.add(canonicalId);
 
-      const cached = state.plotMeta[plotId];
-      const hasCharacters = Array.isArray(cached && cached.characterNames) && cached.characterNames.length > 0;
-      const hasCreators = Array.isArray(cached && cached.creatorNames) && cached.creatorNames.length > 0;
-      const fresh = Number((cached && cached.updatedAt) || 0) > now - 7 * 24 * 60 * 60 * 1000;
+      const cached = state.plotMeta[canonicalId] || (plotId ? state.plotMeta[plotId] : null);
+      const detailFresh = Number((cached && cached.detailFetchedAt) || 0) > now - 7 * 24 * 60 * 60 * 1000;
 
-      if (fresh && hasCharacters && hasCreators) applyPlotMetaToRooms(plotId, cached);
-      else ids.push(plotId);
+      if (detailFresh) {
+        applyPlotMetaToRooms(canonicalId, cached);
+        continue;
+      }
+
+      const failedAt = Number((cached && cached.failedAt) || 0);
+      const failCount = Number((cached && cached.failCount) || 0);
+      const backoff = Math.min(
+        7 * 24 * 60 * 60 * 1000,
+        30 * 60 * 1000 * Math.pow(2, Math.min(failCount, 8))
+      );
+
+      if (failedAt && now - failedAt < backoff) {
+        if (cached) applyPlotMetaToRooms(canonicalId, cached);
+        continue;
+      }
+
+      targets.push({ plotId, originatedId, canonicalId });
     }
 
     let nextIndex = 0;
@@ -521,18 +631,55 @@
     const worker = async () => {
       while (!stop) {
         const index = nextIndex++;
-        if (index >= ids.length) return;
+        if (index >= targets.length) return;
 
-        const plotId = ids[index];
-        const payload = await apiGet('/v1/plots/' + encodeURIComponent(plotId));
-        if (!payload) {
-          if (Date.now() < apiUnavailableUntil) stop = true;
-          continue;
+        const target = targets[index];
+        const candidates = uniqueTexts([
+          target.originatedId,
+          target.plotId
+        ]);
+
+        let meta = null;
+        for (const candidate of candidates) {
+          const payload = await apiGet('/v1/plots/' + encodeURIComponent(candidate));
+          if (!payload) {
+            if (Date.now() < apiUnavailableUntil) {
+              stop = true;
+              break;
+            }
+            continue;
+          }
+
+          const plot = unwrapApi(payload);
+          if (!plot || typeof plot !== 'object') continue;
+          if (!plot.id && !plot.name && !plot.title && !plot.characters && !plot.chatProfiles) continue;
+
+          meta = ingestPlotMeta(
+            plot,
+            target.plotId,
+            target.originatedId || plot.originatedId || plot.originalId,
+            { detailFetched: true }
+          );
+          if (meta) break;
         }
 
-        const plot = unwrapApi(payload);
-        const meta = ingestPlotMeta(plot, plotId);
-        if (meta) applyPlotMetaToRooms(plotId, meta);
+        if (meta) {
+          applyPlotMetaToRooms(target.canonicalId, meta);
+        } else if (!stop) {
+          const previous = state.plotMeta[target.canonicalId]
+            || (target.plotId ? state.plotMeta[target.plotId] : null)
+            || {};
+          state.plotMeta[target.canonicalId] = {
+            ...previous,
+            canonicalId: target.canonicalId,
+            plotId: target.plotId || previous.plotId || '',
+            originatedId: target.originatedId || previous.originatedId || '',
+            characterNames: previous.characterNames || [],
+            creatorNames: previous.creatorNames || [],
+            failedAt: Date.now(),
+            failCount: Number(previous.failCount || 0) + 1
+          };
+        }
 
         if (index % 10 === 0) {
           saveState();
@@ -543,6 +690,47 @@
     };
 
     await Promise.all([worker(), worker(), worker()]);
+    saveState();
+    scheduleRefresh();
+  }
+
+  async function harvestScrappedPlots() {
+    let cursor = '';
+    const seen = new Set();
+
+    for (let page = 0; page < 40; page++) {
+      const payload = await apiGet('/v1/plots/scrapped', {
+        limit: 30,
+        cursor: cursor || undefined
+      });
+      if (!payload) return;
+
+      const body = unwrapApi(payload);
+      const plots = Array.isArray(body && body.plots)
+        ? body.plots
+        : Array.isArray(body && body.items)
+          ? body.items
+          : Array.isArray(body && body.contents)
+            ? body.contents
+            : [];
+
+      for (const plot of plots) {
+        const plotId = normalizeText(plot && (plot.id || plot.plotId));
+        const originatedId = normalizeText(plot && (plot.originatedId || plot.originalId));
+        const canonicalId = canonicalPlotId(plotId, originatedId);
+        const meta = ingestPlotMeta(plot, plotId, originatedId);
+        if (canonicalId && meta) applyPlotMetaToRooms(canonicalId, meta);
+      }
+
+      const next = normalizeText(
+        (body && (body.nextCursor || body.next_cursor)) ||
+        (payload && (payload.nextCursor || payload.next_cursor))
+      );
+      if (!next || seen.has(next)) break;
+      seen.add(next);
+      cursor = next;
+    }
+
     saveState();
     scheduleRefresh();
   }
@@ -563,7 +751,9 @@
       return false;
     }
 
+    await harvestScrappedPlots();
     await enrichMissingPlotMeta();
+
     localStorage.setItem(BACKGROUND_INDEX_STAMP_KEY, String(Date.now()));
     saveState();
     scheduleRefresh();
@@ -759,9 +949,14 @@
     const searchMeta = collectSearchMeta(item, titleEl);
     const roomPlot = type === 'room' ? reactRoomPlotMeta(item) : null;
     const roomPlotId = normalizeText((roomPlot && (roomPlot.id || roomPlot.plotId)) || previous.plotId);
+    const roomOriginatedId = normalizeText(
+      (roomPlot && (roomPlot.originatedId || roomPlot.originalId)) ||
+      previous.originatedId
+    );
+    const roomCanonicalId = canonicalPlotId(roomPlotId, roomOriginatedId);
     const roomMeta = roomPlot
-      ? ingestPlotMeta(roomPlot, roomPlotId)
-      : (roomPlotId ? state.plotMeta[roomPlotId] : null);
+      ? ingestPlotMeta(roomPlot, roomPlotId, roomOriginatedId)
+      : (roomCanonicalId ? state.plotMeta[roomCanonicalId] : null);
 
     state.index[key] = {
       ...previous,
@@ -774,7 +969,7 @@
       image: image || previous.image || '',
       plotId: type === 'room' ? (roomPlotId || previous.plotId || '') : (previous.plotId || ''),
       originatedId: type === 'room'
-        ? normalizeText((roomPlot && (roomPlot.originatedId || roomPlot.originalId)) || previous.originatedId)
+        ? (roomOriginatedId || previous.originatedId || '')
         : (previous.originatedId || ''),
       characterNames: uniqueTexts(searchMeta.characterNames, roomMeta && roomMeta.characterNames, previous.characterNames),
       creatorNames: uniqueTexts(searchMeta.creatorNames, roomMeta && roomMeta.creatorNames, previous.creatorNames)
