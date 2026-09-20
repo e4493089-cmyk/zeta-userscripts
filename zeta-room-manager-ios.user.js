@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.10.0
+// @version      0.11.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -986,7 +986,9 @@
       roomCollectionProgress = {
         running: true,
         count: roomCollectionCount(),
-        phase: '이름 수집 ' + (i + 1) + '/' + targets.length
+        phase: '이름 수집',
+        current: i + 1,
+        total: targets.length
       };
       renderCollectionTools();
 
@@ -1491,7 +1493,7 @@
     document.body.appendChild(modal);
   }
 
-  // 수집은 이 화면에서 돈다. 닫으면 멈추므로 진행 중에는 크게 알린다.
+  // 수집은 이 화면에서 돈다. 닫으면 멈추므로 진행 중에는 화면 가운데에 띄운다.
   function renderCollectionBanner() {
     const progress = currentSection() === 'plot' ? plotCollectionProgress : roomCollectionProgress;
     let banner = document.getElementById(COLLECTION_BANNER_ID);
@@ -1505,11 +1507,12 @@
       banner = document.createElement('div');
       banner.id = COLLECTION_BANNER_ID;
       banner.innerHTML =
-        '<div class="zrm-banner-body">' +
+        '<div class="zrm-banner-card" role="status" aria-live="polite">' +
           '<div class="zrm-banner-title"></div>' +
-          '<div class="zrm-banner-note">이 화면을 닫거나 다른 곳으로 이동하면 멈춰요. 다시 실행하면 남은 것만 이어서 합니다.</div>' +
-        '</div>' +
-        '<button type="button" class="zrm-banner-stop">중지</button>';
+          '<div class="zrm-banner-count"></div>' +
+          '<div class="zrm-banner-note">이 화면을 닫거나 다른 곳으로 이동하면 멈춰요.<br>다시 실행하면 남은 것만 이어서 합니다.</div>' +
+          '<button type="button" class="zrm-banner-stop">중지</button>' +
+        '</div>';
       banner.querySelector('.zrm-banner-stop').addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
@@ -1520,10 +1523,13 @@
     }
 
     if (banner.parentElement !== document.body) document.body.appendChild(banner);
-    const title = banner.querySelector('.zrm-banner-title');
+
     if (!collectionAborted) {
-      title.textContent = 'Room Manager 수집 중 · ' + (progress.phase || '진행 중');
+      banner.querySelector('.zrm-banner-title').textContent = (progress.phase || '수집') + ' 중';
     }
+    banner.querySelector('.zrm-banner-count').textContent = progress.total
+      ? progress.current + ' / ' + progress.total
+      : (progress.count || 0) + '개';
   }
 
   function renderCollectionTools() {
@@ -1754,33 +1760,47 @@
       }
       #${COLLECTION_BANNER_ID} {
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
+        inset: 0;
         z-index: 2147483645;
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 10px 14px;
-        background: #6d52ff;
-        color: #fff;
-        font: 500 12px/1.45 system-ui, -apple-system, sans-serif;
-        box-shadow: 0 4px 14px rgba(0,0,0,.35);
+        justify-content: center;
+        padding: 20px;
+        background: rgba(0,0,0,.45);
+        box-sizing: border-box;
       }
-      #${COLLECTION_BANNER_ID} .zrm-banner-body { flex: 1; min-width: 0; }
-      #${COLLECTION_BANNER_ID} .zrm-banner-title { font-weight: 700; }
-      #${COLLECTION_BANNER_ID} .zrm-banner-note { margin-top: 2px; color: rgba(255,255,255,.82); font-size: 11px; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-card {
+        width: min(300px, 100%);
+        padding: 22px 20px 18px;
+        border-radius: 16px;
+        background: #fff;
+        color: #1b1b1f;
+        text-align: center;
+        font: 500 13px/1.5 system-ui, -apple-system, sans-serif;
+        box-shadow: 0 20px 60px rgba(0,0,0,.4);
+        box-sizing: border-box;
+      }
+      #${COLLECTION_BANNER_ID} .zrm-banner-title { font-size: 14px; font-weight: 700; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-count {
+        margin: 10px 0 12px;
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        color: #6d52ff;
+      }
+      #${COLLECTION_BANNER_ID} .zrm-banner-note { color: #6b6b74; font-size: 11px; }
       #${COLLECTION_BANNER_ID} .zrm-banner-stop {
-        flex: 0 0 auto;
-        height: 30px;
-        padding: 0 12px;
+        width: 100%;
+        height: 40px;
+        margin-top: 16px;
         border: 0;
-        border-radius: 8px;
-        background: rgba(0,0,0,.28);
-        color: #fff;
-        font: 700 12px/1 system-ui, sans-serif;
+        border-radius: 10px;
+        background: #f0f0f3;
+        color: #45454e;
+        font: 700 13px/1 system-ui, sans-serif;
         cursor: pointer;
       }
+      #${COLLECTION_BANNER_ID} .zrm-banner-stop:hover { background: #e6e6ea; }
       #${PLOT_TOOLS_ID}.zrm-tools-fallback {
         position: fixed;
         top: 14px;
