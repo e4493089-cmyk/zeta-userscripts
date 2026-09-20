@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.6.6
+// @version      0.6.7
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1028,6 +1028,120 @@
     return plotCollectionPromise;
   }
 
+
+  // ── 진단: 목록 항목이 실제로 무슨 데이터를 들고 있는지 ─────────────────
+  // 캐릭터명·제작자명을 API 없이 읽으려면 그 값이 화면 어딘가에 있어야 한다.
+  // 어디에 있는지(혹은 없는지)를 추측하지 않고 그대로 찍어 파일로 내보낸다.
+  function describeValue(value) {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'Array(' + value.length + ')';
+    const type = typeof value;
+    if (type === 'string') return value.length > 120 ? value.slice(0, 120) + '…' : value;
+    if (type === 'object') return 'Object{' + Object.keys(value).slice(0, 12).join(',') + '}';
+    return String(value);
+  }
+
+  function collectPropPaths(root, out, path, depth, budget) {
+    if (!root || typeof root !== 'object' || depth > 5 || out.length >= budget) return;
+    const entries = Array.isArray(root)
+      ? root.slice(0, 6).map((v, i) => [String(i), v])
+      : Object.entries(root).slice(0, 40);
+
+    for (const [key, value] of entries) {
+      if (['children', 'ref', '_owner', 'return', 'stateNode', '_store'].includes(key)) continue;
+      const next = path ? path + '.' + key : key;
+      if (value && typeof value === 'object') {
+        out.push(next + ' = ' + describeValue(value));
+        collectPropPaths(value, out, next, depth + 1, budget);
+      } else if (typeof value === 'string' && value.trim()) {
+        out.push(next + ' = ' + describeValue(value));
+      }
+      if (out.length >= budget) return;
+    }
+  }
+
+  function describeItem(item, label) {
+    const lines = ['───── ' + label + ' ─────'];
+
+    const link = item.querySelector('a[href]');
+    lines.push('href: ' + (link ? link.getAttribute('href') : '(없음)'));
+
+    const texts = [];
+    for (const el of item.querySelectorAll('*')) {
+      if (el.children.length) continue;
+      const text = normalizeText(el.textContent);
+      if (text && !texts.includes(text)) texts.push(text);
+    }
+    lines.push('화면 글자: ' + (texts.length ? texts.join(' | ') : '(없음)'));
+
+    const images = Array.from(item.querySelectorAll('img')).map(img => img.getAttribute('src') || '');
+    lines.push('이미지: ' + (images.length ? images.join(' , ') : '(없음)'));
+
+    const dataKeys = Object.keys(item.dataset || {});
+    lines.push('data 속성: ' + (dataKeys.length ? dataKeys.join(',') : '(없음)'));
+
+    const fiberKey = Object.keys(item).find(key => key.startsWith('__reactFiber$'));
+    if (!fiberKey) {
+      lines.push('React 데이터: (fiber 없음)');
+      return lines.join('\n');
+    }
+
+    let fiber = item[fiberKey];
+    for (let depth = 0; fiber && depth < 8; depth++, fiber = fiber.return) {
+      const paths = [];
+      for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
+        if (props && typeof props === 'object') collectPropPaths(props, paths, '', 0, 120);
+      }
+      const useful = paths.filter(line =>
+        /character|creator|author|writer|plot|profile|nickname|name/i.test(line)
+      );
+      if (useful.length) {
+        lines.push('React props (조상 ' + depth + '단계):');
+        for (const line of useful.slice(0, 60)) lines.push('  ' + line);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  function exportRoomManagerDiagnostics() {
+    const section = currentSection();
+    const items = section === 'plot' || section === 'plot-search'
+      ? Array.from(document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]'))
+      : roomItemsFromDocument(document);
+
+    const report = [
+      'Zeta Room Manager 진단',
+      '시각: ' + new Date().toISOString(),
+      '주소: ' + location.href,
+      '구간: ' + (section || '(없음)'),
+      '화면의 항목 수: ' + items.length,
+      '저장된 항목 수: ' + Object.keys(state.index || {}).length,
+      '저장된 플롯 메타 수: ' + Object.keys(state.plotMeta || {}).length,
+      ''
+    ];
+
+    items.slice(0, 5).forEach((item, i) => {
+      try {
+        report.push(describeItem(item, '항목 ' + (i + 1)));
+      } catch (error) {
+        report.push('항목 ' + (i + 1) + ' 읽기 실패: ' + error);
+      }
+      report.push('');
+    });
+
+    const blob = new Blob([report.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zeta-room-manager-diagnostic-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  window.zrmDiagnose = exportRoomManagerDiagnostics;
+
   function exportRoomManagerData() {
     saveStateNow();
     const payload = {
@@ -1238,6 +1352,7 @@
           '<button type="button" data-zrm-action="collect"></button>' +
           '<button type="button" data-zrm-action="export">내보내기</button>' +
           '<button type="button" data-zrm-action="import">불러오기</button>' +
+          '<button type="button" data-zrm-action="diagnose">진단</button>' +
         '</div>' +
       '</div>';
 
@@ -1256,6 +1371,10 @@
       closeCollectionPopup();
       if (isRoom) collectAllRoomsByScrolling();
       else collectAllPlotsByScrolling();
+    });
+    modal.querySelector('[data-zrm-action="diagnose"]').addEventListener('click', () => {
+      closeCollectionPopup();
+      exportRoomManagerDiagnostics();
     });
     modal.querySelector('[data-zrm-action="export"]').addEventListener('click', () => {
       closeCollectionPopup();
