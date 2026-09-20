@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.3.6
+// @version      0.3.7
 // @description  iOS/Stay용. 대화방/플롯 별명과 플롯명·캐릭터명·제작자명 검색을 지원합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -82,7 +82,82 @@
       }
     }
 
-    const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber
+    const fiberKey = Object.keys(item || {}).find(key => key.startsWith('__reactFiber'));
+    let fiber = fiberKey ? item[fiberKey] : null;
+    const seen = new WeakSet();
+    let inspected = 0;
+
+    const inspect = (value, path = [], depth = 0) => {
+      if (value == null || depth > 5 || inspected > 450) return;
+      if (typeof value === 'string') {
+        const key = String(path[path.length - 1] || '').toLowerCase().replace(/[_-]/g, '');
+        const full = path.join('.').toLowerCase().replace(/[_-]/g, '');
+        if (
+          /^(?:charactername|characterdisplayname|charname|charnickname)$/.test(key) ||
+          (full.includes('character') && /(?:name|nickname|displayname)$/.test(key))
+        ) add(characterNames, value);
+        if (
+          /^(?:creatorname|creatornickname|creatordisplayname|authorname|authornickname|writername|writernickname)$/.test(key) ||
+          (/(?:creator|author|writer)/.test(full) && /(?:name|nickname|displayname|username|handle)$/.test(key))
+        ) add(creatorNames, value);
+        return;
+      }
+      if (typeof value !== 'object' || seen.has(value)) return;
+      seen.add(value);
+      inspected++;
+
+      if (Array.isArray(value)) {
+        for (let i = 0; i < Math.min(value.length, 20); i++) {
+          inspect(value[i], path.concat(String(i)), depth + 1);
+        }
+        return;
+      }
+
+      for (const [key, child] of Object.entries(value)) {
+        if (['children', 'ref', '_owner', 'return', 'stateNode'].includes(key)) continue;
+        inspect(child, path.concat(key), depth + 1);
+        if (inspected > 450) break;
+      }
+    };
+
+    for (let depth = 0; fiber && depth < 16; depth++, fiber = fiber.return) {
+      inspect(fiber.memoizedProps, ['props'], 0);
+      inspect(fiber.pendingProps, ['pendingProps'], 0);
+      if (characterNames.size && creatorNames.size) break;
+    }
+
+    return {
+      characterNames: Array.from(characterNames).slice(0, 5),
+      creatorNames: Array.from(creatorNames).slice(0, 5)
+    };
+  }
+
+  function searchValues(entry) {
+    const chars = Array.isArray(entry?.characterNames) ? entry.characterNames : [entry?.characterName];
+    const creators = Array.isArray(entry?.creatorNames) ? entry.creatorNames : [entry?.creatorName];
+    return [entry?.alias, entry?.original, ...chars, ...creators]
+      .map(normalizeText)
+      .filter(Boolean);
+  }
+
+  function matchesSearch(entry, query) {
+    return searchValues(entry).some(value => value.toLocaleLowerCase('ko-KR').includes(query));
+  }
+
+  function searchDetail(entry, fallback) {
+    const parts = [];
+    if (normalizeText(entry?.alias) && normalizeText(entry?.original) && entry.alias !== entry.original) {
+      parts.push(entry.original);
+    }
+    const characterName = (Array.isArray(entry?.characterNames) ? entry.characterNames : [entry?.characterName])
+      .map(normalizeText).find(Boolean);
+    const creatorName = (Array.isArray(entry?.creatorNames) ? entry.creatorNames : [entry?.creatorName])
+      .map(normalizeText).find(Boolean);
+    if (characterName) parts.push('캐릭터: ' + characterName);
+    if (creatorName) parts.push('제작자: ' + creatorName);
+    return parts.join(' · ') || fallback;
+  }
+
   function extractId(href, type) {
     if (!href) return null;
     const re = type === 'room'
