@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.17.0
+// @version      0.18.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -923,6 +923,17 @@
       Array.from(root.querySelectorAll('img[alt^="Profile image of "]'))
         .map(img => normalizeText(img.getAttribute('alt')).slice('Profile image of '.length))
     );
+
+    // 닉네임 아래의 @아이디는 탈퇴한 계정에도 남는다.
+    // 닉네임으로 못 찾을 때의 대안이자, 아이디로도 검색할 수 있게 함께 담는다.
+    const handles = uniqueTexts(
+      Array.from(root.querySelectorAll('span, a'))
+        .map(el => normalizeText(el.textContent))
+        .filter(text => /^@[^\s@]{1,40}$/.test(text))
+    );
+    for (const handle of handles) {
+      if (!creators.includes(handle)) creators.push(handle);
+    }
 
     // 제작자가 탈퇴하면 프로필 링크가 사라지고 "탈퇴한 계정"만 남는다.
     // 링크가 있어야만 읽은 것으로 치면 캐릭터명까지 통째로 버리게 된다.
