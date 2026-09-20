@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.7.0
+// @version      0.8.0
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -803,6 +803,165 @@
     return document.scrollingElement || document.documentElement;
   }
 
+
+  // ── 빈 플롯만 숨긴 화면으로 열어 이름 채우기 ─────────────────────────
+  // 방 목록 데이터에는 characters가 빈 배열이고 creator 키가 아예 없다.
+  // 방 화면 → 플롯 프로필에는 있으므로, 아직 모르는 플롯만 숨긴 iframe으로
+  // 열어서 읽는다. 요청을 직접 만들지 않고 제타 화면이 부르는 대로 둔다.
+  const PROFILE_BUTTON = 'button[data-testid="chat-header-profile"][aria-label="Open plot profile"]';
+  const PROFILE_PATH = /^\/(?:[^/]+\/)?plots\/[a-f\d-]{36}\/profile\/?$/i;
+  const ROOM_UUID = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
+  let collectionAborted = false;
+
+  // 현재 주소의 언어 구간(/ko/...)을 그대로 쓴다.
+  function localeSegment() {
+    const first = location.pathname.split('/').filter(Boolean)[0] || 'ko';
+    return /^[a-z]{2}(?:-[a-z]{2})?$/i.test(first) ? first : 'ko';
+  }
+
+  function abortCollection() {
+    collectionAborted = true;
+  }
+
+  // 같은 플롯을 쓰는 방이 여럿이면 한 번만 연다.
+  // 이미 이름을 아는 플롯(항목이든 plotMeta든)은 건너뛴다.
+  function profileCollectionTargets() {
+    const handledPlots = new Set();
+    const targets = [];
+
+    for (const entry of Object.values(state.index || {})) {
+      if (!entry || entry.type !== 'room' || !ROOM_UUID.test(entry.id || '')) continue;
+
+      const meta = plotMetaForEntry(entry);
+      const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
+      const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
+      if (characters.length && creators.length) continue;
+
+      const keys = [normalizeText(entry.plotId), normalizeText(entry.originatedId)].filter(Boolean);
+      if (keys.length) {
+        if (keys.some(key => handledPlots.has(key))) continue;
+        for (const key of keys) handledPlots.add(key);
+      }
+
+      targets.push({
+        roomId: entry.id,
+        plotId: normalizeText(entry.plotId),
+        originatedId: normalizeText(entry.originatedId)
+      });
+    }
+    return targets;
+  }
+
+  async function readInFrame(frame, read, timeoutMs) {
+    const end = Date.now() + timeoutMs;
+    while (Date.now() < end) {
+      if (collectionAborted) throw new Error('중지됨');
+      try {
+        const win = frame.contentWindow;
+        if (win && win.document) {
+          const value = read(win);
+          if (value) return value;
+        }
+      } catch (error) {
+        if (error && error.name === 'SecurityError') throw new Error('숨김 화면 접근이 막혔습니다');
+        throw error;
+      }
+      await sleep(250);
+    }
+    throw new Error('시간 초과');
+  }
+
+  async function visitRoomProfile(roomId) {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.tabIndex = -1;
+    frame.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:390px;height:850px;opacity:0;pointer-events:none;border:0';
+    document.body.appendChild(frame);
+    frame.src = '/' + localeSegment() + '/rooms/' + roomId;
+
+    try {
+      const button = await readInFrame(frame, win => {
+        if (!win.location.pathname.includes(roomId)) return null;
+        return win.document.querySelector(PROFILE_BUTTON);
+      }, 18000);
+      button.click();
+
+      return await readInFrame(frame, win => {
+        if (!PROFILE_PATH.test(win.location.pathname)) return null;
+        const root = win.document.querySelector('[data-sentry-component="PlotProfile"]');
+        if (!root) return null;
+
+        const creators = uniqueTexts(
+          Array.from(root.querySelectorAll('a[href*="/creators/"][href*="/profile"]'))
+            .map(a => a.querySelector('span.caption1:not([data-sentry-element="Span"])')?.textContent)
+        );
+        if (!creators.length) return null;
+
+        const characters = uniqueTexts(
+          Array.from(root.querySelectorAll('img[alt^="Profile image of "]'))
+            .map(img => normalizeText(img.getAttribute('alt')).slice('Profile image of '.length))
+        );
+        return { creators, characters, profileId: win.location.pathname.split('/')[3] || '' };
+      }, 18000);
+    } finally {
+      if (frame.isConnected) {
+        frame.src = 'about:blank';
+        frame.remove();
+      }
+    }
+  }
+
+  function applyProfileResult(target, result) {
+    const canonicalId = target.plotId || normalizeText(result.profileId) || target.originatedId;
+    if (!canonicalId) return;
+
+    const previous = state.plotMeta[canonicalId] || {};
+    const meta = {
+      ...previous,
+      canonicalId,
+      plotId: target.plotId || previous.plotId || '',
+      originatedId: target.originatedId || previous.originatedId || '',
+      characterNames: uniqueTexts(previous.characterNames, result.characters),
+      creatorNames: uniqueTexts(previous.creatorNames, result.creators),
+      updatedAt: Date.now()
+    };
+
+    state.plotMeta[canonicalId] = meta;
+    plotLookupDirty = true;
+    mergeMetaIntoIndex(meta);
+  }
+
+  async function collectProfilesForEmptyPlots() {
+    const targets = profileCollectionTargets();
+    let done = 0;
+    let failed = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      if (collectionAborted || currentSection() !== 'room') break;
+
+      roomCollectionProgress = {
+        running: true,
+        count: roomCollectionCount(),
+        phase: '이름 수집 ' + (i + 1) + '/' + targets.length
+      };
+      renderCollectionTools();
+
+      try {
+        applyProfileResult(targets[i], await visitRoomProfile(targets[i].roomId));
+        done++;
+      } catch (_) {
+        failed++;
+      }
+
+      if ((done + failed) % 5 === 0) saveStateNow();
+      await sleep(150);
+    }
+
+    saveStateNow();
+    scheduleRefresh();
+    return { targets: targets.length, done, failed };
+  }
+
   async function collectAllRoomsByScrolling() {
     if (currentSection() !== 'room') {
       alert('대화방 목록에서 실행해 주세요.');
@@ -811,7 +970,8 @@
     if (roomCollectionPromise) return roomCollectionPromise;
 
     roomCollectionPromise = (async () => {
-      roomCollectionProgress = { running: true, count: roomCollectionCount() };
+      collectionAborted = false;
+      roomCollectionProgress = { running: true, count: roomCollectionCount(), phase: '목록 수집' };
       renderCollectionTools();
 
       const host = roomCollectionScrollHost();
@@ -862,6 +1022,8 @@
       setScrollTop(host, originalTop);
       await sleep(100);
 
+      const profiles = await collectProfilesForEmptyPlots();
+
       const total = roomCollectionCount();
       roomCollectionProgress = { running: false, count: total };
       renderCollectionTools();
@@ -870,8 +1032,10 @@
         entry && entry.type === 'room' && normalizeText(entry.alias)
       ).length;
       alert(
-        '대화방 전체 수집 완료 · 저장된 방 ' + total + '개' +
-        '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
+        (collectionAborted ? '대화방 수집 중지됨' : '대화방 전체 수집 완료') + ' · 저장된 방 ' + total + '개' +
+        '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
+        '\n이름 수집: 플롯 ' + profiles.targets + '개 중 ' + profiles.done + '개 성공' +
+        (profiles.failed ? ' · ' + profiles.failed + '개 실패' : '')
       );
       return true;
     })().finally(() => {
@@ -1251,11 +1415,12 @@
       '</div>';
 
     modal.querySelector('.zrm-collection-count').textContent =
-      (isRoom ? '저장된 대화방 ' : '저장된 플롯 ') + countValue + '개';
+      (isRoom ? '저장된 대화방 ' : '저장된 플롯 ') + countValue + '개' +
+      (progress.running && progress.phase ? ' · ' + progress.phase : '');
 
     const collect = modal.querySelector('[data-zrm-action="collect"]');
-    collect.disabled = progress.running;
-    collect.textContent = progress.running ? '수집 중…' : '전체 수집';
+    collect.disabled = false;
+    collect.textContent = progress.running ? '중지' : '전체 수집';
 
     modal.querySelector('.zrm-collection-close').addEventListener('click', closeCollectionPopup);
     modal.addEventListener('click', event => {
@@ -1263,6 +1428,10 @@
     });
     collect.addEventListener('click', () => {
       closeCollectionPopup();
+      if (progress.running) {
+        abortCollection();
+        return;
+      }
       if (isRoom) collectAllRoomsByScrolling();
       else collectAllPlotsByScrolling();
     });
