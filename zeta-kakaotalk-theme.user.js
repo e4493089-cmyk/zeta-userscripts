@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.14
+// @version      3.50.15
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7873,6 +7873,73 @@
     html.${ACTIVE} #portal-container
       [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] [class*="text-gray-"] {
       color: #6B7A82 !important;
+    }
+
+
+
+    /* 목록 줄이 시트 끝에 붙어 보이지 않게 안쪽 여백을 준다 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PieceChargeItem"] {
+      padding-left: 14px !important;
+      padding-right: 14px !important;
+      border-radius: 12px !important;
+      background: #F7F9FA !important;
+      border-bottom-color: transparent !important;
+      margin-bottom: 6px !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PieceChargeItem"]:hover {
+      background: #EFF3F5 !important;
+    }
+
+    /* 금액 버튼이 줄 끝에 닿지 않게 살짝 띄운다 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PieceChargeItem"] button[class*="bg-primary-400"] {
+      margin-left: 8px !important;
+      padding-left: 12px !important;
+      padding-right: 12px !important;
+      border-radius: 9px !important;
+    }
+
+    /* 스크롤 막대도 밝은 시트에 맞춘다 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
+      ) div[class*="overflow-y-auto"] {
+      scrollbar-width: thin !important;
+      scrollbar-color: rgba(70,88,99,.28) transparent !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
+      ) div[class*="overflow-y-auto"]::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
+      ) div[class*="overflow-y-auto"]::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
+      ) div[class*="overflow-y-auto"]::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 8px;
+      background-clip: content-box;
+      background-color: rgba(70,88,99,.28);
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
+      ) div[class*="overflow-y-auto"]::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(70,88,99,.42);
     }
 
 
