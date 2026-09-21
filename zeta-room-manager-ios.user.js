@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.70
+// @version      0.20.71
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.70';
+  const SCRIPT_VERSION = '0.20.71';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -2933,15 +2933,20 @@
 
     renderCollectionBanner();
 
+    // 제타는 목록을 건드릴 때마다 이 줄을 다시 그린다. 그때마다 자리를
+    // 다시 잡으면 버튼이 눈에 띄게 움직인다. 이미 붙어 있으면 그대로 둔다.
+    const placed = tools.isConnected
+      && tools.parentElement
+      && tools.parentElement.isConnected
+      && !tools.classList.contains('zrm-tools-fallback');
+    if (placed) return;
+
     const anchor = collectionToolsAnchor();
     if (anchor && anchor.host) {
       tools.classList.remove('zrm-tools-fallback');
-      if (tools.parentElement !== anchor.host) {
-        anchor.host.insertBefore(tools, anchor.before || null);
-      } else if (anchor.before && tools.nextElementSibling !== anchor.before) {
-        anchor.host.insertBefore(tools, anchor.before);
-      }
-    } else {
+      anchor.host.insertBefore(tools, anchor.before || null);
+    } else if (!tools.isConnected || !tools.parentElement?.isConnected) {
+      // 붙일 자리를 아직 못 찾았을 때만 화면 구석에 띄운다.
       tools.classList.add('zrm-tools-fallback');
       if (tools.parentElement !== document.body) document.body.appendChild(tools);
     }
