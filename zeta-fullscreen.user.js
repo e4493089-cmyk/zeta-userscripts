@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.21
+// @version      0.1.22
 // @description  스냅샷 버튼이 있으면 바로 위에, 없으면 실제 액션 버튼 자리와 같은 채팅 영역 왼쪽 아래에 전체화면 버튼을 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -16,12 +16,14 @@
   const BUTTON_ID = 'zeta-fullscreen-native-button';
   const PANEL_SELECTOR = '[data-sentry-component="ActionPanelButton"]';
   const COMPOSER_SELECTOR = '[data-sentry-component="ChatComposer"]';
+  const EXPANDED_EDIT_SELECTOR = '[data-sentry-component="EditModeInputPanelContent"] section[data-expanded="true"]';
   const isChatRoom = () => /(?:^|\/)rooms\/[^/?#]+(?:\/|$)/.test(location.pathname);
 
   let retryTimer = 0;
   let anchorObserver = null;
   let observedParent = null;
   let panelSeenInRoom = false;
+  let editObserver = null;
 
   const fullscreenIcon = `
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" class="size-4" style="color:inherit">
@@ -120,6 +122,30 @@
     return true;
   }
 
+  function isExpandedEditOpen() {
+    return !!document.querySelector(EXPANDED_EDIT_SELECTOR);
+  }
+
+  function syncButtonVisibility() {
+    const button = document.getElementById(BUTTON_ID);
+    if (!button) return;
+    button.style.display = isExpandedEditOpen() ? 'none' : '';
+  }
+
+  function watchEditState() {
+    editObserver?.disconnect();
+    editObserver = new MutationObserver(() => {
+      syncButtonVisibility();
+    });
+    editObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-expanded']
+    });
+    syncButtonVisibility();
+  }
+
   function mountBestAvailable() {
     if (!isChatRoom()) return false;
 
@@ -128,6 +154,7 @@
       panelSeenInRoom = true;
       if (mountOnPanel(panel)) {
         watchAnchorParent(panel.parentElement);
+        syncButtonVisibility();
         return true;
       }
     }
@@ -142,6 +169,7 @@
     const composer = document.querySelector(COMPOSER_SELECTOR);
     if (composer && mountInEmptyPanelSlot(composer)) {
       watchAnchorParent(getNativePanelSlot(composer));
+      syncButtonVisibility();
       return true;
     }
 
@@ -181,11 +209,16 @@
     clearTimeout(retryTimer);
     anchorObserver?.disconnect();
     anchorObserver = null;
+    editObserver?.disconnect();
+    editObserver = null;
     observedParent = null;
     panelSeenInRoom = false;
     document.getElementById(BUTTON_ID)?.remove();
 
-    if (isChatRoom()) setupWhenReady();
+    if (isChatRoom()) {
+      watchEditState();
+      setupWhenReady();
+    }
   }
 
   function hookHistory(name) {
@@ -203,5 +236,8 @@
   hookHistory('replaceState');
   window.addEventListener('popstate', syncRoute);
 
-  if (isChatRoom()) setupWhenReady();
+  if (isChatRoom()) {
+    watchEditState();
+    setupWhenReady();
+  }
 })();
