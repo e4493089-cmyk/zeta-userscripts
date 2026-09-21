@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.38
+// @version      0.20.39
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1685,6 +1685,14 @@
     };
 
     const onResult = (target, result, error) => {
+      // 재검증 표시는 시도한 순간 내린다. 결과와 무관하다.
+      // 성공했을 때만 내리면, 끝내 못 읽는 방이 영원히 대상으로 남아
+      // 새로고침이 끝나지 않는다.
+      const attemptedEntry = state.index[keyOf('room', target.roomId)];
+      if (attemptedEntry && attemptedEntry.needsProfileRefresh) {
+        delete attemptedEntry.needsProfileRefresh;
+      }
+
       if (result) {
         applyProfileResult(target, result, { replaceNames: force || Boolean(target.replaceNames) });
         done++;
@@ -1887,7 +1895,11 @@
 
       const total = roomCollectionCount();
 
-      if (profiles.limited && !collectionAborted) {
+      // 한 바퀴 돌았는데 하나도 처리하지 못했다면 다시 새로고침해도 같다.
+      // 여기서 멈추지 않으면 새로고침이 끝나지 않는다.
+      if (profiles.limited && !collectionAborted && profiles.attempted <= 0) {
+        clearProfileResume();
+      } else if (profiles.limited && !collectionAborted) {
         const previousResume = readProfileResume() || {};
         writeProfileResume({
           active: true,
@@ -2014,7 +2026,9 @@
         targets: forceResume ? profiles.remainingTargets : undefined
       };
 
-      if (profiles.limited && !collectionAborted) {
+      if (profiles.limited && !collectionAborted && profiles.attempted <= 0) {
+        clearProfileResume();
+      } else if (profiles.limited && !collectionAborted) {
         writeProfileResume(next);
         saveStateNow();
         roomCollectionProgress = {
