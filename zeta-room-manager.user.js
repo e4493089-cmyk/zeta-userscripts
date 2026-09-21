@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.18
+// @version      0.23.19
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1540,7 +1540,7 @@
         // 모바일/Monkey에서는 가상 목록이 페이지를 추가하면서 스크롤 컨테이너
         // 자체를 교체하는 경우가 있다. 시작할 때 잡은 낡은 host를 계속 쓰면
         // 중간 지점에서 더 이상 내려가지 못하므로 현재 DOM의 host를 다시 잡는다.
-        if (force && (!mobileList || round % 6 === 0 || barrenRounds >= 2)) {
+        if ((force || mobileList) && (!mobileList || round % 4 === 0 || barrenRounds >= 2)) {
           const liveHost = roomCollectionScrollHost();
           if (liveHost && liveHost !== host) {
             const oldTop = scrollMetrics(host).top;
@@ -1561,10 +1561,10 @@
         const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
         if (nearBottom) {
           setScrollTop(host, before.height);
-          await sleep(force ? (mobileList ? 700 : 1200) : 700);
+          await sleep(mobileList ? 900 : (force ? 1200 : 700));
           if (collectionAborted) break;
 
-          if (force) {
+          if (force || mobileList) {
             const liveHost = roomCollectionScrollHost();
             if (liveHost && liveHost !== host) {
               host = liveHost;
@@ -1583,7 +1583,7 @@
 
             // 모바일 무한목록은 다음 묶음 로딩이 늦으면 중간 지점을 바닥처럼 보이게 한다.
             // 강제 재수집에서는 위로 살짝 올렸다가 다시 바닥으로 내려 로딩 감지를 깨운다.
-            if (force && stableRounds % 2 === 0) {
+            if ((force || mobileList) && stableRounds % 2 === 0) {
               const nudge = Math.max(240, Math.floor(after.client * 0.45));
               setScrollTop(host, Math.max(0, after.top - nudge));
               await sleep(mobileList ? 120 : 250);
@@ -1601,19 +1601,20 @@
           }
 
           // 일반 수집은 기존 판정을 유지하고, 다시 전체 수집은 훨씬 오래 확인한다.
-          if (stableRounds >= (force ? 12 : 4)) break;
+          const stableLimit = mobileList ? (force ? 14 : 8) : (force ? 12 : 4);
+          if (stableRounds >= stableLimit) break;
         } else {
           stableRounds = 0;
           // 이미 아는 방만 지나가는 구간은 크게 건너뛴다.
           // 다시 수집할 때 목록 전체를 처음부터 훑는 시간을 줄인다.
           const factor = !force && barrenRounds >= 3
-            ? 2.6
-            : (force && mobileList ? 0.96 : 0.78);
-          const step = Math.max(force && mobileList ? 420 : 320, Math.floor(before.client * factor));
+            ? (mobileList ? 1.0 : 2.6)
+            : (mobileList ? 0.9 : 0.78);
+          const step = Math.max(mobileList ? 380 : 320, Math.floor(before.client * factor));
           setScrollTop(host, Math.min(before.height, before.top + step));
           await sleep(!force && barrenRounds >= 3
-            ? 170
-            : (force && mobileList ? 160 : 320));
+            ? (mobileList ? 240 : 170)
+            : (mobileList ? 220 : 320));
           if (collectionAborted) break;
         }
 
@@ -1625,7 +1626,8 @@
 
         // 새로 들어오는 방이 한참 없으면 나머지는 이미 수집된 구간이다.
         // 제타는 최근 대화 순으로 정렬하므로 새 방은 위쪽에 있다.
-        if (!force && knownAtStart > 0 && barrenRounds >= 14) {
+        const knownStopLimit = mobileList ? 28 : 14;
+        if (!force && knownAtStart > 0 && barrenRounds >= knownStopLimit) {
           skippedKnown = true;
           break;
         }
