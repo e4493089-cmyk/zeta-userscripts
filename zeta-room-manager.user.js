@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.59
+// @version      0.23.60
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.59';
+  const SCRIPT_VERSION = '0.23.60';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1300,10 +1300,9 @@
     return text && text.length <= 40 ? text : '';
   }
 
-  function roomCharacterCount(roomId) {
+  function roomCharacterNames(roomId) {
     const entry = peekEntry(keyOf('room', roomId));
-    const names = entry && Array.isArray(entry.characterNames) ? entry.characterNames : [];
-    return names.length;
+    return entry && Array.isArray(entry.characterNames) ? entry.characterNames : [];
   }
 
   async function collectOneRoom(item) {
@@ -1348,8 +1347,9 @@
       saveState();
     }
 
-    if (!roomCharacterCount(roomId)) return { ok: false, reason: '캐릭터명을 찾지 못했습니다' };
-    return { ok: true };
+    const collected = roomCharacterNames(roomId);
+    if (!collected.length) return { ok: false, reason: '캐릭터명을 찾지 못했습니다' };
+    return { ok: true, names: collected };
   }
 
   function showConvertProgress(current, total, name) {
@@ -1459,6 +1459,7 @@
 
     const startedAt = location.pathname + location.search;
     const failed = [];
+    const collected = [];
     let done = 0;
     let skipped = 0;
 
@@ -1471,6 +1472,9 @@
         if (result.ok) {
           done++;
           if (result.skipped) skipped++;
+          if (result.names && result.names.length) {
+            collected.push({ room: item.name, names: result.names });
+          }
         } else if (result.reason !== '중지됨') {
           failed.push({ name: item.name, url: item.url, reason: result.reason });
         }
@@ -1489,7 +1493,8 @@
       okCount: done,
       failCount: failed.length,
       failures: failed,
-      failuresLabel: '이름을 못 받은 대화방'
+      failuresLabel: '이름을 못 받은 대화방',
+      collected
     });
   }
 
@@ -1667,11 +1672,12 @@
   }
 
   // title: 팝업 제목, okCount/failCount: 수집 완료·실패 개수, failures: 실패 목록 전체.
-  function showCollectionResult({ title, okLabel, okCount, failCount, failures, failuresLabel, action }) {
+  function showCollectionResult({ title, okLabel, okCount, failCount, failures, failuresLabel, action, collected }) {
     ensureCollectionResultStyle();
     document.getElementById(COLLECTION_RESULT_ID)?.remove();
 
     const list = Array.isArray(failures) ? failures : [];
+    const found = (Array.isArray(collected) ? collected : []).filter(item => item && item.names && item.names.length);
     const modal = document.createElement('div');
     modal.id = COLLECTION_RESULT_ID;
     modal.className = 'zrm-modal';
@@ -1703,6 +1709,26 @@
     statValues[1].textContent = failCount + '개';
     card.appendChild(stats);
 
+    if (found.length) {
+      const box = document.createElement('div');
+      box.className = 'zrm-result-list';
+      const boxTitle = document.createElement('div');
+      boxTitle.className = 'zrm-result-list-title';
+      boxTitle.textContent = '수집한 이름 ' + found.length + '개';
+      box.appendChild(boxTitle);
+      for (const item of found) {
+        const row = document.createElement('div');
+        row.className = 'zrm-result-item';
+        const names = document.createElement('b');
+        names.textContent = item.names.join(', ');
+        const room = document.createElement('span');
+        room.textContent = item.room || '(제목 없음)';
+        row.append(names, document.createElement('br'), room);
+        box.appendChild(row);
+      }
+      card.appendChild(box);
+    }
+
     if (list.length) {
       const box = document.createElement('div');
       box.className = 'zrm-result-list';
@@ -1727,6 +1753,12 @@
       title,
       (okLabel || '수집 완료') + ' ' + okCount + '개 · 실패 ' + failCount + '개'
     ].concat(
+      found.length
+        ? ['', '수집한 이름 ' + found.length + '개'].concat(
+            found.map(item => '· ' + item.names.join(', ') + '\n  ' + (item.room || '(제목 없음)'))
+          )
+        : []
+    ).concat(
       list.length
         ? ['', (failuresLabel || '실패한 대화방') + ' ' + list.length + '개'].concat(
             list.map(item => '· ' + (item.name || '(제목 없음)') + '\n  ' + (item.url || ''))
@@ -1738,7 +1770,7 @@
     const buttons = document.createElement('div');
     buttons.className = 'zrm-result-buttons';
     buttons.innerHTML =
-      (list.length ? '<button type="button" class="zrm-result-copy">복사</button>' : '') +
+      (list.length || found.length ? '<button type="button" class="zrm-result-copy">복사</button>' : '') +
       '<button type="button" class="zrm-result-close">닫기</button>';
     card.appendChild(buttons);
 
