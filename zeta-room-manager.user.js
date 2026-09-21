@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.53
+// @version      0.23.54
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.53';
+  const SCRIPT_VERSION = '0.23.54';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -882,20 +882,6 @@
     return payload;
   }
 
-  function metadataCoverage(type) {
-    let total = 0;
-    let character = 0;
-    let creator = 0;
-    for (const entry of Object.values(state.index || {})) {
-      if (!entry || entry.type !== type) continue;
-      total++;
-      const meta = plotMetaForEntry(entry);
-      if (uniqueTexts(entry.characterNames, meta && meta.characterNames).length) character++;
-      if (uniqueTexts(entry.creatorNames, meta && meta.creatorNames).length) creator++;
-    }
-    return { total, character, creator };
-  }
-
   function canonicalPlotId(plotId, originatedId) {
     // 내 계정에 있는 실제 플롯(plot.id)을 우선한다.
     // originatedId는 원본이며, 원본이 삭제된 경우 조회가 영구 실패한다.
@@ -1216,6 +1202,248 @@
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
   }
 
+  // ── 수집 결과 팝업 ───────────────────────────────────────────────────
+  // 브라우저 기본 alert 대신 수집 중 배너와 같은 모양의 팝업으로 보여준다.
+  // 실패한 항목은 잘라내지 않고 전부 담고, 전체 내용을 복사할 수 있게 한다.
+  const COLLECTION_RESULT_ID = 'zeta-room-manager-collection-result';
+  const COLLECTION_RESULT_STYLE_ID = 'zeta-room-manager-collection-result-style';
+
+  function ensureCollectionResultStyle() {
+    if (document.getElementById(COLLECTION_RESULT_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = COLLECTION_RESULT_STYLE_ID;
+    style.textContent = `
+      #${COLLECTION_RESULT_ID} {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483646;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(0,0,0,.45);
+        box-sizing: border-box;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-card {
+        width: min(340px, 100%);
+        max-height: min(78vh, 560px);
+        display: flex;
+        flex-direction: column;
+        padding: 20px 18px 16px;
+        border-radius: 16px;
+        background: #fff;
+        color: #1b1b1f;
+        text-align: center;
+        font: 500 12px/1.5 system-ui, -apple-system, sans-serif;
+        box-shadow: 0 20px 60px rgba(0,0,0,.4);
+        box-sizing: border-box;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-title { font-size: 13px; font-weight: 700; }
+      #${COLLECTION_RESULT_ID} .zrm-result-stats {
+        display: flex;
+        gap: 10px;
+        margin: 12px 0 4px;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-stat {
+        flex: 1 1 0;
+        padding: 10px 6px;
+        border-radius: 12px;
+        background: #f5f4ff;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-stat.zrm-result-fail { background: #fff1f1; }
+      #${COLLECTION_RESULT_ID} .zrm-result-stat-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #6b6b74;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-stat-value {
+        margin-top: 4px;
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        color: #6d52ff;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-fail .zrm-result-stat-value { color: #b4232a; }
+      #${COLLECTION_RESULT_ID} .zrm-result-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-top: 12px;
+        padding: 10px;
+        border-radius: 12px;
+        background: #f7f7fa;
+        text-align: left;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-list-title {
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #45454e;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-item {
+        padding: 6px 0;
+        border-top: 1px solid #e7e7ec;
+        font-size: 11px;
+        line-height: 1.45;
+        word-break: break-all;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-item:first-child { border-top: 0; }
+      #${COLLECTION_RESULT_ID} .zrm-result-item b { font-weight: 700; }
+      #${COLLECTION_RESULT_ID} .zrm-result-item span { color: #6b6b74; }
+      #${COLLECTION_RESULT_ID} .zrm-result-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      #${COLLECTION_RESULT_ID} button {
+        flex: 1 1 0;
+        height: 40px;
+        border: 0;
+        border-radius: 10px;
+        font: 700 12px/1 system-ui, sans-serif;
+        cursor: pointer;
+      }
+      #${COLLECTION_RESULT_ID} .zrm-result-copy { background: #6d52ff; color: #fff; }
+      #${COLLECTION_RESULT_ID} .zrm-result-close { background: #f0f0f3; color: #45454e; }
+      @media (max-width: 600px) {
+        #${COLLECTION_RESULT_ID} { padding: 14px; }
+        #${COLLECTION_RESULT_ID} .zrm-result-card {
+          width: min(300px, 100%);
+          padding: 17px 15px 14px;
+          font-size: 11px;
+        }
+        #${COLLECTION_RESULT_ID} .zrm-result-title { font-size: 12px; }
+        #${COLLECTION_RESULT_ID} .zrm-result-stat-value { font-size: 18px; }
+        #${COLLECTION_RESULT_ID} button { height: 36px; font-size: 11px; }
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  async function copyCollectionResultText(text, button) {
+    let copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    } catch (_) { copied = false; }
+
+    if (!copied) {
+      // iOS 사파리 등 clipboard API가 막힌 환경을 위한 대비책.
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', 'readonly');
+      area.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+      document.body.appendChild(area);
+      area.select();
+      area.setSelectionRange(0, text.length);
+      try { copied = document.execCommand('copy'); } catch (_) { copied = false; }
+      area.remove();
+    }
+
+    if (button) {
+      const original = button.dataset.zrmLabel || button.textContent;
+      button.dataset.zrmLabel = original;
+      button.textContent = copied ? '복사됨' : '복사 실패';
+      setTimeout(() => { button.textContent = original; }, 1500);
+    }
+  }
+
+  // title: 팝업 제목, okCount/failCount: 수집 완료·실패 개수, failures: 실패 목록 전체.
+  function showCollectionResult({ title, okLabel, okCount, failCount, failures }) {
+    ensureCollectionResultStyle();
+    document.getElementById(COLLECTION_RESULT_ID)?.remove();
+
+    const list = Array.isArray(failures) ? failures : [];
+    const modal = document.createElement('div');
+    modal.id = COLLECTION_RESULT_ID;
+
+    const card = document.createElement('div');
+    card.className = 'zrm-result-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'zrm-result-title';
+    titleEl.textContent = title;
+    card.appendChild(titleEl);
+
+    const stats = document.createElement('div');
+    stats.className = 'zrm-result-stats';
+    stats.innerHTML =
+      '<div class="zrm-result-stat">' +
+        '<div class="zrm-result-stat-label"></div>' +
+        '<div class="zrm-result-stat-value"></div>' +
+      '</div>' +
+      '<div class="zrm-result-stat zrm-result-fail">' +
+        '<div class="zrm-result-stat-label">실패</div>' +
+        '<div class="zrm-result-stat-value"></div>' +
+      '</div>';
+    const statValues = stats.querySelectorAll('.zrm-result-stat-value');
+    stats.querySelector('.zrm-result-stat-label').textContent = okLabel || '수집 완료';
+    statValues[0].textContent = okCount + '개';
+    statValues[1].textContent = failCount + '개';
+    card.appendChild(stats);
+
+    if (list.length) {
+      const box = document.createElement('div');
+      box.className = 'zrm-result-list';
+      const listTitle = document.createElement('div');
+      listTitle.className = 'zrm-result-list-title';
+      listTitle.textContent = '실패한 대화방 ' + list.length + '개';
+      box.appendChild(listTitle);
+      for (const item of list) {
+        const row = document.createElement('div');
+        row.className = 'zrm-result-item';
+        const name = document.createElement('b');
+        name.textContent = item.name || '(제목 없음)';
+        const url = document.createElement('span');
+        url.textContent = item.url || '';
+        row.append(name, document.createElement('br'), url);
+        box.appendChild(row);
+      }
+      card.appendChild(box);
+    }
+
+    const copyText = [
+      title,
+      (okLabel || '수집 완료') + ' ' + okCount + '개 · 실패 ' + failCount + '개'
+    ].concat(
+      list.length
+        ? ['', '실패한 대화방 ' + list.length + '개'].concat(
+            list.map(item => '· ' + (item.name || '(제목 없음)') + '\n  ' + (item.url || ''))
+          )
+        : []
+    ).join('\n');
+
+    const buttons = document.createElement('div');
+    buttons.className = 'zrm-result-buttons';
+    buttons.innerHTML =
+      '<button type="button" class="zrm-result-copy">복사</button>' +
+      '<button type="button" class="zrm-result-close">닫기</button>';
+    card.appendChild(buttons);
+
+    const close = () => modal.remove();
+    buttons.querySelector('.zrm-result-copy').addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      void copyCollectionResultText(copyText, event.currentTarget);
+    });
+    buttons.querySelector('.zrm-result-close').addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+    });
+    modal.addEventListener('click', event => {
+      if (event.target === modal) close();
+    });
+
+    modal.appendChild(card);
+    document.body.appendChild(modal);
+  }
+
   function describeFailure(target, reason) {
     const entry = state.index[keyOf('room', target.roomId)];
     const meta = entry ? plotMetaForEntry(entry) : null;
@@ -1229,14 +1457,6 @@
       roomId: target.roomId,
       reason
     };
-  }
-
-  function failureSummary(failures) {
-    const counts = new Map();
-    for (const item of failures) counts.set(item.reason, (counts.get(item.reason) || 0) + 1);
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([reason, count]) => reason + (count > 1 ? ' × ' + count : ''));
   }
 
   function roomApiCollectionTargets(force = false, roomKeys = null) {
@@ -1539,44 +1759,18 @@
       roomCollectionProgress = { running: false, count: total };
       renderCollectionTools();
 
-      const coverage = metadataCoverage('room');
-      const aliases = Object.values(state.index).filter(entry =>
-        entry && entry.type === 'room' && normalizeText(entry.alias)
-      ).length;
       const resultTitle = collectionAborted
         ? (force ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨')
         : (!listCompleted
             ? (force ? '다시 전체 수집 일부 완료' : '대화방 목록 끝 확인 실패')
             : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료'));
-      const shownFailures = profiles.failures.slice(0, 10);
-      const apiStatus = profiles.waitingForPlotCollection
-        ? '먼저 플롯 전체 수집 필요 · 추가 호출 0개'
-        : profiles.waitingForRoomCollection
-          ? '대화방 목록 끝 확인 전 · 추가 호출 0개'
-          : profiles.apiLocked
-            ? ('API 잠금 · 추가 호출 0개' + (profiles.remaining ? ' · 빈 플롯 ' + profiles.remaining + '개' : ''))
-            : ('API ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개' +
-              (profiles.apiLockCreated ? ' · 빈 항목 없음 · 잠금 완료' : ' · 미완료라 잠금 안 함'));
-
-      alert(
-        resultTitle + ' · 저장된 방 ' + total + '개' +
-        (force && seenRoomKeys ? ' · 이번 확인 ' + seenRoomKeys.size + '개' : '') +
-        (!listCompleted && !collectionAborted ? ' (목록 끝 확인 실패)' : '') +
-        '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
-        '\n이름 조회: ' + apiStatus +
-        (profiles.failed ? ' · 실패 ' + profiles.failed + '개' : '') +
-        (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개' : '') +
-        (profiles.noPlotId ? '\nplotId 없어 API 조회하지 못한 방 ' + profiles.noPlotId + '개' : '') +
-        (profiles.failed
-          ? '\n\n실패 사유\n' + failureSummary(profiles.failures).map(line => '· ' + line).join('\n') +
-            '\n\n실패한 대화방 (최대 10개 표시)\n' + shownFailures
-              .map(item => '· ' + item.name + '\n  ' + item.url)
-              .join('\n') +
-            (profiles.failures.length > shownFailures.length
-              ? '\n· 외 ' + (profiles.failures.length - shownFailures.length) + '개'
-              : '')
-          : '')
-      );
+      showCollectionResult({
+        title: resultTitle,
+        okLabel: '수집 완료',
+        okCount: total,
+        failCount: profiles.failed,
+        failures: profiles.failures
+      });
       return true;
     })().finally(() => {
       forceReconcileSeenRoomKeys = null;
@@ -1890,15 +2084,13 @@
       const total = plotCollectionCount();
       plotCollectionProgress = { running: false, count: total };
       renderCollectionTools();
-      const coverage = metadataCoverage('plot');
-      const aliases = Object.values(state.index).filter(entry =>
-        entry && entry.type === 'plot' && normalizeText(entry.alias)
-      ).length;
-      alert(
-        (collectionAborted ? '전체 수집 중지됨' : (listCompleted ? '전체 수집 완료' : '목록 끝 확인 실패')) +
-        ' · 저장된 플롯 ' + total + '개' +
-        '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
-      );
+      showCollectionResult({
+        title: (collectionAborted ? '전체 수집 중지됨' : (listCompleted ? '전체 수집 완료' : '목록 끝 확인 실패')),
+        okLabel: '수집 완료',
+        okCount: total,
+        failCount: 0,
+        failures: []
+      });
       return true;
     })().finally(() => {
       plotCollectionPromise = null;
