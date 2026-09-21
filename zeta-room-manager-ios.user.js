@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.8
+// @version      0.20.9
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -2275,14 +2275,14 @@
         background: #fff;
         color: #1b1b1f;
         text-align: center;
-        font: 500 13px/1.5 system-ui, -apple-system, sans-serif;
+        font: 500 12px/1.5 system-ui, -apple-system, sans-serif;
         box-shadow: 0 20px 60px rgba(0,0,0,.4);
         box-sizing: border-box;
       }
-      #${COLLECTION_BANNER_ID} .zrm-banner-title { font-size: 14px; font-weight: 700; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-title { font-size: 13px; font-weight: 700; }
       #${COLLECTION_BANNER_ID} .zrm-banner-count {
         margin: 10px 0 12px;
-        font-size: 26px;
+        font-size: 20px;
         font-weight: 800;
         letter-spacing: -.02em;
         color: #6d52ff;
@@ -2290,17 +2290,17 @@
       #${COLLECTION_BANNER_ID} .zrm-banner-eta {
         margin: -6px 0 12px;
         color: #45454e;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
       }
-      #${COLLECTION_BANNER_ID} .zrm-banner-note { color: #6b6b74; font-size: 11px; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-note { color: #6b6b74; font-size: 10px; }
       #${COLLECTION_BANNER_ID} .zrm-banner-warn {
         margin-top: 8px;
         padding: 7px 9px;
         border-radius: 8px;
         background: #fff1f1;
         color: #b4232a;
-        font-size: 11px;
+        font-size: 10px;
         line-height: 1.45;
       }
       #${COLLECTION_BANNER_ID} .zrm-banner-stop {
@@ -2311,7 +2311,7 @@
         border-radius: 10px;
         background: #f0f0f3;
         color: #45454e;
-        font: 700 13px/1 system-ui, sans-serif;
+        font: 700 12px/1 system-ui, sans-serif;
         cursor: pointer;
       }
       #${COLLECTION_BANNER_ID} .zrm-banner-stop:hover { background: #e6e6ea; }
@@ -2374,7 +2374,7 @@
         padding: 16px 16px 10px;
       }
       #${COLLECTION_MODAL_ID} .zrm-collection-title {
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 700;
       }
       #${COLLECTION_MODAL_ID} .zrm-collection-close {
@@ -2385,13 +2385,13 @@
         border-radius: 8px;
         background: transparent;
         color: rgba(255,255,255,.7);
-        font-size: 22px;
+        font-size: 20px;
         line-height: 1;
       }
       #${COLLECTION_MODAL_ID} .zrm-collection-count {
         padding: 0 16px 12px;
         color: rgba(255,255,255,.5);
-        font-size: 12px;
+        font-size: 11px;
       }
       #${COLLECTION_MODAL_ID} .zrm-collection-actions {
         display: grid;
@@ -2406,7 +2406,7 @@
         border-radius: 10px;
         background: rgba(255,255,255,.08);
         color: #fff;
-        font-size: 13px;
+        font-size: 12px;
         text-align: left;
       }
       #${COLLECTION_MODAL_ID} .zrm-collection-actions button:disabled {
@@ -2434,8 +2434,8 @@
         overflow: hidden;
       }
       #${MODAL_ID} .zrm-dialog-body { padding: 18px; }
-      #${MODAL_ID} h3 { margin: 0 0 6px; font-size: 17px; }
-      #${MODAL_ID} p { margin: 0 0 13px; color: rgba(255,255,255,.55); font-size: 12px; line-height: 1.5; }
+      #${MODAL_ID} h3 { margin: 0 0 6px; font-size: 15px; }
+      #${MODAL_ID} p { margin: 0 0 13px; color: rgba(255,255,255,.55); font-size: 11px; line-height: 1.5; }
       #${MODAL_ID} input {
         width: 100%;
         height: 42px;
