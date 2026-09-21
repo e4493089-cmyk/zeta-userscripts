@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.51
+// @version      0.23.52
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.51';
+  const SCRIPT_VERSION = '0.23.52';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -35,7 +35,8 @@
   const ROOM_COLLECTION_STAMP_KEY = 'zeta-room-manager:room-collection-at:v1';
   // 일반 전체 수집에서 능동 API 이름 보충을 한 번 끝내면 잠근다.
   // '다시 전체 수집'만 이 잠금을 그 실행 동안 무시한다.
-  const ROOM_API_BACKFILL_LOCK_KEY = 'zeta-room-manager:room-api-backfill-locked:v1';
+  const ROOM_API_BACKFILL_LOCK_KEY = 'zeta-room-manager:room-api-backfill-locked:v2';
+  const LEGACY_ROOM_API_BACKFILL_LOCK_KEY = 'zeta-room-manager:room-api-backfill-locked:v1';
   const API_BASE = 'https://api.zeta-ai.io';
   const WEB_CLIENT_VERSION = '3.44.7';
   let roomApiUnavailableUntil = 0;
@@ -266,6 +267,7 @@
     localStorage.removeItem(PLOT_COLLECTION_STAMP_KEY);
     localStorage.removeItem(ROOM_COLLECTION_STAMP_KEY);
     localStorage.removeItem(ROOM_API_BACKFILL_LOCK_KEY);
+    localStorage.removeItem(LEGACY_ROOM_API_BACKFILL_LOCK_KEY);
     localStorage.removeItem(CLEANUP_STAMP_KEY);
     saveStateNow();
   }
@@ -310,6 +312,7 @@
       PLOT_COLLECTION_STAMP_KEY,
       ROOM_COLLECTION_STAMP_KEY,
       ROOM_API_BACKFILL_LOCK_KEY,
+      LEGACY_ROOM_API_BACKFILL_LOCK_KEY,
       CLEANUP_STAMP_KEY,
       NO_API_CLEANUP_STAMP_KEY,
       'zeta-room-manager:last-plot-index-at:v1',
@@ -1274,20 +1277,26 @@
   }
 
   async function collectRoomMetaViaApi(force = false, roomKeys = null) {
-    const locked = !force && Boolean(localStorage.getItem(ROOM_API_BACKFILL_LOCK_KEY));
-    if (locked) {
+    const picked = roomApiCollectionTargets(force, roomKeys);
+    const targets = picked.targets;
+
+    if (!localStorage.getItem(PLOT_COLLECTION_STAMP_KEY)) {
       return {
-        locked: true, targets: 0, attempted: 0, done: 0, failed: 0,
-        remaining: 0, failures: [], noPlotId: 0
+        locked: false, waitingForPlotCollection: true, lockCreated: false,
+        targets: targets.length, attempted: 0, done: 0, failed: 0,
+        remaining: targets.length, failures: [], noPlotId: picked.noPlotId
       };
     }
 
-    // API를 쓰는 회차가 시작되는 즉시 잠근다.
-    // 중간에 탭이 닫히거나 사용자가 중지해도 일반 수집이 몰래 재호출하지 않는다.
-    try { localStorage.setItem(ROOM_API_BACKFILL_LOCK_KEY, String(Date.now())); } catch (_) {}
+    const locked = !force && Boolean(localStorage.getItem(ROOM_API_BACKFILL_LOCK_KEY));
+    if (locked) {
+      return {
+        locked: true, waitingForPlotCollection: false, lockCreated: false,
+        targets: targets.length, attempted: 0, done: 0, failed: 0,
+        remaining: targets.length, failures: [], noPlotId: picked.noPlotId
+      };
+    }
 
-    const picked = roomApiCollectionTargets(force, roomKeys);
-    const targets = picked.targets;
     const failures = [];
     let nextIndex = 0;
     let attempted = 0;
@@ -1299,10 +1308,12 @@
       running: true,
       count: roomCollectionCount(),
       roomTotal: roomCollectionCount(),
-      phase: '이름 API 조회',
+      phase: force ? '이름 API 전체 재조회' : '빈 이름 API 보충',
       current: 0,
       total: targets.length,
-      note: '방 목록은 스크롤 수집 · 이름만 API로 1회 보충'
+      note: force
+        ? '이번에 확인한 모든 플롯의 이름을 API로 다시 조회'
+        : '캐릭터명 또는 제작자명이 빈 플롯만 API로 보충'
     };
     renderCollectionTools();
 
@@ -1352,13 +1363,25 @@
     await Promise.all([worker(), worker()]);
     saveStateNow();
 
+    const remainingPicked = roomApiCollectionTargets(false, roomKeys);
+    const remaining = remainingPicked.targets.length;
+    // 요청한 API 회차가 끝까지 성공하고 빈 이름도 없어졌을 때만 잠근다.
+    const completed = !collectionAborted && !stop && failed === 0
+      && attempted === targets.length && remaining === 0;
+    try {
+      if (completed) localStorage.setItem(ROOM_API_BACKFILL_LOCK_KEY, String(Date.now()));
+      else localStorage.removeItem(ROOM_API_BACKFILL_LOCK_KEY);
+    } catch (_) {}
+
     return {
       locked: false,
+      waitingForPlotCollection: false,
+      lockCreated: completed,
       targets: targets.length,
       attempted,
       done,
       failed,
-      remaining: Math.max(0, targets.length - attempted),
+      remaining,
       failures,
       noPlotId: picked.noPlotId
     };
@@ -1488,9 +1511,11 @@
 
       // 방 목록은 여기까지 스크롤로만 수집했다.
       // 이름/제작자 보충은 일반 수집 최초 1회 또는 '다시 전체 수집'을 누른 그 회차에만 API를 쓴다.
-      const apiProfiles = collectionAborted
+      const apiProfiles = collectionAborted || !listCompleted
         ? {
-            locked: false, targets: 0, attempted: 0, done: 0, failed: 0,
+            locked: false, waitingForPlotCollection: false, lockCreated: false,
+            waitingForRoomCollection: !collectionAborted && !listCompleted,
+            targets: 0, attempted: 0, done: 0, failed: 0,
             remaining: 0, failures: [], noPlotId: 0
           }
         : await collectRoomMetaViaApi(force, force ? seenRoomKeys : null);
@@ -1503,6 +1528,9 @@
         remaining: apiProfiles.remaining,
         failures: apiProfiles.failures,
         apiLocked: apiProfiles.locked,
+        apiLockCreated: apiProfiles.lockCreated,
+        waitingForPlotCollection: apiProfiles.waitingForPlotCollection,
+        waitingForRoomCollection: apiProfiles.waitingForRoomCollection,
         noPlotId: apiProfiles.noPlotId
       };
 
@@ -1520,15 +1548,21 @@
             ? (force ? '다시 전체 수집 일부 완료' : '대화방 목록 끝 확인 실패')
             : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료'));
       const shownFailures = profiles.failures.slice(0, 10);
+      const apiStatus = profiles.waitingForPlotCollection
+        ? '먼저 플롯 전체 수집 필요 · 추가 호출 0개'
+        : profiles.waitingForRoomCollection
+          ? '대화방 목록 끝 확인 전 · 추가 호출 0개'
+          : profiles.apiLocked
+            ? ('API 잠금 · 추가 호출 0개' + (profiles.remaining ? ' · 빈 플롯 ' + profiles.remaining + '개' : ''))
+            : ('API ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개' +
+              (profiles.apiLockCreated ? ' · 빈 항목 없음 · 잠금 완료' : ' · 미완료라 잠금 안 함'));
 
       alert(
         resultTitle + ' · 저장된 방 ' + total + '개' +
         (force && seenRoomKeys ? ' · 이번 확인 ' + seenRoomKeys.size + '개' : '') +
         (!listCompleted && !collectionAborted ? ' (목록 끝 확인 실패)' : '') +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
-        '\n이름 조회: ' + (profiles.apiLocked
-          ? 'API 잠금 · 추가 호출 0개'
-          : ('API ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개')) +
+        '\n이름 조회: ' + apiStatus +
         (profiles.failed ? ' · 실패 ' + profiles.failed + '개' : '') +
         (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개' : '') +
         (profiles.noPlotId ? '\nplotId 없어 API 조회하지 못한 방 ' + profiles.noPlotId + '개' : '') +
@@ -3596,6 +3630,9 @@
   }
 
   function start() {
+    // v1은 API 실행 시작 시점에 너무 일찍 기록되던 잠금이므로 사용하지 않는다.
+    try { localStorage.removeItem(LEGACY_ROOM_API_BACKFILL_LOCK_KEY); } catch (_) {}
+
     // 같은 탭에 새 버전을 다시 주입하면 남은 UI의 이전 이벤트를 새 버전으로 다시 묶는다.
     document.getElementById(PLOT_TOOLS_ID)?.remove();
     document.getElementById(COLLECTION_MODAL_ID)?.remove();
