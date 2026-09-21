@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.15
+// @version      0.1.16
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.15';
+  const SCRIPT_VERSION = '0.1.16';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -455,11 +455,16 @@
 
         item.append(who, body);
         item.addEventListener('click', async () => {
-          // 옛 메시지는 거기까지 거슬러 올라가야 한다. 그동안 패널을 열어 둔 채
-          // 진행 상황을 보여 주고, 찾으면 그때 닫는다.
+          // 이동 중에는 긴 결과 목록을 접고 상태만 보이는 작은 창으로 만든다.
+          const card = panel.querySelector('.zcs-card');
+          card.classList.add('zcs-jumping');
           const found = await jumpToMessage(row, status);
-          if (found) closePanel();
-          else status('그 대화까지 가지 못했어요. 전체 색인을 돌린 뒤 다시 눌러 주세요.');
+          if (found) {
+            closePanel();
+          } else {
+            card.classList.remove('zcs-jumping');
+            status('그 대화까지 가지 못했어요. 전체 색인을 돌린 뒤 다시 눌러 주세요.');
+          }
         });
         list.appendChild(item);
       }
@@ -715,6 +720,19 @@
         cursor: pointer;
       }
       #${PANEL_ID} .zcs-more:hover { filter: brightness(.96); }
+      #${PANEL_ID} .zcs-card.zcs-jumping {
+        height: auto;
+        max-height: none;
+      }
+      #${PANEL_ID} .zcs-card.zcs-jumping .zcs-field,
+      #${PANEL_ID} .zcs-card.zcs-jumping .zcs-list,
+      #${PANEL_ID} .zcs-card.zcs-jumping .zcs-foot {
+        display: none;
+      }
+      #${PANEL_ID} .zcs-card.zcs-jumping .zcs-status {
+        padding: 8px 18px 22px;
+        font-size: 12px;
+      }
 
       /* 좁은 화면에서는 제타처럼 아래에서 올라오는 시트로 */
       @media (max-width: 600px) {
