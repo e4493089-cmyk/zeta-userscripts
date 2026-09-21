@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.52
+// @version      0.20.53
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  window.__zrmRoomManagerIosVersion = '0.20.52';
+  window.__zrmRoomManagerIosVersion = '0.20.53';
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
   // 별명만 따로 둔다. 목록을 그리는 데는 이것만 있으면 된다.
@@ -1403,8 +1403,10 @@
           'room', roomCollectionScrollHost, host, () => setScrollTop(host, 0)
         );
         host = moved.host;
+        if (moved.changed) await sleep(ROOM_COLLECTION_SETTLE_MS);
       } else {
         setScrollTop(host, 0);
+        await sleep(ROOM_COLLECTION_SETTLE_MS);
       }
       harvestRoomDocument(document);
 
@@ -1457,6 +1459,7 @@
           );
           if (collectionAborted) break;
           host = waited.host;
+          if (waited.changed) await sleep(ROOM_COLLECTION_SETTLE_MS);
           harvestRoomDocument(document);
         }
       }
@@ -1602,12 +1605,13 @@
     else host.scrollTop = value;
   }
 
-  const COLLECTION_STEP_RATIO = 0.85;
-  const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.85;
-  const PLOT_COLLECTION_STEP_RATIO = 0.85;
-  const PLOT_COLLECTION_SETTLE_MS = 80;
-  const COLLECTION_CHANGE_TIMEOUT_MS = 380;
-  const COLLECTION_BOTTOM_TIMEOUT_MS = 1300;
+  const COLLECTION_STEP_RATIO = 0.65;
+  const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.65;
+  const PLOT_COLLECTION_STEP_RATIO = 0.65;
+  const PLOT_COLLECTION_SETTLE_MS = 160;
+  const ROOM_COLLECTION_SETTLE_MS = 140;
+  const COLLECTION_CHANGE_TIMEOUT_MS = 550;
+  const COLLECTION_BOTTOM_TIMEOUT_MS = 1800;
 
   // 무거운 React 분석 없이 현재 렌더링된 목록 창의 정체만 빠르게 읽는다.
   // 새 창이 그려졌는지 판단하는 용도라 ID가 없는 플롯은 href/텍스트를 대체 토큰으로 쓴다.
