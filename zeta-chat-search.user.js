@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.1
+// @version      0.1.2
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.1';
+  const SCRIPT_VERSION = '0.1.2';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -374,11 +374,11 @@
   // ── 제타 사이드바 메뉴에 끼워 넣기 ───────────────────────────────────
   function menuAnchor() {
     const scope = document.querySelector('[data-sentry-component="ChatSidebar"]') || document.body;
-    for (const button of scope.querySelectorAll('button')) {
-      const text = clean(button.textContent);
-      if (text === '대화 캡처' || text === '책갈피 목록') return button;
-    }
-    return null;
+    const buttons = Array.from(scope.querySelectorAll('button'));
+    // '대화 캡처' 바로 아래가 제자리다. 없을 때만 책갈피 목록 뒤에 선다.
+    return buttons.find(button => clean(button.textContent) === '대화 캡처')
+      || buttons.find(button => clean(button.textContent) === '책갈피 목록')
+      || null;
   }
 
   function renderMenuRow() {
