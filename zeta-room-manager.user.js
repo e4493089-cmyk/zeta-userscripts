@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.68
+// @version      0.23.69
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.68';
+  const SCRIPT_VERSION = '0.23.69';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -3357,8 +3357,9 @@
         color: var(--kt-sub, #666);
       }
       html.kt-chat-theme-active #${MODAL_ID} .zrm-reset {
-        background: #FDECEC;
-        color: #C0392B;
+        background: transparent;
+        box-shadow: inset 0 0 0 1px var(--kt-line, #E7E7E7);
+        color: var(--kt-sub, #666);
       }
       html.kt-chat-theme-active #${MODAL_ID} .zrm-save {
         background: var(--kt-yellow, #FEE500);
