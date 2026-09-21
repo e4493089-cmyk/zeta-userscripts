@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.54
+// @version      0.20.55
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  window.__zrmRoomManagerIosVersion = '0.20.54';
+  window.__zrmRoomManagerIosVersion = '0.20.55';
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
   // 별명만 따로 둔다. 목록을 그리는 데는 이것만 있으면 된다.
@@ -57,6 +57,7 @@
   });
 
   let observer = null;
+  let suspendObserverRefresh = false;
   let swipeGesture = null;
   let rafPending = false;
   let lastRoomContextRecord = null;
@@ -2267,9 +2268,9 @@
     }
 
     const trigger = tools.querySelector('.zrm-tools-trigger');
-    if (trigger && trigger.dataset.zrmBoundVersion !== '0.20.54') {
+    if (trigger && trigger.dataset.zrmBoundVersion !== '0.20.55') {
       const replacement = trigger.cloneNode(true);
-      replacement.dataset.zrmBoundVersion = '0.20.54';
+      replacement.dataset.zrmBoundVersion = '0.20.55';
       trigger.replaceWith(replacement);
       replacement.addEventListener('click', event => {
         event.preventDefault();
