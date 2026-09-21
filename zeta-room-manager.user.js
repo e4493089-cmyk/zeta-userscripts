@@ -1133,6 +1133,19 @@
     return targets;
   }
 
+  // 숨긴 화면에서 confirm()이 뜨면 그 창의 스크립트가 통째로 멈춘다.
+  // "비공개로 전환할까요?" 같은 물음이 뜨면 수집이 거기서 정지한다.
+  function muteFrameDialogs(win) {
+    try {
+      if (!win || win.__zrmNoDialogs) return;
+      win.__zrmNoDialogs = true;
+      win.alert = () => {};
+      win.confirm = () => false;
+      win.prompt = () => null;
+      win.onbeforeunload = null;
+    } catch (_) {}
+  }
+
   async function readInFrame(frame, read, timeoutMs) {
     const end = Date.now() + timeoutMs;
     while (Date.now() < end) {
@@ -1141,6 +1154,7 @@
       try {
         const win = frame.contentWindow;
         if (win && win.document) {
+          muteFrameDialogs(win);
           const value = read(win);
           if (value) return value;
         }
@@ -1207,6 +1221,9 @@
   function hiddenFrame() {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
+    // allow-modals를 주지 않으면 그 안에서 alert/confirm이 무시된다.
+    // "비공개로 전환할까요?" 같은 물음이 뜨면 창 전체가 멈추기 때문에 막아 둔다.
+    frame.setAttribute('sandbox', 'allow-same-origin allow-scripts allow-forms');
     frame.tabIndex = -1;
     frame.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:390px;height:850px;opacity:0;pointer-events:none;border:0';
     document.body.appendChild(frame);
@@ -1470,6 +1487,35 @@
       );
     };
 
+    // 프로필 주소로 바로 가면 화면을 한 번만 불러도 된다.
+    // 제작자가 안 잡히는 경우에만 방을 거치는 느린 경로로 넘어간다.
+    const navigateProfile = async (plotId, deadline) => {
+      const active = ensureFrame();
+      active.src = '/' + localeSegment() + '/plots/' + plotId + '/profile';
+      // 직행은 빨리 뜨거나 안 뜨거나다. 오래 기다리면 느린 경로로 넘어가는 게 손해다.
+      return await readProfileIn(active, plotId, timeLeft(deadline, options.mobile ? 4500 : 6000));
+    };
+
+    const collectOne = async (target, deadline) => {
+      if (target.plotId) {
+        try {
+          const quick = await navigateProfile(target.plotId, deadline);
+          if (quick && quick.creators && quick.creators.length) return quick;
+          // 캐릭터만 얻었으면 제작자를 얻으러 방을 거쳐 본다.
+          try {
+            await resetFrame(0);
+            return await navigateRoom(target.roomId, deadline);
+          } catch (_) {
+            if (quick) return quick;
+            throw _;
+          }
+        } catch (error) {
+          await resetFrame(0);
+        }
+      }
+      return await navigateRoom(target.roomId, deadline);
+    };
+
     try {
       for (;;) {
         const target = queue.next();
@@ -1484,7 +1530,14 @@
         const deadline = Date.now() + targetBudgetMs;
 
         try {
-          const result = await navigateRoom(target.roomId, deadline);
+          // 내부 대기가 어떤 이유로 풀리지 않아도 예산이 지나면 넘어간다.
+          const result = await Promise.race([
+            collectOne(target, deadline),
+            (async () => {
+              await sleep(targetBudgetMs + 1500);
+              throw new Error('시간 초과 — 건너뜀');
+            })()
+          ]);
           onResult(target, result, null);
         } catch (error) {
           // 어떤 실패든 다음 타깃은 깨끗한 iframe에서 시작한다.
