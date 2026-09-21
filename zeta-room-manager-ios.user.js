@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.16
+// @version      0.20.17
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -28,6 +28,11 @@
   const COLLECTION_MODAL_ID = 'zeta-room-manager-collection-modal';
   const PLOT_COLLECTION_STAMP_KEY = 'zeta-room-manager:plot-collection-at:v1';
   const ROOM_COLLECTION_STAMP_KEY = 'zeta-room-manager:room-collection-at:v1';
+  const PROFILE_RESUME_KEY = 'zeta-room-manager:profile-resume:v1';
+  const BOOKMARKLET_MODE = Boolean(
+    window.__zetaRoomManagerBookmarklet ||
+    window.__zetaRoomManagerIosBookmarklet
+  );
 
   const state = loadState();
   let observer = null;
@@ -38,6 +43,22 @@
   let plotCollectionProgress = { running: false, count: 0 };
   let roomCollectionPromise = null;
   let roomCollectionProgress = { running: false, count: 0 };
+
+  function readProfileResume() {
+    try {
+      return JSON.parse(sessionStorage.getItem(PROFILE_RESUME_KEY) || 'null');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeProfileResume(value) {
+    try { sessionStorage.setItem(PROFILE_RESUME_KEY, JSON.stringify(value)); } catch (_) {}
+  }
+
+  function clearProfileResume() {
+    try { sessionStorage.removeItem(PROFILE_RESUME_KEY); } catch (_) {}
+  }
   // iOS에서는 목록 스크롤 때 MutationObserver가 매 프레임 refresh()를 다시 불러
   // 수집기가 같은 방을 두 번 분석하기 쉽다. 수집 중에는 수동 harvest만 사용한다.
   let suspendObserverRefresh = false;
@@ -1098,8 +1119,8 @@
   const MOBILE_PROFILE_WORKERS = 3;
   const PROFILE_FRAME_RECYCLE = 10;
   const PROFILE_SETTLE_MS = 200;
-  const PROFILE_BATCH_DESKTOP = 400;
-  const PROFILE_BATCH_MOBILE = 80;
+  const PROFILE_BATCH_DESKTOP = 80;
+  const PROFILE_BATCH_MOBILE = 50;
   let lastProfileFailures = [];
 
   function isMobileProfileDevice() {
@@ -1363,7 +1384,9 @@
 
     const progressNote = completed => {
       const eta = remainingText(startedAt, completed, targets.length);
-      const guard = '메모리 보호 · 이번 실행 ' + targets.length + '개까지';
+      const guard = BOOKMARKLET_MODE
+        ? '메모리 정리 · 이번 ' + targets.length + '개'
+        : '메모리 정리 · ' + targets.length + '개마다 자동 새로고침';
       return eta ? eta + ' · ' + guard : guard;
     };
 
@@ -1421,13 +1444,14 @@
 
     scheduleRefresh();
     lastProfileFailures = failures;
+    const remainingAfter = collectionAborted ? remaining : profileCollectionTargets(false).length;
     return {
       targets: allTargets.length,
       attempted: done + failed,
       done,
       failed,
-      remaining,
-      limited: remaining > 0 && !collectionAborted,
+      remaining: remainingAfter,
+      limited: remainingAfter > 0 && !collectionAborted,
       failures
     };
   }
@@ -1606,6 +1630,48 @@
       }
 
       const total = roomCollectionCount();
+
+      if (profiles.limited && !collectionAborted) {
+        const previousResume = readProfileResume() || {};
+        writeProfileResume({
+          active: true,
+          force: Boolean(previousResume.force || force),
+          attempted: Number(previousResume.attempted || 0) + profiles.attempted,
+          done: Number(previousResume.done || 0) + profiles.done,
+          failed: Number(previousResume.failed || 0) + profiles.failed,
+          startedAt: Number(previousResume.startedAt || Date.now())
+        });
+        saveStateNow();
+
+        roomCollectionProgress = {
+          running: true,
+          count: total,
+          roomTotal: total,
+          phase: '이름 수집',
+          current: profiles.attempted,
+          total: profiles.attempted + profiles.remaining,
+          note: BOOKMARKLET_MODE
+            ? '저장 완료 · 새로고침 후 북마클릿을 다시 실행하세요'
+            : '메모리 정리 후 자동으로 계속합니다'
+        };
+        renderCollectionTools();
+
+        if (BOOKMARKLET_MODE) {
+          alert(
+            '이름 수집을 ' + profiles.attempted + '개 저장했습니다.' +
+            '\n남은 플롯 약 ' + profiles.remaining + '개' +
+            '\n\n메모리를 비우려면 페이지를 새로고침한 뒤 Room Manager 북마클릿을 다시 실행하세요.' +
+            '\n목록은 다시 수집하지 않고 남은 이름부터 이어집니다.'
+          );
+          return true;
+        }
+
+        await sleep(500);
+        location.reload();
+        return true;
+      }
+
+      clearProfileResume();
       roomCollectionProgress = { running: false, count: total };
       renderCollectionTools();
       const coverage = metadataCoverage('room');
@@ -1614,9 +1680,7 @@
       ).length;
       const resultTitle = collectionAborted
         ? (force ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨')
-        : profiles.limited
-          ? '메모리 보호로 이름 수집 일시 정지'
-          : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료');
+        : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료');
       const shownFailures = profiles.failures.slice(0, 10);
       alert(
         resultTitle + ' · 저장된 방 ' + total + '개' +
@@ -1626,10 +1690,6 @@
         '\n이름 수집: 이번 ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개' +
         (profiles.failed ? ' · 실패 ' + profiles.failed + '개' : '') +
         (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개' : '') +
-        (profiles.limited
-          ? '\n\n브라우저 메모리 보호를 위해 여기서 저장하고 멈췄습니다.' +
-            '\n페이지를 새로고침한 뒤 일반 전체 수집을 누르면 남은 항목만 이어서 수집합니다.'
-          : '') +
         (profiles.failed
           ? '\n\n실패 사유\n' + failureSummary(profiles.failures).map(line => '· ' + line).join('\n') +
             '\n\n실패한 대화방 (최대 10개 표시)\n' + shownFailures
@@ -1649,6 +1709,81 @@
       renderCollectionTools();
       // 수집 중 미뤘던 별명/검색 UI 갱신은 마지막에 한 번만 한다.
       scheduleRefresh();
+    });
+
+    return roomCollectionPromise;
+  }
+
+  async function resumeProfileCollectionIfNeeded() {
+    const resume = readProfileResume();
+    if (!resume || !resume.active || currentSection() !== 'room' || roomCollectionPromise) return false;
+
+    roomCollectionPromise = (async () => {
+      collectionAborted = false;
+      void holdScreenAwake();
+      await sleep(700);
+
+      const profiles = await collectProfilesForEmptyPlots(Boolean(resume.force));
+      const next = {
+        ...resume,
+        active: true,
+        attempted: Number(resume.attempted || 0) + profiles.attempted,
+        done: Number(resume.done || 0) + profiles.done,
+        failed: Number(resume.failed || 0) + profiles.failed
+      };
+
+      if (profiles.limited && !collectionAborted) {
+        writeProfileResume(next);
+        saveStateNow();
+        roomCollectionProgress = {
+          running: true,
+          count: roomCollectionCount(),
+          roomTotal: roomCollectionCount(),
+          phase: '이름 수집',
+          current: next.attempted,
+          total: next.attempted + profiles.remaining,
+          note: BOOKMARKLET_MODE
+            ? '저장 완료 · 새로고침 후 북마클릿을 다시 실행하세요'
+            : '메모리 정리 후 자동으로 계속합니다'
+        };
+        renderCollectionTools();
+
+        if (BOOKMARKLET_MODE) {
+          alert(
+            '이름 수집을 추가로 ' + profiles.attempted + '개 저장했습니다.' +
+            '\n남은 플롯 약 ' + profiles.remaining + '개' +
+            '\n\n페이지를 새로고침한 뒤 Room Manager 북마클릿을 다시 실행하면 계속됩니다.'
+          );
+          return true;
+        }
+
+        await sleep(500);
+        location.reload();
+        return true;
+      }
+
+      clearProfileResume();
+      const total = roomCollectionCount();
+      const coverage = metadataCoverage('room');
+      const aliases = Object.values(state.index).filter(entry =>
+        entry && entry.type === 'room' && normalizeText(entry.alias)
+      ).length;
+      roomCollectionProgress = { running: false, count: total };
+      renderCollectionTools();
+
+      alert(
+        (collectionAborted ? '대화방 수집 중지됨' : '대화방 전체 수집 완료') +
+        ' · 저장된 방 ' + total + '개' +
+        '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
+        '\n이름 수집: 총 ' + next.attempted + '개 처리 · 성공 ' + next.done + '개' +
+        (next.failed ? ' · 실패 ' + next.failed + '개' : '')
+      );
+      return true;
+    })().finally(() => {
+      roomCollectionPromise = null;
+      roomCollectionProgress.running = false;
+      void releaseScreenAwake();
+      renderCollectionTools();
     });
 
     return roomCollectionPromise;
@@ -3495,6 +3630,7 @@
     observer = new MutationObserver(scheduleRefresh);
     bindSwipeOpenLock();
     refresh();
+    if (readProfileResume()?.active) setTimeout(() => { void resumeProfileCollectionIfNeeded(); }, 350);
 
     let lastUrl = location.href;
     setInterval(() => {
