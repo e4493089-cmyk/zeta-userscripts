@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.5
+// @version      0.23.6
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1210,50 +1210,89 @@
 
   async function profileWorker(queue, onResult, options = {}) {
     const slowMobileForce = Boolean(options.force && options.mobile);
-    for (;;) {
-      const target = queue.next();
-      if (!target) return;
+    let frame = null;
+    let used = 0;
 
-      try {
-        if (!target.plotId) {
-          onResult(target, await visitRoomProfile(target.roomId), null);
-          continue;
+    const ensureFrame = () => {
+      if (!frame || !frame.isConnected) frame = hiddenFrame();
+      return frame;
+    };
+    const hardNavigateProfile = async (plotId, timeoutMs) => {
+      const active = ensureFrame();
+      active.src = profilePath(plotId);
+      return await readProfileIn(active, plotId, timeoutMs);
+    };
+    const hardNavigateRoomProfile = async roomId => {
+      const active = ensureFrame();
+      active.src = '/' + localeSegment() + '/rooms/' + roomId;
+
+      const button = await readInFrame(active, win => {
+        if (!win.location.pathname.includes(roomId)) return null;
+        return win.document.querySelector(PROFILE_BUTTON);
+      }, 10000);
+      button.click();
+
+      return await readInFrame(active, win => {
+        if (!PROFILE_PATH.test(win.location.pathname)) return null;
+        return readPlotProfile(win);
+      }, 10000);
+    };
+
+    try {
+      for (;;) {
+        const target = queue.next();
+        if (!target) return;
+
+        // 같은 browsing context에서 URL을 완전히 다시 로드한다.
+        // pushState처럼 이전 DOM을 재사용하지 않으므로 메타 오염은 막고,
+        // 매 항목마다 새 iframe을 생성/폐기하는 것보다 메모리 누적이 적다.
+        if (used >= 24) {
+          dropFrame(frame);
+          frame = null;
+          used = 0;
+          await sleep(250);
         }
-
-        let result = null;
-        let directError = null;
 
         try {
-          // 매 항목마다 새 iframe으로 직접 연다. 이전 플롯의 DOM이 섞이지 않는다.
-          result = await visitPlotProfile(target.plotId, 18000);
-        } catch (error) {
-          directError = error;
-        }
-
-        // 비공개/복제 플롯은 원본 ID 프로필로 한 번 더 확인한다.
-        if (!result && target.originatedId && target.originatedId !== target.plotId) {
-          try {
-            result = await visitPlotProfile(target.originatedId, 15000);
-          } catch (_) {}
-        }
-
-        // 직접 프로필 주소가 막히면 실제 대화방을 열고 프로필 버튼을 누른다.
-        if (!result) {
-          try {
-            result = await visitRoomProfile(target.roomId);
-          } catch (roomError) {
-            throw roomError || directError || new Error('프로필을 열 수 없습니다');
+          if (!target.plotId) {
+            onResult(target, await hardNavigateRoomProfile(target.roomId), null);
+            used++;
+            continue;
           }
+
+          let result = null;
+          let directError = null;
+
+          try {
+            result = await hardNavigateProfile(target.plotId, 18000);
+          } catch (error) {
+            directError = error;
+          }
+
+          if (!result && target.originatedId && target.originatedId !== target.plotId) {
+            try {
+              result = await hardNavigateProfile(target.originatedId, 15000);
+            } catch (_) {}
+          }
+
+          if (!result) {
+            try {
+              result = await hardNavigateRoomProfile(target.roomId);
+            } catch (roomError) {
+              throw roomError || directError || new Error('프로필을 열 수 없습니다');
+            }
+          }
+
+          onResult(target, result, null);
+        } catch (error) {
+          onResult(target, null, error);
         }
 
-        onResult(target, result, null);
-      } catch (error) {
-        onResult(target, null, error);
+        used++;
+        if (slowMobileForce) await sleep(300);
       }
-
-      // 모바일에서 강제 재수집을 수백 개 연속 요청하면 같은 지점부터
-      // 프로필 로딩이 급격히 느려지는 경우가 있어 요청 사이에 짧게 쉰다.
-      if (slowMobileForce) await sleep(300);
+    } finally {
+      dropFrame(frame);
     }
   }
 
@@ -1266,7 +1305,10 @@
   }
 
   async function collectProfilesForEmptyPlots(force = false) {
-    const targets = profileCollectionTargets(force);
+    // 다시 전체 수집은 앞 단계에서 index/plotMeta를 비우고 목록을 처음부터 새로 훑는다.
+    // 그 과정에서 캐릭터/제작자 정보까지 새로 들어온 플롯을 또 프로필로 열 필요는 없다.
+    // 프로필 단계는 새 수집 후에도 비어 있는 칸만 보충한다.
+    const targets = profileCollectionTargets(false);
     if (!targets.length) return { targets: 0, done: 0, failed: 0 };
 
     const startedAt = Date.now();
@@ -1354,7 +1396,7 @@
       };
       renderCollectionTools();
 
-      const host = roomCollectionScrollHost();
+      let host = roomCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
       let lastHeight = 0;
       let lastCount = roomCollectionCount();
@@ -1368,6 +1410,21 @@
       harvestRoomDocument(document);
 
       for (let round = 0; round < 1600; round++) {
+        // 모바일/Monkey에서는 가상 목록이 페이지를 추가하면서 스크롤 컨테이너
+        // 자체를 교체하는 경우가 있다. 시작할 때 잡은 낡은 host를 계속 쓰면
+        // 중간 지점에서 더 이상 내려가지 못하므로 현재 DOM의 host를 다시 잡는다.
+        if (force) {
+          const liveHost = roomCollectionScrollHost();
+          if (liveHost && liveHost !== host) {
+            const oldTop = scrollMetrics(host).top;
+            host = liveHost;
+            const live = scrollMetrics(host);
+            setScrollTop(host, Math.min(live.height, Math.max(live.top, oldTop)));
+            stableRounds = 0;
+            await sleep(120);
+          }
+        }
+
         harvestRoomDocument(document);
         const before = scrollMetrics(host);
         const count = roomCollectionCount();
@@ -1378,6 +1435,17 @@
         if (nearBottom) {
           setScrollTop(host, before.height);
           await sleep(force ? 1200 : 700);
+
+          if (force) {
+            const liveHost = roomCollectionScrollHost();
+            if (liveHost && liveHost !== host) {
+              host = liveHost;
+              stableRounds = 0;
+              setScrollTop(host, scrollMetrics(host).height);
+              await sleep(500);
+            }
+          }
+
           harvestRoomDocument(document);
 
           let after = scrollMetrics(host);
