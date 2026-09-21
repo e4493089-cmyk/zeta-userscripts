@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.62
+// @version      0.23.63
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.62';
+  const SCRIPT_VERSION = '0.23.63';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -30,6 +30,7 @@
   const PLOT_NATIVE_RESULTS_ID = 'zeta-room-manager-plot-native-results';
   const PLOT_TOOLS_ID = 'zeta-room-manager-plot-tools';
   const COLLECTION_BANNER_ID = 'zeta-room-manager-collection-banner';
+  const CHAT_RENAME_ID = 'zeta-room-manager-chat-rename';
   const COLLECTION_MODAL_ID = 'zeta-room-manager-collection-modal';
   const PLOT_COLLECTION_STAMP_KEY = 'zeta-room-manager:plot-collection-at:v1';
   const ROOM_COLLECTION_STAMP_KEY = 'zeta-room-manager:room-collection-at:v1';
@@ -3050,6 +3051,19 @@
         line-height: 1.5;
         white-space: pre-wrap;
       }
+      .zrm-chat-rename {
+        flex: 0 0 auto;
+        height: 26px;
+        padding: 0 9px;
+        border: 0;
+        border-radius: 8px;
+        background: rgba(255,255,255,.12);
+        color: #fff;
+        font: 700 11px/1 system-ui, sans-serif;
+        cursor: pointer;
+      }
+      .zrm-chat-rename:hover { background: rgba(255,255,255,.2); }
+      [data-testid="chat-header-profile"] span.zrm-has-alias { color: #cdbcff; }
       [data-zrm-dead="1"] a[href*="/rooms/"] { opacity: .45; }
       [data-zrm-dead="1"] a[href*="/rooms/"]::after {
         content: '플롯 삭제됨';
@@ -3725,6 +3739,82 @@
   }
 
 
+  // ── 대화창에서 별명 바꾸기 ───────────────────────────────────────────
+  // 목록으로 돌아가지 않아도 지금 보고 있는 방의 별명을 고칠 수 있다.
+  function chatHeaderTitle() {
+    return document.querySelector('[data-testid="chat-header-profile"] span') || null;
+  }
+
+  function renderChatAliasTools() {
+    const roomId = currentRoomId();
+    const header = document.querySelector('[data-testid="chat-header-profile"]');
+    if (!roomId || !header) {
+      document.getElementById(CHAT_RENAME_ID)?.remove();
+      return;
+    }
+
+    const key = keyOf('room', roomId);
+    const entry = peekEntry(key) || {};
+    const alias = normalizeText(state.aliases[key] || entry.alias);
+    const title = chatHeaderTitle();
+
+    // 목록에 들르지 않아도 검색이 바로 별명을 찾게 인덱스에도 반영한다.
+    if (entry.type === 'room' && normalizeText(entry.alias) !== alias) {
+      putEntry(key, { ...entry, alias });
+      saveState();
+    }
+
+    // 원래 이름은 제타가 헤더에 그린 이름이다. 별명을 씌우기 전에 붙잡아 둔다.
+    if (title) {
+      if (!title.dataset.zrmOriginal || !alias) {
+        const shown = normalizeText(title.textContent);
+        if (shown && shown !== alias) title.dataset.zrmOriginal = shown;
+      }
+      const original = title.dataset.zrmOriginal || normalizeText(entry.original);
+      const next = alias || original;
+      if (next && normalizeText(title.textContent) !== next) title.textContent = next;
+      title.classList.toggle('zrm-has-alias', !!alias);
+    }
+
+    let button = document.getElementById(CHAT_RENAME_ID);
+    if (!button) {
+      button = document.createElement('button');
+      button.id = CHAT_RENAME_ID;
+      button.type = 'button';
+      button.className = 'zrm-chat-rename';
+      button.textContent = '별명';
+    }
+
+    if (button.dataset.zrmBoundVersion !== SCRIPT_VERSION) {
+      button.dataset.zrmBoundVersion = SCRIPT_VERSION;
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const id = currentRoomId();
+        if (!id) return;
+        const entryKey = keyOf('room', id);
+        const saved = peekEntry(entryKey) || {};
+        const heading = chatHeaderTitle();
+        openRenameModal({
+          key: entryKey,
+          type: 'room',
+          id,
+          original: (heading && heading.dataset.zrmOriginal)
+            || normalizeText(saved.original)
+            || normalizeText(heading && heading.textContent)
+            || '이 대화방'
+        });
+      }, true);
+    }
+
+    // 헤더 오른쪽 빈 영역이 제타가 버튼을 두는 자리다.
+    const host = header.parentElement;
+    if (!host) return;
+    const slot = host.lastElementChild;
+    if (slot && slot !== header && !slot.contains(button)) slot.appendChild(button);
+    else if (button.parentElement !== host) host.appendChild(button);
+  }
+
   // ── 대화창에서 수집 ──────────────────────────────────────────────────
   // 대화방을 열어보는 것만으로 캐릭터명·제작자명이 쌓인다.
   // 요청은 보내지 않고, 이미 화면에 그려진 것만 읽는다.
@@ -4153,6 +4243,7 @@
     removeLegacyPanel();
 
     if (!section || section === 'chat') {
+      if (section !== 'chat') document.getElementById(CHAT_RENAME_ID)?.remove();
       document.getElementById(NATIVE_RESULTS_ID)?.remove();
       document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
       document.getElementById(PLOT_TOOLS_ID)?.remove();
@@ -4167,6 +4258,7 @@
       document.getElementById('zeta-room-manager-private-profile-tools')?.remove();
       if (section === 'chat') {
         harvestChatRoom();
+        renderChatAliasTools();
         observer?.observe(document.documentElement, { childList: true, subtree: true });
       }
       return;
@@ -4225,6 +4317,7 @@
     document.getElementById(PLOT_TOOLS_ID)?.remove();
     document.getElementById(COLLECTION_MODAL_ID)?.remove();
     document.getElementById(COLLECTION_BANNER_ID)?.remove();
+    document.getElementById(CHAT_RENAME_ID)?.remove();
     document.getElementById('zeta-room-manager-private-profile-tools')?.remove();
     document.getElementById(NATIVE_RESULTS_ID)?.remove();
     document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
