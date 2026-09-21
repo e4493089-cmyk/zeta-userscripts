@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.61
+// @version      0.20.60
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.61';
+  const SCRIPT_VERSION = '0.20.60';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -1262,233 +1262,11 @@
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
   }
 
-  // ── 삭제된 플롯 방 비공개 전환 ───────────────────────────────────────
-  // 제타는 방 주소로 바로 들어가는 딥링크가 막혀 있다.
-  // 대신 앱 내부 라우터로 옮겨 다니면 페이지가 새로 뜨지 않아 스크립트도 살아 있다.
-  let convertAborted = false;
-  let convertRunning = false;
-
-  function routerNavigate(path) {
-    const router = window.next && window.next.router;
-    if (router && typeof router.push === 'function') {
-      try {
-        router.push(path);
-        return true;
-      } catch (_) {}
-    }
-    try {
-      history.pushState({}, '', path);
-      dispatchEvent(new PopStateEvent('popstate'));
-      return true;
-    } catch (_) {}
-    return false;
-  }
-
-  function deletedPlotPanel() {
-    return document.querySelector('[data-sentry-component="DeletedPlotNudgePanel"]');
-  }
-
-  // 확인 팝업에서 '전환' 버튼만 고른다. '취소'를 누르면 안 된다.
-  function convertConfirmButton() {
-    for (const popup of document.querySelectorAll('[data-sentry-component="Popup"]')) {
-      if (!/비공개 대화로 전환/.test(popup.textContent || '')) continue;
-      for (const button of popup.querySelectorAll('button')) {
-        if (normalizeText(button.textContent) === '전환') return button;
-      }
-    }
-    return null;
-  }
-
-  async function waitFor(check, timeout = 12000, step = 180) {
-    const until = Date.now() + timeout;
-    while (Date.now() < until) {
-      if (convertAborted) return null;
-      const hit = check();
-      if (hit) return hit;
-      await sleep(step);
-    }
-    return null;
-  }
-
-  async function convertOneRoom(item) {
-    const path = (() => {
-      try { return new URL(item.url, location.origin).pathname; } catch (_) { return ''; }
-    })();
-    if (!path) return { ok: false, reason: '방 주소를 만들지 못했습니다' };
-
-    if (!routerNavigate(path)) return { ok: false, reason: '방으로 이동하지 못했습니다' };
-
-    // 주소가 실제로 바뀌기 전에 앞 방의 패널을 눌러버리면 엉뚱한 방이 전환된다.
-    const moved = await waitFor(() => (location.pathname === path ? true : null), 8000);
-    if (convertAborted) return { ok: false, reason: '중지됨' };
-    if (!moved) return { ok: false, reason: '방으로 이동하지 못했습니다' };
-
-    const panel = await waitFor(deletedPlotPanel);
-    if (convertAborted) return { ok: false, reason: '중지됨' };
-    // 패널이 없으면 이미 전환됐거나 삭제된 방이 아니다. 실패로 세지 않는다.
-    if (!panel) return { ok: true, skipped: true };
-
-    const open = panel.querySelector('button');
-    if (!open) return { ok: false, reason: '전환 버튼을 찾지 못했습니다' };
-    open.click();
-
-    const confirm = await waitFor(convertConfirmButton, 8000);
-    if (convertAborted) return { ok: false, reason: '중지됨' };
-    if (!confirm) return { ok: false, reason: '확인 창이 뜨지 않았습니다' };
-    confirm.click();
-
-    // 전환이 끝나면 안내 패널이 사라진다. 그것만 성공 신호로 본다.
-    const done = await waitFor(() => (deletedPlotPanel() ? null : true), 20000);
-    if (convertAborted) return { ok: false, reason: '중지됨' };
-    if (!done) return { ok: false, reason: '전환이 끝나지 않았습니다 (제타패스/횟수 제한일 수 있습니다)' };
-    return { ok: true };
-  }
-
-  function showConvertProgress(current, total, name) {
-    ensureCollectionResultStyle();
-    let modal = document.getElementById(CONVERT_PROGRESS_ID);
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = CONVERT_PROGRESS_ID;
-      modal.innerHTML =
-        '<div class="zrm-result-card" role="status" aria-live="polite">' +
-          '<div class="zrm-result-title">비공개 전환 중</div>' +
-          '<div class="zrm-convert-count"></div>' +
-          '<div class="zrm-convert-name"></div>' +
-          '<div class="zrm-result-buttons">' +
-            '<button type="button" class="zrm-result-close">중지</button>' +
-          '</div>' +
-        '</div>';
-      modal.querySelector('.zrm-result-close').addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        convertAborted = true;
-        modal.querySelector('.zrm-result-title').textContent = '중지하는 중…';
-      });
-      document.body.appendChild(modal);
-    }
-    modal.querySelector('.zrm-convert-count').textContent = current + ' / ' + total;
-    modal.querySelector('.zrm-convert-name').textContent = name || '';
-  }
-
-  // 확인 창도 브라우저 기본 팝업을 쓰지 않는다.
-  function askCollectionConfirm({ title, lines, okLabel }) {
-    ensureCollectionResultStyle();
-    return new Promise(resolve => {
-      const modal = document.createElement('div');
-      modal.id = COLLECTION_RESULT_ID;
-
-      const card = document.createElement('div');
-      card.className = 'zrm-result-card';
-      card.setAttribute('role', 'dialog');
-      card.setAttribute('aria-modal', 'true');
-
-      const titleEl = document.createElement('div');
-      titleEl.className = 'zrm-result-title';
-      titleEl.textContent = title;
-      card.appendChild(titleEl);
-
-      const box = document.createElement('div');
-      box.className = 'zrm-result-list';
-      for (const line of lines || []) {
-        const row = document.createElement('div');
-        row.className = 'zrm-result-item';
-        row.textContent = line;
-        box.appendChild(row);
-      }
-      card.appendChild(box);
-
-      const buttons = document.createElement('div');
-      buttons.className = 'zrm-result-buttons';
-      buttons.innerHTML =
-        '<button type="button" class="zrm-result-close">취소</button>' +
-        '<button type="button" class="zrm-result-copy">' + (okLabel || '확인') + '</button>';
-      card.appendChild(buttons);
-
-      const finish = answer => {
-        modal.remove();
-        resolve(answer);
-      };
-      buttons.querySelector('.zrm-result-close').addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        finish(false);
-      });
-      buttons.querySelector('.zrm-result-copy').addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        finish(true);
-      });
-      modal.addEventListener('click', event => {
-        if (event.target === modal) finish(false);
-      });
-
-      modal.appendChild(card);
-      document.body.appendChild(modal);
-    });
-  }
-
-  async function convertDeletedPlotRooms(failures) {
-    const list = (Array.isArray(failures) ? failures : []).filter(item => item && item.url);
-    if (!list.length) return;
-    if (convertRunning) return;
-    const agreed = await askCollectionConfirm({
-      title: '삭제된 플롯 방 ' + list.length + '개를 비공개로 전환할까요?',
-      lines: [
-        '각 방이 내 비공개 대화로 바뀝니다. 되돌리려면 하나씩 지워야 합니다.',
-        '제타패스가 없으면 1개까지만 무료입니다.',
-        '진행 중에는 이 탭을 그대로 두세요. 끝나면 원래 화면으로 돌아옵니다.'
-      ],
-      okLabel: '전환 시작'
-    });
-    if (!agreed) return;
-
-    convertRunning = true;
-    convertAborted = false;
-    document.getElementById(COLLECTION_RESULT_ID)?.remove();
-
-    const startedAt = location.pathname + location.search;
-    const failed = [];
-    let done = 0;
-    let skipped = 0;
-
-    try {
-      for (let i = 0; i < list.length; i++) {
-        if (convertAborted) break;
-        const item = list[i];
-        showConvertProgress(i + 1, list.length, item.name || '(제목 없음)');
-        const result = await convertOneRoom(item);
-        if (result.ok) {
-          done++;
-          if (result.skipped) skipped++;
-        } else if (result.reason !== '중지됨') {
-          failed.push({ name: item.name, url: item.url, reason: result.reason });
-        }
-        // 연속 요청으로 보이지 않게 사이를 둔다.
-        await sleep(1200);
-      }
-    } finally {
-      document.getElementById(CONVERT_PROGRESS_ID)?.remove();
-      convertRunning = false;
-      routerNavigate(startedAt);
-    }
-
-    showCollectionResult({
-      title: convertAborted ? '비공개 전환 중지됨' : '비공개 전환 완료',
-      okLabel: '전환 완료',
-      okCount: done,
-      failCount: failed.length,
-      failures: failed,
-      failuresLabel: '전환 실패한 대화방'
-    });
-  }
-
   // ── 수집 결과 팝업 ───────────────────────────────────────────────────
   // 브라우저 기본 alert 대신 수집 중 배너와 같은 모양의 팝업으로 보여준다.
   // 실패한 항목은 잘라내지 않고 전부 담고, 전체 내용을 복사할 수 있게 한다.
   const COLLECTION_RESULT_ID = 'zeta-room-manager-collection-result';
   const COLLECTION_RESULT_STYLE_ID = 'zeta-room-manager-collection-result-style';
-  const CONVERT_PROGRESS_ID = 'zeta-room-manager-convert-progress';
 
   function ensureCollectionResultStyle() {
     if (document.getElementById(COLLECTION_RESULT_STYLE_ID)) return;
@@ -1586,40 +1364,6 @@
         font: 700 12px/1 system-ui, sans-serif;
         cursor: pointer;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-action {
-        width: 100%;
-        height: 40px;
-        margin-top: 12px;
-        border: 0;
-        border-radius: 10px;
-        background: #f3f1ff;
-        color: #4b33d6;
-        font: 700 12px/1 system-ui, sans-serif;
-        cursor: pointer;
-      }
-      #${CONVERT_PROGRESS_ID} {
-        position: fixed;
-        inset: 0;
-        z-index: 2147483646;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-        background: rgba(0,0,0,.45);
-        box-sizing: border-box;
-      }
-      #${CONVERT_PROGRESS_ID} .zrm-convert-count {
-        margin: 12px 0 4px;
-        font-size: 20px;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        color: #6d52ff;
-      }
-      #${CONVERT_PROGRESS_ID} .zrm-convert-name {
-        color: #6b6b74;
-        font-size: 11px;
-        word-break: break-all;
-      }
       #${COLLECTION_RESULT_ID} .zrm-result-copy { background: #6d52ff; color: #fff; }
       #${COLLECTION_RESULT_ID} .zrm-result-close { background: #f0f0f3; color: #45454e; }
       @media (max-width: 600px) {
@@ -1668,7 +1412,7 @@
   }
 
   // title: 팝업 제목, okCount/failCount: 수집 완료·실패 개수, failures: 실패 목록 전체.
-  function showCollectionResult({ title, okLabel, okCount, failCount, failures, failuresLabel, action }) {
+  function showCollectionResult({ title, okLabel, okCount, failCount, failures }) {
     ensureCollectionResultStyle();
     document.getElementById(COLLECTION_RESULT_ID)?.remove();
 
@@ -1708,7 +1452,7 @@
       box.className = 'zrm-result-list';
       const listTitle = document.createElement('div');
       listTitle.className = 'zrm-result-list-title';
-      listTitle.textContent = (failuresLabel || '실패한 대화방') + ' ' + list.length + '개';
+      listTitle.textContent = '실패한 대화방 ' + list.length + '개';
       box.appendChild(listTitle);
       for (const item of list) {
         const row = document.createElement('div');
@@ -1728,7 +1472,7 @@
       (okLabel || '수집 완료') + ' ' + okCount + '개 · 실패 ' + failCount + '개'
     ].concat(
       list.length
-        ? ['', (failuresLabel || '실패한 대화방') + ' ' + list.length + '개'].concat(
+        ? ['', '실패한 대화방 ' + list.length + '개'].concat(
             list.map(item => '· ' + (item.name || '(제목 없음)') + '\n  ' + (item.url || ''))
           )
         : []
@@ -1742,20 +1486,6 @@
     card.appendChild(buttons);
 
     const close = () => modal.remove();
-
-    if (action && action.label && typeof action.run === 'function') {
-      const extra = document.createElement('button');
-      extra.type = 'button';
-      extra.className = 'zrm-result-action';
-      extra.textContent = action.label;
-      card.insertBefore(extra, buttons);
-      extra.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        close();
-        void action.run();
-      });
-    }
     buttons.querySelector('.zrm-result-copy').addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
@@ -2099,13 +1829,7 @@
         okLabel: '수집 완료',
         okCount: total,
         failCount: profiles.failed,
-        failures: profiles.failures,
-        action: profiles.failures.length
-          ? {
-              label: '삭제된 플롯 방 비공개로 전환',
-              run: () => convertDeletedPlotRooms(profiles.failures)
-            }
-          : null
+        failures: profiles.failures
       });
       return true;
     })().finally(() => {
