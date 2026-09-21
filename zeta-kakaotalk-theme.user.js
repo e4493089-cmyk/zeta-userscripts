@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.15
+// @version      3.50.16
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7940,6 +7940,19 @@
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) div[class*="overflow-y-auto"]::-webkit-scrollbar-thumb:hover {
       background-color: rgba(70,88,99,.42);
+    }
+
+
+
+    /* 배너는 어두운 그림 위에 글씨를 얹는다. 밝은 시트용 글자색을 여기엔 쓰지 않는다 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PieceChargeBannerItem.tsx"],
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PieceChargeBannerItem.tsx"] :is(span,div,p),
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PieceChargeBannerItem.tsx"] [class*="text-white"] {
+      color: #FFFFFF !important;
+      text-shadow: 0 1px 3px rgba(0,0,0,.35);
     }
 
 
