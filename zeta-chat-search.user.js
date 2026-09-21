@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.10
+// @version      0.1.11
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.10';
+  const SCRIPT_VERSION = '0.1.11';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -714,16 +714,20 @@
 
     let captureTimer = null;
     const scheduleCapture = () => {
-      if (captureTimer) return;
+      if (deepLoadRunning || captureTimer) return;
       captureTimer = setTimeout(() => {
         captureTimer = null;
+        // 전체 색인 중에는 deepIndex가 직접 읽고 카운트한다.
+        // 여기서 먼저 읽어 버리면 진행 숫자는 늘지 않는데 DB에는 저장되는
+        // 경합이 생길 수 있으므로 자동 색인은 잠시 쉰다.
+        if (deepLoadRunning) return;
         void captureRendered();
       }, 700);
     };
 
     new MutationObserver(() => {
       scheduleMenu();
-      scheduleCapture();
+      if (!deepLoadRunning) scheduleCapture();
     }).observe(document.documentElement, { childList: true, subtree: true });
 
     renderMenuRow();
