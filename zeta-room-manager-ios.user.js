@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.48
+// @version      0.20.49
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -2012,7 +2012,7 @@
       if (host) return { host, before: host.firstElementChild || null };
     }
 
-    if (section === 'plot') {
+    if (section === 'plot' || section === 'plot-search') {
       const search = creatorCenterSearchLink();
       if (search && search.parentElement) {
         const host = search.parentElement;
@@ -2031,9 +2031,10 @@
     closeCollectionPopup();
 
     const section = currentSection();
-    if (!['room', 'plot'].includes(section)) return;
+    if (!['room', 'plot', 'plot-search', 'plot-profile'].includes(section)) return;
 
     const isRoom = section === 'room';
+    const isPlotList = section === 'plot' || section === 'plot-search';
     const progress = isRoom ? roomCollectionProgress : plotCollectionProgress;
     const countValue = isRoom ? roomCollectionCount() : plotCollectionCount();
 
@@ -2047,7 +2048,7 @@
         '</div>' +
         '<div class="zrm-collection-count"></div>' +
         '<div class="zrm-collection-actions">' +
-          '<button type="button" data-zrm-action="collect"></button>' +
+          ((isRoom || isPlotList) ? '<button type="button" data-zrm-action="collect"></button>' : '') +
           (isRoom ? '<button type="button" data-zrm-action="force-collect">다시 전체 수집</button>' : '') +
           '<button type="button" data-zrm-action="export">내보내기</button>' +
           '<button type="button" data-zrm-action="import">불러오기</button>' +
@@ -2062,8 +2063,10 @@
     const collect = modal.querySelector('[data-zrm-action="collect"]');
     const forceCollect = modal.querySelector('[data-zrm-action="force-collect"]');
     const deleteButton = modal.querySelector('[data-zrm-action="delete"]');
-    collect.disabled = false;
-    collect.textContent = progress.running ? '중지' : (isRoom ? '일반 전체 수집' : '전체 수집');
+    if (collect) {
+      collect.disabled = false;
+      collect.textContent = progress.running ? '중지' : (isRoom ? '일반 전체 수집' : '전체 수집');
+    }
     if (forceCollect) forceCollect.disabled = progress.running;
     if (deleteButton) deleteButton.disabled = progress.running;
 
@@ -2071,7 +2074,7 @@
     modal.addEventListener('click', event => {
       if (event.target === modal) closeCollectionPopup();
     });
-    collect.addEventListener('click', () => {
+    collect?.addEventListener('click', () => {
       closeCollectionPopup();
       if (progress.running) {
         abortCollection();
@@ -2103,7 +2106,10 @@
 
   // 수집은 이 화면에서 돈다. 닫으면 멈추므로 진행 중에는 화면 가운데에 띄운다.
   function renderCollectionBanner() {
-    const progress = currentSection() === 'plot' ? plotCollectionProgress : roomCollectionProgress;
+    const section = currentSection();
+    const progress = (section === 'plot' || section === 'plot-search' || section === 'plot-profile')
+      ? plotCollectionProgress
+      : roomCollectionProgress;
     let banner = document.getElementById(COLLECTION_BANNER_ID);
 
     if (!progress.running) {
@@ -2170,7 +2176,7 @@
   function renderCollectionTools() {
     const section = currentSection();
     let tools = document.getElementById(PLOT_TOOLS_ID);
-    if (!['room', 'plot'].includes(section)) {
+    if (!['room', 'plot', 'plot-search', 'plot-profile'].includes(section)) {
       tools?.remove();
       closeCollectionPopup();
       return;
@@ -3136,10 +3142,18 @@
   }
 
   function currentSection() {
-    if (/^\/(?:[^/]+\/)?rooms\/?$/i.test(location.pathname)) return 'room';
-    if (/^\/(?:[^/]+\/)?creator-center\/search\/?$/i.test(location.pathname)) return 'plot-search';
-    if (/^\/(?:[^/]+\/)?creator-center(?:\/|$)/i.test(location.pathname)) return 'plot';
+    const path = location.pathname;
+    if (/^\/(?:[^/]+\/)?rooms\/?$/i.test(path)) return 'room';
+    if (/^\/(?:[^/]+\/)?creator-center\/search\/?$/i.test(path)) return 'plot-search';
+    if (/^\/(?:[^/]+\/)?creator-center(?:\/|$)/i.test(path)) return 'plot';
     if (currentRoomId()) return 'chat';
+
+    // 비공개/내 플롯 화면은 URL 구조가 달라져도 실제 렌더된 컴포넌트로 잡는다.
+    if (document.querySelector('[data-sentry-component="CreatorCenterSearchPage"]')) return 'plot-search';
+    if (document.querySelector('[data-sentry-component="CreatorCenterMyPlotListItem"]')) return 'plot';
+    if (/^\/(?:[^/]+\/)?plots\/[a-f\d-]{36}\/profile\/?$/i.test(path) ||
+        document.querySelector('[data-sentry-component="PlotProfile"]')) return 'plot-profile';
+
     return null;
   }
 
