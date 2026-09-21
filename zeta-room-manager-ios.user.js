@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.30
+// @version      0.20.31
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -631,6 +631,7 @@
       if (replaceNames) {
         entry.characterNames = uniqueTexts(meta.characterNames);
         entry.creatorNames = uniqueTexts(meta.creatorNames);
+        delete entry.needsProfileRefresh;
       } else {
         entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
         entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
@@ -1111,9 +1112,10 @@
       const meta = plotMetaForEntry(entry);
       const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
       const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
-      if (!force && characters.length && creators.length) continue;
+      const needsProfileRefresh = Boolean(entry.needsProfileRefresh);
+      if (!force && !needsProfileRefresh && characters.length && creators.length) continue;
 
-      if (!force && characters.length && meta && meta.creatorUnavailable) continue;
+      if (!force && !needsProfileRefresh && characters.length && meta && meta.creatorUnavailable) continue;
 
       if (!force && meta && Number(meta.profileFailCount || 0) >= 2 &&
         Date.now() - Number(meta.profileFailedAt || 0) < 7 * 24 * 60 * 60 * 1000) continue;
@@ -1127,7 +1129,8 @@
       targets.push({
         roomId: entry.id,
         plotId: normalizeText(entry.plotId),
-        originatedId: normalizeText(entry.originatedId)
+        originatedId: normalizeText(entry.originatedId),
+        replaceNames: needsProfileRefresh
       });
     }
     return targets;
@@ -1546,7 +1549,7 @@
 
     const onResult = (target, result, error) => {
       if (result) {
-        applyProfileResult(target, result, { replaceNames: force });
+        applyProfileResult(target, result, { replaceNames: force || Boolean(target.replaceNames) });
         done++;
       } else {
         failed++;
@@ -1626,6 +1629,7 @@
 
     roomCollectionPromise = (async () => {
       collectionAborted = false;
+      harvestedItems.clear();
       void holdScreenAwake();
 
       // 일반 수집은 새 방/연결 변경/이름 누락만 열고,
@@ -1799,7 +1803,9 @@
       ).length;
       const resultTitle = collectionAborted
         ? (force ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨')
-        : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료');
+        : (!listCompleted
+            ? (force ? '다시 전체 수집 일부 완료' : '대화방 목록 끝 확인 실패')
+            : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료'));
       const shownFailures = profiles.failures.slice(0, 10);
       alert(
         resultTitle + ' · 저장된 방 ' + total + '개' +
@@ -2100,6 +2106,7 @@
 
     plotCollectionPromise = (async () => {
       collectionAborted = false;
+      harvestedItems.clear();
       void holdScreenAwake();
       suspendObserverRefresh = true;
       observer?.disconnect();
@@ -2498,7 +2505,7 @@
         '<div class="zrm-banner-card" role="status" aria-live="polite">' +
           '<div class="zrm-banner-title"></div>' +
           '<div class="zrm-banner-count"></div>' +
-          '<div class="zrm-banner-note">이 화면을 닫거나 다른 곳으로 이동하면 멈춰요.<br>다시 실행하면 남은 것만 이어서 합니다.</div>' +
+          '<div class="zrm-banner-note">이 화면을 닫거나 다른 곳으로 이동하면 멈춰요.<br>중간 저장되며 다시 실행해도 저장된 데이터는 유지됩니다.</div>' +
           '<button type="button" class="zrm-banner-stop">중지</button>' +
         '</div>';
       banner.querySelector('.zrm-banner-stop').addEventListener('click', event => {
@@ -3086,24 +3093,27 @@
     // 제타가 실제로 그려준 방이면 사라진 방이 아니다.
     delete previous.missingSince;
 
-    // 다시 전체 수집도 기존 방이 그대로면 무거운 React 전체 분석을 반복하지 않는다.
-    // 방에 붙은 plot 객체만 얕게 확인해 연결/이름이 달라진 경우에만 깊게 본다.
-    let forceQuickChanged = false;
-    if (forceReconcileSeenRoomKeys && type === 'room') {
-      const quickPlot = reactRoomPlotMeta(item);
+    // 각 수집 세션에서 방 하나당 한 번만 plot 연결을 얕게 확인한다.
+    // 일반 전체 수집도 기존 방의 plot 연결이 바뀌었으면 정밀 분석/이름 재검증 대상으로 올린다.
+    let quickPlot = null;
+    let plotConnectionChanged = false;
+    if (type === 'room' && harvestedItems.get(key) !== original) {
+      quickPlot = reactRoomPlotMeta(item);
       const quickPlotId = normalizeText(quickPlot && (quickPlot.id || quickPlot.plotId));
       const quickOriginatedId = normalizeText(quickPlot && (quickPlot.originatedId || quickPlot.originalId));
+      const previousPlotId = normalizeText(previous.plotId);
+      const previousOriginatedId = normalizeText(previous.originatedId);
 
-      const plotChanged = Boolean(
-        (quickPlotId && quickPlotId !== normalizeText(previous.plotId)) ||
-        (quickOriginatedId && quickOriginatedId !== normalizeText(previous.originatedId))
+      plotConnectionChanged = Boolean(
+        previous.type === 'room' && (
+          (quickPlotId && quickPlotId !== previousPlotId) ||
+          (quickOriginatedId && quickOriginatedId !== previousOriginatedId)
+        )
       );
-      forceQuickChanged = plotChanged;
     }
 
-    // 이번 세션에서 이미 훑은 항목은 다시 훑지 않는다.
-    // 제목이 바뀌면 내용이 달라진 것이므로 다시 본다.
-    if (harvestedItems.get(key) === original && !forceQuickChanged) {
+    // 이번 세션에서 이미 훑은 항목은 즉시 통과한다.
+    if (harvestedItems.get(key) === original) {
       previous.alias = alias;
       if (link && link.href) previous.href = link.href;
       if (image && normalizeText(previous.image) !== normalizeText(image)) previous.image = image;
@@ -3112,12 +3122,13 @@
       };
     }
 
-    // 이미 이름까지 수집됐고 얕은 비교에서도 변화가 없으면 즉시 통과한다.
+    // 이미 이름까지 수집됐고 plot 연결도 그대로면 무거운 React 전체 분석을 생략한다.
     if (previous.type === type
       && normalizeText(previous.original) === original
       && uniqueTexts(previous.characterNames).length
       && uniqueTexts(previous.creatorNames).length
-      && !forceQuickChanged) {
+      && !plotConnectionChanged) {
+      harvestedItems.set(key, original);
       previous.alias = alias;
       if (link && link.href) previous.href = link.href;
       if (image && normalizeText(previous.image) !== normalizeText(image)) previous.image = image;
@@ -3136,7 +3147,7 @@
     // reactEntityForId가 돌려주는 건 room 자체이므로 plot을 꺼내 써야 한다.
     // 그대로 쓰면 plotId 자리에 방 ID가 들어가 플롯 연결이 전부 어긋난다.
     const ownPlot = ownEntity && typeof ownEntity.plot === 'object' ? ownEntity.plot : null;
-    const roomPlot = type === 'room' ? (reactRoomPlotMeta(item) || ownPlot) : null;
+    const roomPlot = type === 'room' ? (quickPlot || reactRoomPlotMeta(item) || ownPlot) : null;
     const plotEntity = type === 'plot' ? ownEntity : null;
     const plotEntityMeta = plotEntity
       ? ingestPlotMeta(
@@ -3185,6 +3196,10 @@
         previous.creatorNames
       )
     };
+
+    if (type === 'room' && plotConnectionChanged) {
+      state.index[key].needsProfileRefresh = true;
+    }
 
     return {
       key, type, id, item, link, titleEl, original, alias
