@@ -1230,10 +1230,35 @@
     return frame;
   }
 
+  // 숨긴 화면 하나가 제타 앱 전체를 들고 있다. 수백 번 띄우면 메모리가 쌓여
+  // 브라우저가 Out of Memory로 죽는다. 버리기 전에 안을 확실히 비운다.
   function dropFrame(frame) {
-    if (frame && frame.isConnected) {
-      frame.src = 'about:blank';
-      frame.remove();
+    if (!frame) return;
+    try {
+      const win = frame.contentWindow;
+      if (win) {
+        // 앱이 걸어둔 타이머를 끊어 문서가 붙잡히지 않게 한다.
+        const highest = win.setTimeout(() => {}, 0);
+        for (let id = highest; id >= 0 && id > highest - 800; id--) {
+          win.clearTimeout(id);
+          win.clearInterval(id);
+        }
+      }
+    } catch (_) {}
+
+    try { frame.src = 'about:blank'; } catch (_) {}
+    try { frame.srcdoc = ''; } catch (_) {}
+    if (frame.isConnected) frame.remove();
+  }
+
+  // 남은 메모리가 빠듯하면 모두 정리하고 숨을 돌린다.
+  function memoryPressure() {
+    try {
+      const memory = performance && performance.memory;
+      if (!memory || !memory.jsHeapSizeLimit) return 0;
+      return memory.usedJSHeapSize / memory.jsHeapSizeLimit;
+    } catch (_) {
+      return 0;
     }
   }
 
@@ -1292,9 +1317,11 @@
 
   // 플롯마다 iframe을 새로 띄우면 제타 앱을 매번 처음부터 부팅한다.
   // 손으로 할 때처럼, 앱은 한 번만 띄우고 그 안에서 화면만 바꾼다.
-  const PROFILE_WORKERS = 4;
-  const MOBILE_PROFILE_WORKERS = 3;
-  const PROFILE_FRAME_RECYCLE = 10;
+  const PROFILE_WORKERS = 3;
+  const MOBILE_PROFILE_WORKERS = 2;
+  const PROFILE_FRAME_RECYCLE = 6;
+  // 이 비율을 넘기면 화면을 모두 버리고 잠시 쉰다.
+  const MEMORY_PAUSE_RATIO = 0.7;
   const PROFILE_SETTLE_MS = 200;
   const PROFILE_BATCH_DESKTOP = 200;
   const PROFILE_BATCH_MOBILE = 100;
@@ -1439,6 +1466,7 @@
   }
 
   async function profileWorker(queue, onResult, options = {}) {
+    const onPressure = typeof options.onPressure === 'function' ? options.onPressure : () => {};
     const pauseMs = options.mobile ? 120 : 80;
     const recycleEvery = options.mobile ? 6 : PROFILE_FRAME_RECYCLE;
     const targetBudgetMs = options.mobile ? 22000 : 48000;
@@ -1546,6 +1574,14 @@
         }
 
         used++;
+
+        // 메모리가 빠듯하면 화면을 버리고 회수될 틈을 준다.
+        if (memoryPressure() > MEMORY_PAUSE_RATIO) {
+          await resetFrame(0);
+          onPressure();
+          await sleep(1200);
+        }
+
         await sleep(pauseMs);
       }
     } finally {
@@ -1637,11 +1673,20 @@
     renderCollectionTools();
 
     const workerLimit = mobile ? MOBILE_PROFILE_WORKERS : PROFILE_WORKERS;
+    let memoryPauses = 0;
     suspendPassiveNativeCapture = true;
     try {
       const workers = [];
       for (let i = 0; i < Math.min(workerLimit, targets.length); i++) {
-        workers.push(profileWorker(queue, onResult, { force, mobile }));
+        workers.push(profileWorker(queue, onResult, {
+          force,
+          mobile,
+          onPressure: () => {
+            memoryPauses++;
+            roomCollectionProgress = { ...roomCollectionProgress, note: '메모리 정리 중…' };
+            renderCollectionTools();
+          }
+        }));
       }
       await Promise.all(workers);
     } finally {
@@ -1665,6 +1710,7 @@
       remaining: remainingAfter,
       limited: remainingAfter > 0 && !collectionAborted,
       failures,
+      memoryPauses,
       remainingTargets: hasExplicitTargets ? remainingTargets : []
     };
   }
@@ -1866,6 +1912,7 @@
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 이번 ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개' +
         (profiles.failed ? ' · 실패 ' + profiles.failed + '개' : '') +
+        (profiles.memoryPauses ? ' · 메모리 정리 ' + profiles.memoryPauses + '회' : '') +
         (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개' : '') +
         (profiles.failed
           ? '\n\n실패 사유\n' + failureSummary(profiles.failures).map(line => '· ' + line).join('\n') +
