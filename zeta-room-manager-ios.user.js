@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.28
+// @version      0.20.29
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1582,8 +1582,9 @@
     if (completed < 3) return '';
     const perItem = (Date.now() - startedAt) / completed;
     const left = Math.round(perItem * (total - completed) / 1000);
-    if (left < 60) return '약 ' + left + '초 남음';
-    return '약 ' + Math.round(left / 60) + '분 남음';
+    const speed = ' · ' + (perItem / 1000).toFixed(1) + '초/건';
+    if (left < 60) return '약 ' + left + '초 남음' + speed;
+    return '약 ' + Math.round(left / 60) + '분 남음' + speed;
   }
 
   async function collectProfilesForEmptyPlots(force = false, explicitTargets = null) {
@@ -3073,6 +3074,11 @@
       || null;
   }
 
+  // 이번 세션에서 무거운 탐색을 마친 항목. 키 → 그때의 제목.
+  // 스크롤을 내리면 같은 방이 몇 번이고 다시 화면에 들어오는데, 그때마다
+  // 항목당 수천 노드를 재탐색하는 것이 첫 목록 수집이 느린 가장 큰 이유였다.
+  const harvestedItems = new Map();
+
   function parseItem(item, type) {
     if (item.closest && item.closest('#' + NATIVE_RESULTS_ID + ', #' + PLOT_NATIVE_RESULTS_ID)) return null;
     const link = type === 'room'
@@ -3133,6 +3139,18 @@
       );
     }
 
+    // 이번 세션에서 이미 훑은 항목은 다시 훑지 않는다.
+    // 제목이 바뀌면 내용이 달라진 것이므로 다시 본다.
+    if (harvestedItems.get(key) === original && !forceQuickChanged) {
+      previous.alias = alias;
+      if (link && link.href) previous.href = link.href;
+      if (image && normalizeText(previous.image) !== normalizeText(image)) previous.image = image;
+      return {
+        key, type, id, item, link, titleEl, original, alias,
+        needsProfileVerification
+      };
+    }
+
     // 이미 이름까지 수집됐고 얕은 비교에서도 변화가 없으면 즉시 통과한다.
     if (previous.type === type
       && normalizeText(previous.original) === original
@@ -3150,6 +3168,7 @@
 
     // 카드에 텍스트로 안 보여도 React props 안의 plot 데이터에서 이름을 보강한다.
     harvestReactPlotData(item);
+    harvestedItems.set(key, original);
     const searchMeta = collectSearchMeta(item, titleEl);
     // 플롯 목록 항목은 API 보강 대상이 아니라 화면 데이터가 유일한 출처다.
     const ownEntity = reactEntityForId(item, id);
