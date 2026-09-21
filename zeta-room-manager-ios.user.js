@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.57
+// @version      0.20.58
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.57';
+  const SCRIPT_VERSION = '0.20.58';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -1309,13 +1309,9 @@
     roomCollectionProgress = {
       running: true,
       count: roomCollectionCount(),
-      roomTotal: roomCollectionCount(),
-      phase: force ? '이름 API 전체 재조회' : '빈 이름 API 보충',
+      stage: 'names',
       current: 0,
-      total: targets.length,
-      note: force
-        ? '이번에 확인한 모든 플롯의 이름을 API로 다시 조회'
-        : '캐릭터명 또는 제작자명이 빈 플롯만 API로 보충'
+      total: targets.length
     };
     renderCollectionTools();
 
@@ -1411,7 +1407,9 @@
       roomCollectionProgress = {
         running: true,
         count: roomCollectionCount(),
-        phase: force ? '다시 목록 수집' : '목록 수집',
+        stage: 'room-list',
+        current: 0,
+        total: 0,
         force
       };
       renderCollectionTools();
@@ -1435,6 +1433,8 @@
         await sleep(ROOM_COLLECTION_SETTLE_MS);
       }
       harvestRoomDocument(document);
+      updateListCollectionProgress('room', host);
+      renderCollectionTools();
 
       for (let round = 0; round < 2400; round++) {
         if (collectionAborted) break;
@@ -1452,6 +1452,7 @@
         const before = collectionSnapshot('room', host);
         const count = roomCollectionCount();
         roomCollectionProgress.count = count;
+        updateListCollectionProgress('room', host, before);
         if (!mobileList || round % 4 === 0 || count !== checkpointCount) renderCollectionTools();
 
         if (count - checkpointCount >= 20 || Date.now() - checkpointAt >= 2000) {
@@ -1645,6 +1646,16 @@
     };
   }
 
+  function updateListCollectionProgress(kind, host, metrics = scrollMetrics(host)) {
+    const progress = kind === 'plot' ? plotCollectionProgress : roomCollectionProgress;
+    const current = harvestedItems.size;
+    const traversed = Math.max(1, metrics.top + metrics.client);
+    const fraction = metrics.height > 0 ? Math.min(1, traversed / metrics.height) : 1;
+    const estimatedTotal = fraction > 0 ? Math.max(current, Math.round(current / fraction)) : current;
+    progress.current = current;
+    progress.total = estimatedTotal;
+  }
+
   function setScrollTop(host, value) {
     const root = host === document.scrollingElement || host === document.documentElement || host === document.body;
     if (root) window.scrollTo(0, value);
@@ -1774,7 +1785,13 @@
       void holdScreenAwake();
       suspendObserverRefresh = true;
       observer?.disconnect();
-      plotCollectionProgress = { running: true, count: plotCollectionCount(), phase: '플롯 목록 수집' };
+      plotCollectionProgress = {
+        running: true,
+        count: plotCollectionCount(),
+        stage: 'plot-list',
+        current: 0,
+        total: 0
+      };
       renderCollectionTools();
 
       let host = plotCollectionScrollHost();
@@ -1796,6 +1813,8 @@
         await sleep(PLOT_COLLECTION_SETTLE_MS);
       }
       if (!collectionAborted) collectRenderedPlots();
+      updateListCollectionProgress('plot', host);
+      renderCollectionTools();
 
       for (let round = 0; round < 2400; round++) {
         if (collectionAborted) break;
@@ -1813,6 +1832,7 @@
         const count = plotCollectionCount();
 
         plotCollectionProgress.count = count;
+        updateListCollectionProgress('plot', host, before);
         renderCollectionTools();
 
         if (count - checkpointCount >= 20 || Date.now() - checkpointAt >= 2000) {
@@ -2274,13 +2294,15 @@
     if (banner.parentElement !== document.body) document.body.appendChild(banner);
 
     if (!collectionAborted) {
-      banner.querySelector('.zrm-banner-title').textContent = (progress.phase || '수집') + ' 중';
+      banner.querySelector('.zrm-banner-title').textContent = progress.stage === 'names'
+        ? '캐릭터명 및 제작자명 수집 중'
+        : progress.stage === 'plot-list'
+          ? '플롯 수집 중'
+          : '대화방 수집 중';
     }
-    banner.querySelector('.zrm-banner-count').textContent = progress.total
-      ? (progress.roomTotal
-          ? '방 ' + progress.roomTotal + '개 · 플롯 ' + progress.current + ' / ' + progress.total
-          : progress.current + ' / ' + progress.total)
-      : (progress.count || 0) + '개';
+    const current = Number(progress.current || 0);
+    const total = Math.max(current, Number(progress.total || current));
+    banner.querySelector('.zrm-banner-count').textContent = current + ' / ' + total;
 
     const note = banner.querySelector('.zrm-banner-note');
     let eta = banner.querySelector('.zrm-banner-eta');
@@ -2577,7 +2599,7 @@
         font-size: 11px;
         font-weight: 600;
       }
-      #${COLLECTION_BANNER_ID} .zrm-banner-note { color: #6b6b74; font-size: 10px; }
+      #${COLLECTION_BANNER_ID} .zrm-banner-note { color: #6b6b74; font-size: 11px; }
       #${COLLECTION_BANNER_ID} .zrm-banner-warn {
         margin-top: 8px;
         padding: 7px 9px;
@@ -2762,7 +2784,7 @@
           font-size: 18px;
         }
         #${COLLECTION_BANNER_ID} .zrm-banner-eta { font-size: 10px; }
-        #${COLLECTION_BANNER_ID} .zrm-banner-note,
+        #${COLLECTION_BANNER_ID} .zrm-banner-note { font-size: 10px; }
         #${COLLECTION_BANNER_ID} .zrm-banner-warn { font-size: 9px; }
         #${COLLECTION_BANNER_ID} .zrm-banner-stop {
           height: 36px;
