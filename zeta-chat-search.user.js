@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.5
+// @version      0.1.6
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.5';
+  const SCRIPT_VERSION = '0.1.6';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -290,6 +290,20 @@
   }
 
   // ── 검색 패널 ────────────────────────────────────────────────────────
+  function emptyView(title, detail) {
+    const box = document.createElement('div');
+    box.className = 'zcs-empty';
+    const heading = document.createElement('div');
+    heading.className = 'zcs-empty-title';
+    heading.textContent = title;
+    const body = document.createElement('div');
+    body.className = 'zcs-empty-text';
+    body.textContent = detail;
+    box.append(heading, body);
+    return box;
+  }
+
+
   function closePanel() {
     deepLoadAborted = true;
     document.getElementById(PANEL_ID)?.remove();
@@ -306,9 +320,23 @@
     panel.id = PANEL_ID;
     panel.innerHTML =
       '<div class="zcs-card" role="dialog" aria-modal="true" aria-label="대화 검색">' +
+        '<div class="zcs-grip"></div>' +
         '<div class="zcs-head">' +
-          '<input type="search" class="zcs-input" placeholder="대화 내용 검색" autocomplete="off">' +
-          '<button type="button" class="zcs-close" aria-label="닫기">×</button>' +
+          '<h2 class="zcs-title">대화 검색</h2>' +
+          '<button type="button" class="zcs-close" aria-label="닫기">' +
+            '<svg viewBox="0 0 20 20" aria-hidden="true">' +
+              '<path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" ' +
+                'stroke-linecap="round" fill="none"></path>' +
+            '</svg>' +
+          '</button>' +
+        '</div>' +
+        '<div class="zcs-field">' +
+          '<svg class="zcs-field-icon" viewBox="0 0 20 20" aria-hidden="true">' +
+            '<circle cx="9" cy="9" r="5.4" stroke="currentColor" stroke-width="1.7" fill="none"></circle>' +
+            '<path d="M13.2 13.2L17 17" stroke="currentColor" stroke-width="1.7" ' +
+              'stroke-linecap="round" fill="none"></path>' +
+          '</svg>' +
+          '<input type="search" class="zcs-input" placeholder="이 대화방에서 찾기" autocomplete="off">' +
         '</div>' +
         '<div class="zcs-status"></div>' +
         '<div class="zcs-list"></div>' +
@@ -337,14 +365,23 @@
       list.textContent = '';
 
       if (!query) {
-        status('이 대화방에 색인된 메시지 ' + rows.length + '개');
+        status('이 대화방에 색인된 메시지 ' + rows.length.toLocaleString() + '개');
+        list.appendChild(emptyView('찾을 말을 입력해 주세요', '지금까지 읽은 대화에서 바로 찾습니다.'));
         return;
       }
 
       const hits = matchRows(rows, query);
       status(hits.length
-        ? '찾은 메시지 ' + hits.length + '개 · 색인 ' + rows.length + '개'
-        : '색인된 ' + rows.length + '개 중에는 없어요. 지난 대화를 더 불러와 보세요.');
+        ? '찾은 메시지 ' + hits.length.toLocaleString() + '개 · 색인 ' + rows.length.toLocaleString() + '개'
+        : '색인 ' + rows.length.toLocaleString() + '개');
+
+      if (!hits.length) {
+        list.appendChild(emptyView(
+          '찾은 대화가 없어요',
+          '아래에서 전체 색인을 한 번 돌리면 옛 대화까지 찾습니다.'
+        ));
+        return;
+      }
 
       for (const row of hits.slice(0, 100)) {
         const item = document.createElement('button');
@@ -452,95 +489,185 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 20px;
-        background: rgba(0,0,0,.45);
+        padding: 24px;
+        background: rgba(12,16,20,.55);
+        backdrop-filter: blur(6px);
         box-sizing: border-box;
+        font: 500 13px/1.55 -apple-system, BlinkMacSystemFont, "Noto Sans KR", system-ui, sans-serif;
       }
       #${PANEL_ID} .zcs-card {
         display: flex;
         flex-direction: column;
-        width: min(420px, 100%);
-        max-height: min(80vh, 620px);
-        border-radius: 16px;
-        background: var(--kt-white, #202023);
-        color: var(--kt-text, #fff);
-        box-shadow: 0 20px 60px rgba(0,0,0,.45);
+        width: min(440px, 100%);
+        max-height: min(78vh, 640px);
+        border-radius: 20px;
+        background: var(--kt-white, #1c1c20);
+        color: var(--kt-text, #f2f2f4);
+        box-shadow: 0 24px 70px rgba(0,0,0,.45);
         overflow: hidden;
-        font: 500 13px/1.5 system-ui, -apple-system, sans-serif;
       }
-      #${PANEL_ID} .zcs-head { display: flex; gap: 8px; padding: 14px 14px 10px; }
-      #${PANEL_ID} .zcs-input {
-        flex: 1 1 auto;
-        height: 40px;
-        min-width: 0;
-        padding: 0 12px;
-        box-sizing: border-box;
-        border: 1px solid var(--kt-line, rgba(255,255,255,.12));
-        border-radius: 10px;
-        background: var(--kt-soft, #2a2a2e);
-        color: inherit;
-        font: inherit;
+      #${PANEL_ID} .zcs-grip { display: none; }
+      #${PANEL_ID} .zcs-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 18px 10px;
+      }
+      #${PANEL_ID} .zcs-title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: -.01em;
       }
       #${PANEL_ID} .zcs-close {
-        flex: 0 0 auto;
-        width: 40px;
-        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
         border: 0;
-        border-radius: 10px;
-        background: transparent;
-        color: var(--kt-sub, rgba(255,255,255,.6));
-        font-size: 22px;
+        border-radius: 9px;
+        background: var(--kt-soft2, rgba(255,255,255,.06));
+        color: var(--kt-sub, rgba(255,255,255,.55));
         cursor: pointer;
       }
-      #${PANEL_ID} .zcs-status {
-        padding: 0 16px 8px;
-        color: var(--kt-sub, rgba(255,255,255,.55));
-        font-size: 11px;
+      #${PANEL_ID} .zcs-close svg { width: 16px; height: 16px; }
+      #${PANEL_ID} .zcs-close:hover { background: var(--kt-soft, rgba(255,255,255,.12)); }
+      #${PANEL_ID} .zcs-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 18px;
+        padding: 0 12px;
+        height: 44px;
+        border-radius: 12px;
+        background: var(--kt-soft, rgba(255,255,255,.07));
       }
-      #${PANEL_ID} .zcs-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 10px 6px; }
+      #${PANEL_ID} .zcs-field-icon {
+        width: 17px;
+        height: 17px;
+        flex: 0 0 auto;
+        color: var(--kt-muted, rgba(255,255,255,.4));
+      }
+      #${PANEL_ID} .zcs-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 100%;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: inherit;
+        font: 600 14px/1 inherit;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      #${PANEL_ID} .zcs-input::placeholder { color: var(--kt-muted, rgba(255,255,255,.35)); font-weight: 500; }
+      #${PANEL_ID} .zcs-input::-webkit-search-cancel-button { display: none; }
+      #${PANEL_ID} .zcs-status {
+        padding: 10px 20px 6px;
+        color: var(--kt-sub, rgba(255,255,255,.45));
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .01em;
+      }
+      #${PANEL_ID} .zcs-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 2px 12px 8px;
+      }
       #${PANEL_ID} .zcs-item {
         display: block;
         width: 100%;
         margin-bottom: 6px;
-        padding: 10px 12px;
+        padding: 11px 13px;
         border: 0;
-        border-radius: 12px;
-        background: var(--kt-soft2, rgba(255,255,255,.05));
+        border-radius: 14px;
+        background: var(--kt-soft2, rgba(255,255,255,.045));
         color: inherit;
         font: inherit;
         text-align: left;
         cursor: pointer;
+        transition: background .15s ease;
       }
       #${PANEL_ID} .zcs-item:hover { background: var(--kt-soft, rgba(255,255,255,.1)); }
       #${PANEL_ID} .zcs-who {
-        margin-bottom: 3px;
+        margin-bottom: 4px;
         color: var(--kt-sub, rgba(255,255,255,.5));
         font-size: 11px;
         font-weight: 700;
       }
-      #${PANEL_ID} .zcs-text { font-size: 12px; line-height: 1.5; word-break: break-word; }
+      #${PANEL_ID} .zcs-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        font-size: 12.5px;
+        line-height: 1.5;
+        word-break: break-word;
+      }
       #${PANEL_ID} mark {
         padding: 0 2px;
         border-radius: 4px;
         background: var(--kt-yellow, #6d52ff);
         color: var(--kt-text, #fff);
+        font-weight: 700;
       }
-      #${PANEL_ID} .zcs-foot { padding: 8px 14px 14px; }
+      #${PANEL_ID} .zcs-empty {
+        padding: 34px 18px 38px;
+        text-align: center;
+      }
+      #${PANEL_ID} .zcs-empty-title {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      #${PANEL_ID} .zcs-empty-text {
+        margin-top: 5px;
+        color: var(--kt-sub, rgba(255,255,255,.45));
+        font-size: 11.5px;
+      }
+      #${PANEL_ID} .zcs-foot {
+        padding: 10px 16px 16px;
+        border-top: 1px solid var(--kt-line, rgba(255,255,255,.07));
+      }
       #${PANEL_ID} .zcs-more {
         width: 100%;
-        height: 40px;
+        height: 44px;
         border: 0;
-        border-radius: 10px;
+        border-radius: 12px;
         background: var(--kt-yellow, #6d52ff);
         color: var(--kt-text, #fff);
-        font: 700 12px/1 system-ui, sans-serif;
+        font: 800 13px/1 inherit;
         cursor: pointer;
       }
+      #${PANEL_ID} .zcs-more:hover { filter: brightness(.96); }
+
+      /* 좁은 화면에서는 제타처럼 아래에서 올라오는 시트로 */
+      @media (max-width: 600px) {
+        #${PANEL_ID} { align-items: flex-end; padding: 0; }
+        #${PANEL_ID} .zcs-card {
+          width: 100%;
+          max-height: 86vh;
+          border-radius: 20px 20px 0 0;
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        #${PANEL_ID} .zcs-grip {
+          display: block;
+          width: 36px;
+          height: 4px;
+          margin: 9px auto 0;
+          border-radius: 2px;
+          background: var(--kt-line, rgba(255,255,255,.18));
+        }
+        #${PANEL_ID} .zcs-head { padding: 12px 16px 8px; }
+        #${PANEL_ID} .zcs-field { margin: 0 16px; }
+      }
+
       .${HIGHLIGHT_CLASS} {
         outline: 2px solid var(--kt-yellow, #6d52ff);
         outline-offset: 3px;
         border-radius: 10px;
-        transition: outline-color .3s ease;
       }
     `;
     document.documentElement.appendChild(style);
