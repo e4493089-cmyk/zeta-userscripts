@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.40
+// @version      0.23.41
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1717,10 +1717,18 @@
   // 두 바퀴 연속 제자리면 새로고침을 멈추고 마무리한다.
   const PROFILE_STALL_LIMIT = 2;
 
-  function profileStallCount(previousResume, remaining) {
-    const before = Number(previousResume && previousResume.lastRemaining);
+  function newProfileRunId() {
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  // 제자리걸음은 같은 회차 안에서만 센다.
+  // 지난 회차가 남긴 숫자를 이어받으면, 새로 시작한 수집이
+  // 첫 묶음만 하고 끝나 버린다.
+  function profileStallCount(previousResume, remaining, runId) {
+    if (!previousResume || !runId || previousResume.runId !== runId) return 0;
+    const before = Number(previousResume.lastRemaining);
     if (!Number.isFinite(before) || remaining < before) return 0;
-    return Number((previousResume && previousResume.stalls) || 0) + 1;
+    return Number(previousResume.stalls || 0) + 1;
   }
 
   function remainingText(startedAt, completed, total) {
@@ -1984,23 +1992,20 @@
 
       const total = roomCollectionCount();
 
-      // 한 바퀴 돌았는데 하나도 처리하지 못했거나 남은 개수가 그대로면,
-      // 다시 새로고침해도 결과가 같다. 여기서 멈추지 않으면 새로고침이 끝나지 않는다.
-      const previousResume = readProfileResume() || {};
-      const stalls = profileStallCount(previousResume, profiles.remaining);
-      const stalled = profiles.attempted <= 0 || stalls >= PROFILE_STALL_LIMIT;
-
-      if (profiles.limited && !collectionAborted && stalled) {
+      // 버튼으로 시작한 수집은 언제나 새 회차다.
+      // 한 바퀴 돌았는데 하나도 처리하지 못했다면 다시 새로고침해도 같다.
+      if (profiles.limited && !collectionAborted && profiles.attempted <= 0) {
         clearProfileResume();
       } else if (profiles.limited && !collectionAborted) {
         writeProfileResume({
           active: true,
-          force: Boolean(previousResume.force || force),
-          attempted: Number(previousResume.attempted || 0) + profiles.attempted,
-          done: Number(previousResume.done || 0) + profiles.done,
-          failed: Number(previousResume.failed || 0) + profiles.failed,
-          startedAt: Number(previousResume.startedAt || Date.now()),
-          stalls,
+          runId: newProfileRunId(),
+          force,
+          attempted: profiles.attempted,
+          done: profiles.done,
+          failed: profiles.failed,
+          startedAt: Date.now(),
+          stalls: 0,
           lastRemaining: profiles.remaining,
           targets: force ? profiles.remainingTargets : undefined
         });
@@ -2022,16 +2027,7 @@
         if (BOOKMARKLET_MODE && !bookmarkletControllerReady()) {
           const turnOn = await requestBookmarkletAutoResume();
           if (turnOn) {
-            writeProfileResume({
-              active: true,
-              force,
-              attempted: profiles.attempted,
-              done: profiles.done,
-              failed: profiles.failed,
-              startedAt: Date.now(),
-              targets: force ? profiles.remainingTargets : undefined
-            });
-            saveStateNow();
+            // 기록은 위에서 이미 남겼다. 여기서 다시 쓰면 회차 번호가 지워진다.
             await sleep(250);
             location.reload();
           }
@@ -2110,7 +2106,7 @@
         ? (Array.isArray(resume.targets) ? resume.targets : profileCollectionTargets(true))
         : null;
       const profiles = await collectProfilesForEmptyPlots(forceResume, resumeTargets);
-      const stalls = profileStallCount(resume, profiles.remaining);
+      const stalls = profileStallCount(resume, profiles.remaining, resume.runId);
       const next = {
         ...resume,
         active: true,
