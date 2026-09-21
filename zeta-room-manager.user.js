@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.30
+// @version      0.23.31
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1989,6 +1989,8 @@
   }
 
   const COLLECTION_STEP_RATIO = 0.92;
+  const PLOT_COLLECTION_STEP_RATIO = 0.82;
+  const PLOT_COLLECTION_SETTLE_MS = 80;
   const COLLECTION_CHANGE_TIMEOUT_MS = 380;
   const COLLECTION_BOTTOM_TIMEOUT_MS = 1300;
 
@@ -2169,7 +2171,7 @@
             break;
           }
         } else {
-          const step = Math.max(320, Math.floor(before.client * COLLECTION_STEP_RATIO));
+          const step = Math.max(280, Math.floor(before.client * PLOT_COLLECTION_STEP_RATIO));
           const targetTop = Math.min(before.height, before.top + step);
           const waited = await moveAndWaitForCollection(
             'plot', plotCollectionScrollHost, host,
@@ -2177,6 +2179,7 @@
           );
           if (collectionAborted) break;
           host = waited.host;
+          if (waited.changed) await sleep(PLOT_COLLECTION_SETTLE_MS);
           collectRenderedPlots();
         }
       }
