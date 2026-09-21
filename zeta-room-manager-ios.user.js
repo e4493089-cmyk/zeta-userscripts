@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.53
+// @version      0.20.54
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  window.__zrmRoomManagerIosVersion = '0.20.53';
+  window.__zrmRoomManagerIosVersion = '0.20.54';
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
   // 별명만 따로 둔다. 목록을 그리는 데는 이것만 있으면 된다.
@@ -2264,7 +2264,14 @@
             '<circle cx="19" cy="12" r="1.7" fill="currentColor"></circle>' +
           '</svg>' +
         '</button>';
-      tools.querySelector('.zrm-tools-trigger').addEventListener('click', event => {
+    }
+
+    const trigger = tools.querySelector('.zrm-tools-trigger');
+    if (trigger && trigger.dataset.zrmBoundVersion !== '0.20.54') {
+      const replacement = trigger.cloneNode(true);
+      replacement.dataset.zrmBoundVersion = '0.20.54';
+      trigger.replaceWith(replacement);
+      replacement.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
         openCollectionPopup();
@@ -3665,6 +3672,16 @@
   }
 
   function start() {
+    // 북마클릿/Stay에서 같은 탭에 새 버전을 다시 주입하면 이전 UI DOM이 남을 수 있다.
+    // 남은 버튼에는 이전 클로저의 클릭 핸들러가 붙어 있어 "보이는데 안 눌리는" 상태가 된다.
+    // 데이터는 건드리지 않고 Room Manager가 만든 UI만 지워 새 이벤트를 다시 묶는다.
+    document.getElementById(PLOT_TOOLS_ID)?.remove();
+    document.getElementById(COLLECTION_MODAL_ID)?.remove();
+    document.getElementById(COLLECTION_BANNER_ID)?.remove();
+    document.getElementById('zeta-room-manager-private-profile-tools')?.remove();
+    document.getElementById(NATIVE_RESULTS_ID)?.remove();
+    document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
+
     installPassiveNativeDataCapture();
     injectStyle();
 
