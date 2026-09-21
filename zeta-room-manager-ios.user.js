@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.68
+// @version      0.20.69
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.68';
+  const SCRIPT_VERSION = '0.20.69';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -3053,18 +3053,7 @@
         line-height: 1.5;
         white-space: pre-wrap;
       }
-      .zrm-chat-rename {
-        flex: 0 0 auto;
-        height: 26px;
-        padding: 0 9px;
-        border: 0;
-        border-radius: 8px;
-        background: rgba(255,255,255,.12);
-        color: #fff;
-        font: 700 11px/1 system-ui, sans-serif;
-        cursor: pointer;
-      }
-      .zrm-chat-rename:hover { background: rgba(255,255,255,.2); }
+      #${CHAT_RENAME_ID} { width: 100%; cursor: pointer; }
       [data-testid="chat-header-profile"] span.zrm-has-alias { color: #cdbcff; }
       [data-zrm-dead="1"] a[href*="/rooms/"] { opacity: .45; }
       [data-zrm-dead="1"] a[href*="/rooms/"]::after {
@@ -3790,14 +3779,18 @@
 
   // ── 대화창에서 별명 바꾸기 ───────────────────────────────────────────
   // 목록으로 돌아가지 않아도 지금 보고 있는 방의 별명을 고칠 수 있다.
-  function chatHeaderTitle() {
-    return document.querySelector('[data-testid="chat-header-profile"] span') || null;
+  // 제타 사이드바 메뉴의 '대화 캡처' 아래에 끼워 넣는다.
+  function chatMenuAnchor() {
+    const scope = document.querySelector('[data-sentry-component="ChatSidebar"]') || document.body;
+    for (const button of scope.querySelectorAll('button')) {
+      if (normalizeText(button.textContent) === '대화 캡처') return button;
+    }
+    return null;
   }
 
   function renderChatAliasTools() {
     const roomId = currentRoomId();
-    const header = document.querySelector('[data-testid="chat-header-profile"]');
-    if (!roomId || !header) {
+    if (!roomId) {
       document.getElementById(CHAT_RENAME_ID)?.remove();
       return;
     }
@@ -3805,7 +3798,6 @@
     const key = keyOf('room', roomId);
     const entry = peekEntry(key) || {};
     const alias = normalizeText(state.aliases[key] || entry.alias);
-    const title = chatHeaderTitle();
 
     // 목록에 들르지 않아도 검색이 바로 별명을 찾게 인덱스에도 반영한다.
     if (entry.type === 'room' && normalizeText(entry.alias) !== alias) {
@@ -3813,37 +3805,49 @@
       saveState();
     }
 
-    // 원래 이름은 제타가 헤더에 그린 이름이다. 별명을 씌우기 전에 붙잡아 둔다.
+    // 별명은 헤더 이름에도 씌운다. 제타가 다시 그려도 원래 이름을 붙잡아 둔다.
+    const title = document.querySelector('[data-testid="chat-header-profile"] span');
     if (title) {
       if (!title.dataset.zrmOriginal || !alias) {
         const shown = normalizeText(title.textContent);
         if (shown && shown !== alias) title.dataset.zrmOriginal = shown;
       }
-      const original = title.dataset.zrmOriginal || normalizeText(entry.original);
-      const next = alias || original;
+      const next = alias || title.dataset.zrmOriginal || normalizeText(entry.original);
       if (next && normalizeText(title.textContent) !== next) title.textContent = next;
       title.classList.toggle('zrm-has-alias', !!alias);
     }
 
-    let button = document.getElementById(CHAT_RENAME_ID);
-    if (!button) {
-      button = document.createElement('button');
-      button.id = CHAT_RENAME_ID;
-      button.type = 'button';
-      button.className = 'zrm-chat-rename';
-      button.textContent = '별명';
+    // 메뉴가 닫혀 있으면 끼워 넣을 곳도 없다.
+    const anchor = chatMenuAnchor();
+    if (!anchor) {
+      document.getElementById(CHAT_RENAME_ID)?.remove();
+      return;
     }
 
-    if (button.dataset.zrmBoundVersion !== SCRIPT_VERSION) {
-      button.dataset.zrmBoundVersion = SCRIPT_VERSION;
-      button.addEventListener('click', event => {
+    let row = document.getElementById(CHAT_RENAME_ID);
+    if (!row) {
+      row = document.createElement('button');
+      row.id = CHAT_RENAME_ID;
+      row.type = 'button';
+      row.innerHTML =
+        '<span class="flex-1 text-left body14 font-medium text-gray-200">별명</span>' +
+        '<span class="zrm-chat-rename-value w-20 overflow-hidden text-right body14 text-ellipsis text-white/50"></span>';
+    }
+
+    // 제타가 메뉴 항목에 쓰는 모양을 그대로 따른다.
+    row.className = anchor.className.replace(/\btext-left\b/, '').trim() + ' zrm-chat-rename';
+    row.querySelector('.zrm-chat-rename-value').textContent = alias || '없음';
+
+    if (row.dataset.zrmBoundVersion !== SCRIPT_VERSION) {
+      row.dataset.zrmBoundVersion = SCRIPT_VERSION;
+      row.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
         const id = currentRoomId();
         if (!id) return;
         const entryKey = keyOf('room', id);
         const saved = peekEntry(entryKey) || {};
-        const heading = chatHeaderTitle();
+        const heading = document.querySelector('[data-testid="chat-header-profile"] span');
         openRenameModal({
           key: entryKey,
           type: 'room',
@@ -3856,12 +3860,7 @@
       }, true);
     }
 
-    // 헤더 오른쪽 빈 영역이 제타가 버튼을 두는 자리다.
-    const host = header.parentElement;
-    if (!host) return;
-    const slot = host.lastElementChild;
-    if (slot && slot !== header && !slot.contains(button)) slot.appendChild(button);
-    else if (button.parentElement !== host) host.appendChild(button);
+    if (anchor.nextElementSibling !== row) anchor.after(row);
   }
 
   // ── 대화창에서 수집 ──────────────────────────────────────────────────
