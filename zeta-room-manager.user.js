@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.6
+// @version      0.23.7
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -2430,6 +2430,57 @@
       #${MODAL_ID} .zrm-cancel { background: #343438; color: #ddd; }
       #${MODAL_ID} .zrm-reset { background: #3a3030; color: #ffaaaa; }
       #${MODAL_ID} .zrm-save { background: #6d52ff; color: #fff; font-weight: 700; }
+      @media (max-width: 600px) {
+        #${COLLECTION_BANNER_ID} { padding: 14px; }
+        #${COLLECTION_BANNER_ID} .zrm-banner-card {
+          width: min(270px, 100%);
+          padding: 18px 16px 15px;
+          font-size: 11px;
+        }
+        #${COLLECTION_BANNER_ID} .zrm-banner-title { font-size: 12px; }
+        #${COLLECTION_BANNER_ID} .zrm-banner-count {
+          margin: 8px 0 10px;
+          font-size: 18px;
+        }
+        #${COLLECTION_BANNER_ID} .zrm-banner-eta { font-size: 10px; }
+        #${COLLECTION_BANNER_ID} .zrm-banner-note,
+        #${COLLECTION_BANNER_ID} .zrm-banner-warn { font-size: 9px; }
+        #${COLLECTION_BANNER_ID} .zrm-banner-stop {
+          height: 36px;
+          margin-top: 13px;
+          font-size: 11px;
+        }
+
+        #${COLLECTION_MODAL_ID} { padding: 14px; }
+        #${COLLECTION_MODAL_ID} .zrm-collection-dialog { width: min(300px, 100%); }
+        #${COLLECTION_MODAL_ID} .zrm-collection-head { padding: 13px 14px 8px; }
+        #${COLLECTION_MODAL_ID} .zrm-collection-title { font-size: 14px; }
+        #${COLLECTION_MODAL_ID} .zrm-collection-close {
+          width: 28px;
+          height: 28px;
+          font-size: 19px;
+        }
+        #${COLLECTION_MODAL_ID} .zrm-collection-count {
+          padding: 0 14px 10px;
+          font-size: 10px;
+        }
+        #${COLLECTION_MODAL_ID} .zrm-collection-actions {
+          gap: 6px;
+          padding: 0 14px 14px;
+        }
+        #${COLLECTION_MODAL_ID} .zrm-collection-actions button {
+          height: 38px;
+          font-size: 11px;
+        }
+
+        #${MODAL_ID} .zrm-dialog { width: min(320px, 100%); }
+        #${MODAL_ID} .zrm-dialog-body { padding: 15px; }
+        #${MODAL_ID} h3 { font-size: 15px; }
+        #${MODAL_ID} p { font-size: 10px; }
+        #${MODAL_ID} input { height: 38px; font-size: 12px; }
+        #${MODAL_ID} .zrm-actions { padding: 0 15px 15px; }
+        #${MODAL_ID} button { height: 36px; font-size: 11px; }
+      }
     `;
     document.documentElement.appendChild(style);
   }
