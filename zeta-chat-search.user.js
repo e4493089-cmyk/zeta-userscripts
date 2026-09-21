@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.17
+// @version      0.1.18
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.17';
+  const SCRIPT_VERSION = '0.1.18';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -261,19 +261,30 @@
     element.append(text.slice(0, at), mark, text.slice(at + query.length));
   }
 
-  function nativeCursorUrl(messageId) {
+  function messageCursor(messageId) {
     const match = String(messageId || '').match(/^message-(MESSAGE-\d+-[A-Za-z0-9_-]+)/);
-    if (!match) return '';
-    const url = new URL(location.href);
-    url.searchParams.set('cursor', match[1]);
-    return url.href;
+    return match ? match[1] : '';
   }
 
-  async function tryNativeCursor(row, status) {
-    const targetUrl = nativeCursorUrl(row.id);
-    if (!targetUrl) return false;
+  function bookmarkUrl() {
+    return location.pathname.replace(/\/bookmarks\/?$/, '').replace(/\/$/, '') + '/bookmarks';
+  }
 
-    status('제타 이동 기능으로 대화를 여는 중…');
+  function cursorFromValue(value) {
+    let text = String(value || '');
+    for (let index = 0; index < 3; index += 1) {
+      try { text = decodeURIComponent(text); } catch (_) { break; }
+    }
+    const match = text.match(/MESSAGE-\d+-[A-Za-z0-9_-]+/);
+    return match ? match[0] : '';
+  }
+
+  let nativeUrlTemplate = '';
+
+  async function learnNativeUrlTemplate(status) {
+    if (nativeUrlTemplate) return nativeUrlTemplate;
+
+    status('제타 이동 방식을 확인하는 중…');
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.style.cssText =
@@ -281,22 +292,58 @@
     document.body.appendChild(frame);
 
     try {
-      frame.src = targetUrl;
-      for (let attempt = 0; attempt < 80 && !deepLoadAborted; attempt += 1) {
-        await sleep(attempt ? 100 : 350);
-        let target = null;
-        try { target = frame.contentDocument?.getElementById(row.id) || null; } catch (_) {}
-        if (!target) continue;
+      frame.src = bookmarkUrl();
+      let button = null;
+      for (let attempt = 0; attempt < 100 && !deepLoadAborted && !button; attempt += 1) {
+        await sleep(attempt ? 120 : 400);
+        try {
+          button = frame.contentDocument?.querySelector('[data-testid^="bookmark-item-"]') || null;
+        } catch (_) {}
+      }
+      if (!button) return '';
 
-        // 책갈피를 눌렀을 때와 같은 cursor 주소가 실제 메시지를 연 것을
-        // 확인한 뒤 현재 창도 그 주소로 이동한다.
-        location.assign(frame.contentWindow?.location?.href || targetUrl);
-        return true;
+      let navigatedUrl = '';
+      const frameWindow = frame.contentWindow;
+      for (const name of ['pushState', 'replaceState']) {
+        try {
+          const original = frameWindow.history[name].bind(frameWindow.history);
+          frameWindow.history[name] = (...args) => {
+            navigatedUrl = String(args[2] || navigatedUrl);
+            return original(...args);
+          };
+        } catch (_) {}
+      }
+      button.click();
+
+      for (let attempt = 0; attempt < 120 && !deepLoadAborted; attempt += 1) {
+        await sleep(80);
+        let currentUrl = '';
+        try { currentUrl = frameWindow.location.href; } catch (_) {}
+
+        for (const candidate of [navigatedUrl, currentUrl]) {
+          const cursor = cursorFromValue(candidate);
+          if (!cursor) continue;
+          const absolute = new URL(candidate, location.origin).href;
+          nativeUrlTemplate = absolute.replace(cursor, '__ZCS_MESSAGE__');
+          return nativeUrlTemplate;
+        }
       }
     } finally {
       frame.remove();
     }
-    return false;
+    return '';
+  }
+
+  async function tryNativeCursor(row, status) {
+    const cursor = messageCursor(row.id);
+    if (!cursor) return false;
+
+    const template = await learnNativeUrlTemplate(status);
+    if (!template) return false;
+
+    status('해당 대화로 이동하는 중…');
+    location.assign(template.replace('__ZCS_MESSAGE__', cursor));
+    return true;
   }
 
   async function jumpToMessage(row, status) {
