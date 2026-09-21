@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.54
+// @version      0.23.55
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.54';
+  const SCRIPT_VERSION = '0.23.55';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -38,7 +38,11 @@
   const ROOM_API_BACKFILL_LOCK_KEY = 'zeta-room-manager:room-api-backfill-locked:v2';
   const LEGACY_ROOM_API_BACKFILL_LOCK_KEY = 'zeta-room-manager:room-api-backfill-locked:v1';
   const API_BASE = 'https://api.zeta-ai.io';
-  const WEB_CLIENT_VERSION = '3.44.7';
+  // 제타 웹앱이 보내는 X-Client-Version을 그대로 따라간다.
+  // 아래 값은 한 번도 관측하지 못했을 때만 쓰는 대비책이다.
+  const WEB_CLIENT_VERSION_FALLBACK = '3.44.7';
+  const CLIENT_VERSION_KEY = 'zeta-room-manager:client-version:v1';
+  let observedClientVersion = '';
   let roomApiUnavailableUntil = 0;
   // 방 목록을 그리는 데 필요한 건 별명뿐이다.
   // 캐릭터명·제작자명이 든 큰 덩어리는 검색을 시작할 때 읽는다.
@@ -705,6 +709,48 @@
     if (count) saveState();
   }
 
+  // 페이지가 보낸 요청 헤더에서 클라이언트 버전을 주워 담는다.
+  // 제타가 버전을 올려도 스크립트를 고칠 필요가 없다.
+  function rememberClientVersion(value) {
+    const version = normalizeText(value);
+    if (!version || !/^[\d.]+$/.test(version)) return;
+    if (version === observedClientVersion) return;
+    observedClientVersion = version;
+    try { localStorage.setItem(CLIENT_VERSION_KEY, version); } catch (_) {}
+  }
+
+  function clientVersion() {
+    if (observedClientVersion) return observedClientVersion;
+    try {
+      const stored = normalizeText(localStorage.getItem(CLIENT_VERSION_KEY));
+      if (stored) {
+        observedClientVersion = stored;
+        return stored;
+      }
+    } catch (_) {}
+    return WEB_CLIENT_VERSION_FALLBACK;
+  }
+
+  function captureClientVersionFromHeaders(init) {
+    try {
+      const headers = init && init.headers;
+      if (!headers) return;
+      if (typeof headers.get === 'function') {
+        rememberClientVersion(headers.get('X-Client-Version'));
+        return;
+      }
+      if (Array.isArray(headers)) {
+        for (const pair of headers) {
+          if (pair && /^x-client-version$/i.test(pair[0])) rememberClientVersion(pair[1]);
+        }
+        return;
+      }
+      for (const [name, value] of Object.entries(headers)) {
+        if (/^x-client-version$/i.test(name)) rememberClientVersion(value);
+      }
+    } catch (_) {}
+  }
+
   function installPassiveNativeDataCapture() {
     if (window.__zrmPassiveNativeCaptureInstalled) return;
     window.__zrmPassiveNativeCaptureInstalled = true;
@@ -713,6 +759,11 @@
     const originalFetch = window.fetch;
     if (typeof originalFetch === 'function') {
       window.fetch = async function () {
+        try {
+          const first = arguments[0];
+          if (first && typeof first !== 'string' && first.headers) captureClientVersionFromHeaders(first);
+          captureClientVersionFromHeaders(arguments[1]);
+        } catch (_) {}
         const response = await originalFetch.apply(this, arguments);
         try {
           const first = arguments[0];
@@ -728,11 +779,17 @@
 
     const xhrOpen = XMLHttpRequest.prototype.open;
     const xhrSend = XMLHttpRequest.prototype.send;
+    const xhrSetHeader = XMLHttpRequest.prototype.setRequestHeader;
     const xhrUrl = new WeakMap();
 
     XMLHttpRequest.prototype.open = function (method, url) {
       try { xhrUrl.set(this, String(url || '')); } catch (_) {}
       return xhrOpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
+      if (/^x-client-version$/i.test(String(name || ''))) rememberClientVersion(value);
+      return xhrSetHeader.apply(this, arguments);
     };
 
     XMLHttpRequest.prototype.send = function () {
@@ -834,10 +891,11 @@
   function roomApiHeaders() {
     const token = zetaAccessToken();
     const deviceId = zetaDeviceId(token);
+    const version = clientVersion();
     const headers = {
       Accept: 'application/json',
-      'X-Client-Version': WEB_CLIENT_VERSION,
-      'X-Client-Native-Version': WEB_CLIENT_VERSION,
+      'X-Client-Version': version,
+      'X-Client-Native-Version': version,
       'X-Client-Type': 'web',
       'X-Device-Type': /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'web' : 'pc_web',
       'X-User-Language': 'KOREAN'
