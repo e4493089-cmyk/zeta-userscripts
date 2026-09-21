@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.63
+// @version      0.20.64
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.63';
+  const SCRIPT_VERSION = '0.20.64';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -1736,10 +1736,11 @@
         : []
     ).join('\n');
 
+    // 복사할 실패 목록이 없으면 복사 버튼도 띄우지 않는다.
     const buttons = document.createElement('div');
     buttons.className = 'zrm-result-buttons';
     buttons.innerHTML =
-      '<button type="button" class="zrm-result-copy">복사</button>' +
+      (list.length ? '<button type="button" class="zrm-result-copy">복사</button>' : '') +
       '<button type="button" class="zrm-result-close">닫기</button>';
     card.appendChild(buttons);
 
@@ -1758,7 +1759,7 @@
         void action.run();
       });
     }
-    buttons.querySelector('.zrm-result-copy').addEventListener('click', event => {
+    buttons.querySelector('.zrm-result-copy')?.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
       void copyCollectionResultText(copyText, event.currentTarget);
