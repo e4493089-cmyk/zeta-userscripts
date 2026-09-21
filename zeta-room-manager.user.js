@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.60
+// @version      0.23.61
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.60';
+  const SCRIPT_VERSION = '0.23.61';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1719,11 +1719,11 @@
       for (const item of found) {
         const row = document.createElement('div');
         row.className = 'zrm-result-item';
-        const names = document.createElement('b');
-        names.textContent = item.names.join(', ');
-        const room = document.createElement('span');
+        const room = document.createElement('b');
         room.textContent = item.room || '(제목 없음)';
-        row.append(names, document.createElement('br'), room);
+        const names = document.createElement('span');
+        names.textContent = item.names.join(', ');
+        row.append(room, document.createElement('br'), names);
         box.appendChild(row);
       }
       card.appendChild(box);
@@ -1755,7 +1755,7 @@
     ].concat(
       found.length
         ? ['', '수집한 이름 ' + found.length + '개'].concat(
-            found.map(item => '· ' + item.names.join(', ') + '\n  ' + (item.room || '(제목 없음)'))
+            found.map(item => '· ' + (item.room || '(제목 없음)') + '\n  ' + item.names.join(', '))
           )
         : []
     ).concat(
