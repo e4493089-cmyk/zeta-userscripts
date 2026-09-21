@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.29
+// @version      0.20.30
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -948,9 +948,6 @@
       const record = parseItem(item, 'room');
       if (!record) continue;
       if (forceReconcileSeenRoomKeys) forceReconcileSeenRoomKeys.add(record.key);
-      if (forceReconcileProfileRoomKeys && record.needsProfileVerification) {
-        forceReconcileProfileRoomKeys.add(record.key);
-      }
       applyAlias(record);
       harvested++;
     }
@@ -1026,20 +1023,23 @@
   }
 
 
-  // ── 빈 플롯만 숨긴 화면으로 열어 이름 채우기 ─────────────────────────
+  // ── 숨긴 대화방을 거쳐 플롯 이름 채우기 ─────────────────────────────
   // 방 목록 데이터에는 characters가 빈 배열이고 creator 키가 아예 없다.
-  // 방 화면 → 플롯 프로필에는 있으므로, 아직 모르는 플롯만 숨긴 iframe으로
-  // 열어서 읽는다. 요청을 직접 만들지 않고 제타 화면이 부르는 대로 둔다.
+  // 대화방 → 플롯 프로필에는 있으므로 필요한 플롯을 숨긴 iframe으로 열어 읽는다.
+  // 요청이나 프로필 주소를 직접 만들지 않고 제타 화면이 이동하는 대로 둔다.
   const PROFILE_BUTTON = 'button[data-testid="chat-header-profile"][aria-label="Open plot profile"]';
-  const PROFILE_PATH = /^\/(?:[^/]+\/)?plots\/[a-f\d-]{36}\/profile\/?$/i;
+  const PROFILE_PATH = /^\/(?:[^/]+\/)?plots\/([a-f\d-]{36})\/profile\/?$/i;
   const ROOM_UUID = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
   let collectionAborted = false;
   let forceReconcileSeenRoomKeys = null;
-  let forceReconcileProfileRoomKeys = null;
   let wakeLock = null;
   let wakeStatus = '';
   // 숨김 프로필을 연속으로 읽는 동안 fetch/XHR 응답까지 복제하면 메모리 사용량이 크게 늘어난다.
   let suspendPassiveNativeCapture = false;
+
+  function plotProfileId(pathname) {
+    return normalizeText((String(pathname || '').match(PROFILE_PATH) || [])[1]);
+  }
 
   function collectionRunning() {
     return Boolean(roomCollectionProgress.running || plotCollectionProgress.running);
@@ -1195,7 +1195,7 @@
     if (!creators.length && /탈퇴한 계정/.test(root.textContent || '')) {
       creators.push('탈퇴한 계정');
     }
-    const profileId = win.location.pathname.split('/')[3] || '';
+    const profileId = plotProfileId(win.location.pathname);
     if (creators.length) return { creators, characters, profileId };
 
     // 제작자를 끝내 못 읽어도 캐릭터명까지 버릴 이유는 없다.
@@ -1219,41 +1219,6 @@
       frame.remove();
     }
   }
-
-  // 플롯마다 새 iframe을 사용한다.
-  // 이전 프로필 DOM을 재사용하면 URL만 먼저 바뀐 순간의 낡은 DOM을 새 플롯으로
-  // 오인할 수 있으므로, 프로필 수집에서는 history.pushState 재사용을 하지 않는다.
-  async function visitPlotProfile(plotId, timeoutMs = 18000) {
-    const frame = hiddenFrame();
-    frame.src = '/' + localeSegment() + '/plots/' + plotId + '/profile';
-    try {
-      return await readProfileIn(frame, plotId, timeoutMs);
-    } finally {
-      dropFrame(frame);
-    }
-  }
-
-  // 프로필 주소를 모르거나 열리지 않으면 방을 거쳐 간다(페이지 2번).
-  async function visitRoomProfile(roomId) {
-    const frame = hiddenFrame();
-    frame.src = '/' + localeSegment() + '/rooms/' + roomId;
-
-    try {
-      const button = await readInFrame(frame, win => {
-        if (!win.location.pathname.includes(roomId)) return null;
-        return win.document.querySelector(PROFILE_BUTTON);
-      }, 10000);
-      button.click();
-
-      return await readInFrame(frame, win => {
-        if (!PROFILE_PATH.test(win.location.pathname)) return null;
-        return readPlotProfile(win);
-      }, 10000);
-    } finally {
-      dropFrame(frame);
-    }
-  }
-
 
   function applyProfileResult(target, result, options = {}) {
     const canonicalId = target.plotId || normalizeText(result.profileId) || target.originatedId;
@@ -1481,12 +1446,8 @@
       return Math.max(800, Math.min(cap, left));
     };
 
-    const navigatePlot = async (plotId, timeoutMs) => {
-      const active = ensureFrame();
-      active.src = profilePath(plotId);
-      return await readProfileIn(active, plotId, timeoutMs);
-    };
-
+    // 제작자명은 대화방에서 플롯 프로필 버튼을 눌러 들어가야 안정적으로 보인다.
+    // 직접 /plots/.../profile 주소를 여는 우회 경로는 쓰지 않는다.
     const navigateRoom = async (roomId, deadline) => {
       const active = ensureFrame();
       active.src = '/' + localeSegment() + '/rooms/' + roomId;
@@ -1497,10 +1458,16 @@
       }, timeLeft(deadline, options.mobile ? 6500 : 10000));
       button.click();
 
-      return await readInFrame(active, win => {
+      const profileId = await readInFrame(active, win => {
         if (!PROFILE_PATH.test(win.location.pathname)) return null;
-        return readPlotProfile(win);
+        return plotProfileId(win.location.pathname) || null;
       }, timeLeft(deadline, options.mobile ? 6500 : 10000));
+
+      return await readProfileIn(
+        active,
+        profileId,
+        timeLeft(deadline, options.mobile ? 10000 : 18000)
+      );
     };
 
     try {
@@ -1517,56 +1484,11 @@
         const deadline = Date.now() + targetBudgetMs;
 
         try {
-          if (!target.plotId) {
-            try {
-              onResult(target, await navigateRoom(target.roomId, deadline), null);
-            } catch (error) {
-              await resetFrame();
-              throw error;
-            }
-            used++;
-            await sleep(pauseMs);
-            continue;
-          }
-
-          let result = null;
-          let directError = null;
-
-          try {
-            result = await navigatePlot(
-              target.plotId,
-              timeLeft(deadline, options.mobile ? 10000 : 18000)
-            );
-          } catch (error) {
-            directError = error;
-            // 한 번 멈춘 iframe은 다음 주소까지 끌고 가지 않는다.
-            await resetFrame();
-          }
-
-          if (!result && target.originatedId && target.originatedId !== target.plotId) {
-            try {
-              result = await navigatePlot(
-                target.originatedId,
-                timeLeft(deadline, options.mobile ? 7000 : 15000)
-              );
-            } catch (_) {
-              await resetFrame();
-            }
-          }
-
-          if (!result) {
-            try {
-              result = await navigateRoom(target.roomId, deadline);
-            } catch (roomError) {
-              await resetFrame();
-              throw roomError || directError || new Error('프로필을 열 수 없습니다');
-            }
-          }
-
+          const result = await navigateRoom(target.roomId, deadline);
           onResult(target, result, null);
         } catch (error) {
           // 어떤 실패든 다음 타깃은 깨끗한 iframe에서 시작한다.
-          if (frame && frame.isConnected) await resetFrame();
+          await resetFrame();
           onResult(target, null, error);
         }
 
@@ -1706,10 +1628,9 @@
       collectionAborted = false;
       void holdScreenAwake();
 
-      // 다시 전체 수집은 기존 데이터를 지우지 않고 비교한다.
-      // 이름 프로필은 새 방/연결 변경/이름 누락처럼 필요한 방만 다시 연다.
+      // 일반 수집은 새 방/연결 변경/이름 누락만 열고,
+      // 다시 전체 수집은 기존 데이터를 지우지 않은 채 모든 고유 플롯을 재검증한다.
       forceReconcileSeenRoomKeys = force ? new Set() : null;
-      forceReconcileProfileRoomKeys = force ? new Set() : null;
       // PC판과 같은 수집 흐름은 유지하되, iOS WebKit에서만 발생하는
       // MutationObserver → refresh → renderedItems 중복 분석을 막는다.
       suspendObserverRefresh = true;
@@ -1725,136 +1646,86 @@
       const mobileList = isMobileProfileDevice();
       let host = roomCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
-      let lastHeight = 0;
-      let lastCount = roomCollectionCount();
-      let stableRounds = 0;
-      let barrenRounds = 0;
-      let skippedKnown = false;
-      const knownAtStart = force ? 0 : roomCollectionCount();
+      let listCompleted = false;
+      let checkpointAt = Date.now();
+      let checkpointCount = roomCollectionCount();
 
-      setScrollTop(host, 0);
-      await sleep(450);
+      if (originalTop > 1) {
+        const moved = await moveAndWaitForCollection(
+          'room', roomCollectionScrollHost, host, () => setScrollTop(host, 0)
+        );
+        host = moved.host;
+      } else {
+        setScrollTop(host, 0);
+      }
       harvestRoomDocument(document);
 
-      for (let round = 0; round < 1600; round++) {
+      for (let round = 0; round < 2400; round++) {
         if (collectionAborted) break;
 
-        // 모바일/Monkey에서는 가상 목록이 페이지를 추가하면서 스크롤 컨테이너
-        // 자체를 교체하는 경우가 있다. 시작할 때 잡은 낡은 host를 계속 쓰면
-        // 중간 지점에서 더 이상 내려가지 못하므로 현재 DOM의 host를 다시 잡는다.
-        if ((force || mobileList) && (!mobileList || round % 4 === 0 || barrenRounds >= 2)) {
-          const liveHost = roomCollectionScrollHost();
-          if (liveHost && liveHost !== host) {
-            const oldTop = scrollMetrics(host).top;
-            host = liveHost;
-            const live = scrollMetrics(host);
-            setScrollTop(host, Math.min(live.height, Math.max(live.top, oldTop)));
-            stableRounds = 0;
-            await sleep(mobileList ? 60 : 120);
-          }
+        const liveHost = roomCollectionScrollHost();
+        if (liveHost && liveHost !== host) {
+          const oldTop = scrollMetrics(host).top;
+          host = liveHost;
+          const live = scrollMetrics(host);
+          setScrollTop(host, Math.min(live.height, Math.max(live.top, oldTop)));
         }
 
         harvestRoomDocument(document);
-        const before = scrollMetrics(host);
+        const before = collectionSnapshot('room', host);
         const count = roomCollectionCount();
         roomCollectionProgress.count = count;
-        if (!mobileList || round % 4 === 0 || count !== lastCount) renderCollectionTools();
+        if (!mobileList || round % 4 === 0 || count !== checkpointCount) renderCollectionTools();
+
+        if (count - checkpointCount >= 20 || Date.now() - checkpointAt >= 2000) {
+          saveStateNow();
+          checkpointAt = Date.now();
+          checkpointCount = count;
+        }
 
         const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
         if (nearBottom) {
-          setScrollTop(host, before.height);
-          await sleep(force && !mobileList ? 1200 : 700);
+          const waited = await moveAndWaitForCollection(
+            'room', roomCollectionScrollHost, host,
+            () => setScrollTop(host, before.height),
+            COLLECTION_BOTTOM_TIMEOUT_MS
+          );
           if (collectionAborted) break;
-
-          if (force || mobileList) {
-            const liveHost = roomCollectionScrollHost();
-            if (liveHost && liveHost !== host) {
-              host = liveHost;
-              stableRounds = 0;
-              setScrollTop(host, scrollMetrics(host).height);
-              await sleep(500);
-            }
-          }
-
+          host = waited.host;
           harvestRoomDocument(document);
-
-          let after = scrollMetrics(host);
-          let afterCount = roomCollectionCount();
-          if (after.height <= before.height + 2 && afterCount <= count) {
-            stableRounds++;
-
-            // 모바일 무한목록은 다음 묶음 로딩이 늦으면 중간 지점을 바닥처럼 보이게 한다.
-            // 강제 재수집에서는 위로 살짝 올렸다가 다시 바닥으로 내려 로딩 감지를 깨운다.
-            if (force && stableRounds % 2 === 0) {
-              const nudge = Math.max(240, Math.floor(after.client * 0.45));
-              setScrollTop(host, Math.max(0, after.top - nudge));
-              await sleep(mobileList ? 120 : 250);
-              harvestRoomDocument(document);
-              const nudged = scrollMetrics(host);
-              setScrollTop(host, nudged.height);
-              await sleep(mobileList ? 500 : 900);
-              harvestRoomDocument(document);
-              after = scrollMetrics(host);
-              afterCount = roomCollectionCount();
-              if (after.height > before.height + 2 || afterCount > count) stableRounds = 0;
-            }
-          } else {
-            stableRounds = 0;
+          const after = collectionSnapshot('room', host);
+          const stillBottom = after.top + after.client >= after.height - Math.max(80, after.client * 0.15);
+          if (!waited.changed && stillBottom && sameCollectionWindow(before, after)) {
+            listCompleted = true;
+            break;
           }
-
-          // 일반 수집은 기존 판정을 유지하고, 다시 전체 수집은 훨씬 오래 확인한다.
-          const stableLimit = force ? 12 : 4;
-          if (stableRounds >= stableLimit) break;
         } else {
-          stableRounds = 0;
-          // 이미 아는 방만 지나가는 구간은 크게 건너뛴다.
-          // 다시 수집할 때 목록 전체를 처음부터 훑는 시간을 줄인다.
-          const factor = !force && barrenRounds >= 3
-            ? 2.6
-            : (force && mobileList ? 0.96 : 0.78);
-          const step = Math.max(force && mobileList ? 420 : 320, Math.floor(before.client * factor));
-          setScrollTop(host, Math.min(before.height, before.top + step));
-          await sleep(!force && barrenRounds >= 3
-            ? 170
-            : (force && mobileList ? 160 : 320));
+          const step = Math.max(320, Math.floor(before.client * COLLECTION_STEP_RATIO));
+          const targetTop = Math.min(before.height, before.top + step);
+          const waited = await moveAndWaitForCollection(
+            'room', roomCollectionScrollHost, host,
+            () => setScrollTop(host, targetTop)
+          );
           if (collectionAborted) break;
+          host = waited.host;
+          harvestRoomDocument(document);
         }
-
-        const now = scrollMetrics(host);
-        const nowCount = roomCollectionCount();
-
-        if (nowCount > count) barrenRounds = 0;
-        else barrenRounds++;
-
-        // 새로 들어오는 방이 한참 없으면 나머지는 이미 수집된 구간이다.
-        // 제타는 최근 대화 순으로 정렬하므로 새 방은 위쪽에 있다.
-        const knownStopLimit = 14;
-        if (!force && knownAtStart > 0 && barrenRounds >= knownStopLimit) {
-          skippedKnown = true;
-          break;
-        }
-
-        // nearBottom 안정 판정은 위 블록에서 한 번만 센다.
-        lastHeight = now.height;
-        lastCount = nowCount;
       }
 
       harvestRoomDocument(document);
       saveStateNow();
-      localStorage.setItem(ROOM_COLLECTION_STAMP_KEY, String(Date.now()));
+      if (!collectionAborted && listCompleted) {
+        localStorage.setItem(ROOM_COLLECTION_STAMP_KEY, String(Date.now()));
+      }
       setScrollTop(host, originalTop);
-      await sleep(100);
 
       const seenRoomKeys = force && forceReconcileSeenRoomKeys
         ? new Set(forceReconcileSeenRoomKeys)
         : null;
-      const profileRoomKeys = force && forceReconcileProfileRoomKeys
-        ? new Set(forceReconcileProfileRoomKeys)
-        : null;
       forceReconcileSeenRoomKeys = null;
-      forceReconcileProfileRoomKeys = null;
 
-      const forceTargets = force ? profileCollectionTargets(true, profileRoomKeys) : null;
+      // 다시 전체 수집은 이번에 실제로 확인한 모든 고유 플롯을 대화방 경유로 재검증한다.
+      const forceTargets = force ? profileCollectionTargets(true, seenRoomKeys) : null;
       const profiles = collectionAborted
         ? {
             targets: 0, attempted: 0, done: 0, failed: 0,
@@ -1933,7 +1804,7 @@
       alert(
         resultTitle + ' · 저장된 방 ' + total + '개' +
         (force && seenRoomKeys ? ' · 이번 확인 ' + seenRoomKeys.size + '개' : '') +
-        (skippedKnown ? ' (이미 수집된 구간은 건너뜀)' : '') +
+        (!listCompleted && !collectionAborted ? ' (목록 끝 확인 실패)' : '') +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 이번 ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개' +
         (profiles.failed ? ' · 실패 ' + profiles.failed + '개' : '') +
@@ -1952,7 +1823,6 @@
       return true;
     })().finally(() => {
       forceReconcileSeenRoomKeys = null;
-      forceReconcileProfileRoomKeys = null;
       roomCollectionPromise = null;
       roomCollectionProgress.running = false;
       suspendObserverRefresh = false;
@@ -1963,32 +1833,6 @@
     });
 
     return roomCollectionPromise;
-  }
-
-  async function startFullNameRecollection() {
-    if (currentSection() !== 'room') {
-      alert('대화방 목록에서 실행해 주세요.');
-      return false;
-    }
-    if (roomCollectionPromise || roomCollectionProgress.running) return false;
-
-    const targets = profileCollectionTargets(true);
-    if (!targets.length) {
-      alert('다시 확인할 플롯이 없습니다.');
-      return true;
-    }
-
-    writeProfileResume({
-      active: true,
-      force: true,
-      mode: 'names',
-      attempted: 0,
-      done: 0,
-      failed: 0,
-      startedAt: Date.now(),
-      targets
-    });
-    return await resumeProfileCollectionIfNeeded();
   }
 
   async function resumeProfileCollectionIfNeeded() {
@@ -2141,6 +1985,111 @@
     else host.scrollTop = value;
   }
 
+  const COLLECTION_STEP_RATIO = 0.92;
+  const COLLECTION_CHANGE_TIMEOUT_MS = 380;
+  const COLLECTION_BOTTOM_TIMEOUT_MS = 1300;
+
+  // 무거운 React 분석 없이 현재 렌더링된 목록 창의 정체만 빠르게 읽는다.
+  // 새 창이 그려졌는지 판단하는 용도라 ID가 없는 플롯은 href/텍스트를 대체 토큰으로 쓴다.
+  function collectionWindowTokens(kind) {
+    const items = kind === 'room'
+      ? roomItemsFromDocument(document)
+      : Array.from(document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]'));
+    const out = [];
+    const seen = new Set();
+
+    for (const item of items) {
+      const link = item.querySelector(kind === 'room' ? 'a[href*="/rooms/"]' : 'a[href*="/plots/"]');
+      const token = extractId(link && link.href, kind)
+        || normalizeText(item.getAttribute('data-plot-id'))
+        || normalizeText(link && link.getAttribute('href'))
+        || normalizeText(item.textContent).slice(0, 120);
+      if (!token || seen.has(token)) continue;
+      seen.add(token);
+      out.push(token);
+    }
+    return out;
+  }
+
+  function collectionSnapshot(kind, host) {
+    const metrics = scrollMetrics(host);
+    const tokens = collectionWindowTokens(kind);
+    return {
+      host,
+      ...metrics,
+      tokens,
+      last: tokens[tokens.length - 1] || '',
+      signature: tokens.join('\u001f')
+    };
+  }
+
+  function sameCollectionWindow(a, b) {
+    return Boolean(a && b
+      && Math.abs(a.height - b.height) <= 2
+      && a.last === b.last
+      && a.signature === b.signature);
+  }
+
+  // observer를 먼저 건 뒤 스크롤한다. 빠른 기기는 DOM 창이 바뀌는 즉시 반환하고,
+  // 변화 신호를 놓친 경우에만 짧은 timeout을 fallback으로 사용한다.
+  function moveAndWaitForCollection(kind, hostGetter, host, move, timeoutMs = COLLECTION_CHANGE_TIMEOUT_MS) {
+    const before = collectionSnapshot(kind, host);
+
+    return new Promise(resolve => {
+      let done = false;
+      let raf = 0;
+      let resizeObserver = null;
+
+      const finish = changed => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        cancelAnimationFrame(raf);
+        mutationObserver.disconnect();
+        resizeObserver?.disconnect();
+        const liveHost = hostGetter() || host;
+        resolve({ changed, host: liveHost, snapshot: collectionSnapshot(kind, liveHost) });
+      };
+
+      const check = () => {
+        if (done) return;
+        const liveHost = hostGetter() || host;
+        const after = collectionSnapshot(kind, liveHost);
+        if (liveHost !== host || !sameCollectionWindow(before, after)) finish(true);
+      };
+
+      const scheduleCheck = () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(check);
+      };
+
+      const mutationObserver = new MutationObserver(scheduleCheck);
+      mutationObserver.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['href', 'data-plot-id', 'data-sentry-component']
+      });
+
+      if (window.ResizeObserver) {
+        resizeObserver = new ResizeObserver(scheduleCheck);
+        try { resizeObserver.observe(host); } catch (_) {}
+        try {
+          const content = host.querySelector?.('[data-sentry-component="RoomList"], :scope > div');
+          if (content && content !== host) resizeObserver.observe(content);
+        } catch (_) {}
+      }
+
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      try {
+        move();
+        requestAnimationFrame(() => requestAnimationFrame(check));
+      } catch (_) {
+        finish(false);
+      }
+    });
+  }
+
   async function collectAllPlotsByScrolling() {
     const section = currentSection();
     if (section !== 'plot' && section !== 'plot-search') {
@@ -2152,64 +2101,90 @@
     plotCollectionPromise = (async () => {
       collectionAborted = false;
       void holdScreenAwake();
+      suspendObserverRefresh = true;
+      observer?.disconnect();
       plotCollectionProgress = { running: true, count: plotCollectionCount(), phase: '플롯 목록 수집' };
       renderCollectionTools();
 
-      const host = plotCollectionScrollHost();
+      let host = plotCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
-      let lastHeight = 0;
-      let lastCount = plotCollectionCount();
-      let stableRounds = 0;
+      let listCompleted = false;
+      let checkpointAt = Date.now();
+      let checkpointCount = plotCollectionCount();
 
       // 처음부터 훑어야 가상 목록에서 빠지는 항목이 없다.
-      setScrollTop(host, 0);
-      await sleep(450);
+      if (originalTop > 1) {
+        const moved = await moveAndWaitForCollection(
+          'plot', plotCollectionScrollHost, host, () => setScrollTop(host, 0)
+        );
+        host = moved.host;
+      } else {
+        setScrollTop(host, 0);
+      }
       if (!collectionAborted) collectRenderedPlots();
 
-      for (let round = 0; round < 1600; round++) {
+      for (let round = 0; round < 2400; round++) {
         if (collectionAborted) break;
+
+        const liveHost = plotCollectionScrollHost();
+        if (liveHost && liveHost !== host) {
+          const oldTop = scrollMetrics(host).top;
+          host = liveHost;
+          const live = scrollMetrics(host);
+          setScrollTop(host, Math.min(live.height, Math.max(live.top, oldTop)));
+        }
+
         collectRenderedPlots();
-        const before = scrollMetrics(host);
+        const before = collectionSnapshot('plot', host);
         const count = plotCollectionCount();
 
         plotCollectionProgress.count = count;
         renderCollectionTools();
 
-        const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
-        if (nearBottom) {
-          setScrollTop(host, before.height);
-          await sleep(700);
-          if (collectionAborted) break;
-          collectRenderedPlots();
-
-          const after = scrollMetrics(host);
-          const afterCount = plotCollectionCount();
-          if (after.height <= before.height + 2 && afterCount <= count) stableRounds++;
-          else stableRounds = 0;
-
-          if (stableRounds >= 4) break;
-        } else {
-          stableRounds = 0;
-          const step = Math.max(320, Math.floor(before.client * 0.78));
-          setScrollTop(host, Math.min(before.height, before.top + step));
-          await sleep(320);
-          if (collectionAborted) break;
+        if (count - checkpointCount >= 20 || Date.now() - checkpointAt >= 2000) {
+          saveStateNow();
+          checkpointAt = Date.now();
+          checkpointCount = count;
         }
 
-        const now = scrollMetrics(host);
-        const nowCount = plotCollectionCount();
-        if (now.height === lastHeight && nowCount === lastCount && nearBottom) stableRounds++;
-        lastHeight = now.height;
-        lastCount = nowCount;
+        const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
+        if (nearBottom) {
+          const waited = await moveAndWaitForCollection(
+            'plot', plotCollectionScrollHost, host,
+            () => setScrollTop(host, before.height),
+            COLLECTION_BOTTOM_TIMEOUT_MS
+          );
+          if (collectionAborted) break;
+          host = waited.host;
+          collectRenderedPlots();
+
+          const after = collectionSnapshot('plot', host);
+          const stillBottom = after.top + after.client >= after.height - Math.max(80, after.client * 0.15);
+          if (!waited.changed && stillBottom && sameCollectionWindow(before, after)) {
+            listCompleted = true;
+            break;
+          }
+        } else {
+          const step = Math.max(320, Math.floor(before.client * COLLECTION_STEP_RATIO));
+          const targetTop = Math.min(before.height, before.top + step);
+          const waited = await moveAndWaitForCollection(
+            'plot', plotCollectionScrollHost, host,
+            () => setScrollTop(host, targetTop)
+          );
+          if (collectionAborted) break;
+          host = waited.host;
+          collectRenderedPlots();
+        }
       }
 
       if (!collectionAborted) collectRenderedPlots();
       saveStateNow();
-      localStorage.setItem(PLOT_COLLECTION_STAMP_KEY, String(Date.now()));
+      if (!collectionAborted && listCompleted) {
+        localStorage.setItem(PLOT_COLLECTION_STAMP_KEY, String(Date.now()));
+      }
 
       // 사용자가 보던 위치로 돌아간다.
       setScrollTop(host, originalTop);
-      await sleep(100);
 
       const total = plotCollectionCount();
       plotCollectionProgress = { running: false, count: total };
@@ -2219,15 +2194,18 @@
         entry && entry.type === 'plot' && normalizeText(entry.alias)
       ).length;
       alert(
-        (collectionAborted ? '전체 수집 중지됨' : '전체 수집 완료') + ' · 저장된 플롯 ' + total + '개' +
+        (collectionAborted ? '전체 수집 중지됨' : (listCompleted ? '전체 수집 완료' : '목록 끝 확인 실패')) +
+        ' · 저장된 플롯 ' + total + '개' +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
       );
       return true;
     })().finally(() => {
       plotCollectionPromise = null;
       plotCollectionProgress.running = false;
+      suspendObserverRefresh = false;
       void releaseScreenAwake();
       renderCollectionTools();
+      scheduleRefresh();
     });
 
     return plotCollectionPromise;
@@ -3110,33 +3088,17 @@
 
     // 다시 전체 수집도 기존 방이 그대로면 무거운 React 전체 분석을 반복하지 않는다.
     // 방에 붙은 plot 객체만 얕게 확인해 연결/이름이 달라진 경우에만 깊게 본다.
-    let needsProfileVerification = false;
     let forceQuickChanged = false;
     if (forceReconcileSeenRoomKeys && type === 'room') {
       const quickPlot = reactRoomPlotMeta(item);
       const quickPlotId = normalizeText(quickPlot && (quickPlot.id || quickPlot.plotId));
       const quickOriginatedId = normalizeText(quickPlot && (quickPlot.originatedId || quickPlot.originalId));
-      const quickCharacters = plotCharacterNames(quickPlot);
-      const quickCreators = plotCreatorNames(quickPlot);
-      const previousCharacters = uniqueTexts(previous.characterNames);
-      const previousCreators = uniqueTexts(previous.creatorNames);
-
-      const sameList = (a, b) =>
-        a.length === b.length && a.every((value, index) => value === b[index]);
 
       const plotChanged = Boolean(
-        (quickPlotId && normalizeText(previous.plotId) && quickPlotId !== normalizeText(previous.plotId)) ||
-        (quickOriginatedId && normalizeText(previous.originatedId) && quickOriginatedId !== normalizeText(previous.originatedId))
+        (quickPlotId && quickPlotId !== normalizeText(previous.plotId)) ||
+        (quickOriginatedId && quickOriginatedId !== normalizeText(previous.originatedId))
       );
-      const characterChanged = quickCharacters.length && !sameList(quickCharacters, previousCharacters);
-      const creatorChanged = quickCreators.length && !sameList(quickCreators, previousCreators);
-
-      forceQuickChanged = Boolean(plotChanged || characterChanged || creatorChanged);
-      needsProfileVerification = Boolean(
-        forceQuickChanged ||
-        !previousCharacters.length ||
-        !previousCreators.length
-      );
+      forceQuickChanged = plotChanged;
     }
 
     // 이번 세션에서 이미 훑은 항목은 다시 훑지 않는다.
@@ -3146,8 +3108,7 @@
       if (link && link.href) previous.href = link.href;
       if (image && normalizeText(previous.image) !== normalizeText(image)) previous.image = image;
       return {
-        key, type, id, item, link, titleEl, original, alias,
-        needsProfileVerification
+        key, type, id, item, link, titleEl, original, alias
       };
     }
 
@@ -3161,8 +3122,7 @@
       if (link && link.href) previous.href = link.href;
       if (image && normalizeText(previous.image) !== normalizeText(image)) previous.image = image;
       return {
-        key, type, id, item, link, titleEl, original, alias,
-        needsProfileVerification
+        key, type, id, item, link, titleEl, original, alias
       };
     }
 
@@ -3226,16 +3186,8 @@
       )
     };
 
-    if (forceReconcileSeenRoomKeys && type === 'room') {
-      const current = state.index[key] || {};
-      if (!uniqueTexts(current.characterNames).length || !uniqueTexts(current.creatorNames).length) {
-        needsProfileVerification = true;
-      }
-    }
-
     return {
-      key, type, id, item, link, titleEl, original, alias,
-      needsProfileVerification
+      key, type, id, item, link, titleEl, original, alias
     };
   }
 
