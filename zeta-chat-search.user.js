@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.18
+// @version      0.1.19
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.18';
+  const SCRIPT_VERSION = '0.1.19';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -284,7 +284,7 @@
   async function learnNativeUrlTemplate(status) {
     if (nativeUrlTemplate) return nativeUrlTemplate;
 
-    status('제타 이동 방식을 확인하는 중…');
+    status('이동 중');
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.style.cssText =
@@ -341,7 +341,7 @@
     const template = await learnNativeUrlTemplate(status);
     if (!template) return false;
 
-    status('해당 대화로 이동하는 중…');
+    status('이동 중');
     location.assign(template.replace('__ZCS_MESSAGE__', cursor));
     return true;
   }
@@ -364,7 +364,7 @@
     if (await tryNativeCursor(row, status)) return true;
 
     // cursor 이동을 지원하지 않는 화면에서는 기존 스크롤 탐색으로 대체한다.
-    status('그 대화까지 거슬러 올라가는 중…');
+    status('이동 중');
     const log = chatLog();
     if (!log) return false;
 
