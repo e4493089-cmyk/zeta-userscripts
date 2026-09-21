@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.71
+// @version      0.20.72
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.71';
+  const SCRIPT_VERSION = '0.20.72';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -32,6 +32,7 @@
   const PLOT_TOOLS_ID = 'zeta-room-manager-plot-tools';
   const COLLECTION_BANNER_ID = 'zeta-room-manager-collection-banner';
   const CHAT_RENAME_ID = 'zeta-room-manager-chat-rename';
+  const TOOLS_BUTTON_SIZE = 34;
   const COLLECTION_MODAL_ID = 'zeta-room-manager-collection-modal';
   const PLOT_COLLECTION_STAMP_KEY = 'zeta-room-manager:plot-collection-at:v1';
   const ROOM_COLLECTION_STAMP_KEY = 'zeta-room-manager:room-collection-at:v1';
@@ -2933,22 +2934,34 @@
 
     renderCollectionBanner();
 
-    // 제타는 목록을 건드릴 때마다 이 줄을 다시 그린다. 그때마다 자리를
-    // 다시 잡으면 버튼이 눈에 띄게 움직인다. 이미 붙어 있으면 그대로 둔다.
-    const placed = tools.isConnected
-      && tools.parentElement
-      && tools.parentElement.isConnected
-      && !tools.classList.contains('zrm-tools-fallback');
-    if (placed) return;
+    // 제타 헤더 안에 끼워 넣으면 목록을 다시 그릴 때마다 버튼이 딸려
+    // 움직인다. 화면에 고정해 두고 헤더 옆자리에 맞춰 놓기만 한다.
+    tools.classList.remove('zrm-tools-fallback');
+    tools.classList.add('zrm-tools-fixed');
+    if (tools.parentElement !== document.body) document.body.appendChild(tools);
+    placeCollectionTools(tools);
+  }
 
-    const anchor = collectionToolsAnchor();
-    if (anchor && anchor.host) {
-      tools.classList.remove('zrm-tools-fallback');
-      anchor.host.insertBefore(tools, anchor.before || null);
-    } else if (!tools.isConnected || !tools.parentElement?.isConnected) {
-      // 붙일 자리를 아직 못 찾았을 때만 화면 구석에 띄운다.
-      tools.classList.add('zrm-tools-fallback');
-      if (tools.parentElement !== document.body) document.body.appendChild(tools);
+  // 헤더의 검색 버튼 왼쪽에 나란히 세운다. 헤더가 없으면 화면 구석에 둔다.
+  function placeCollectionTools(tools) {
+    const anchor = roomSearchControl() || creatorCenterSearchLink() || null;
+    const rect = anchor ? anchor.getBoundingClientRect() : null;
+
+    const spot = rect && rect.width && rect.height
+      ? {
+          top: Math.max(4, Math.round(rect.top + (rect.height - TOOLS_BUTTON_SIZE) / 2)),
+          left: Math.max(4, Math.round(rect.left - TOOLS_BUTTON_SIZE - 6))
+        }
+      : { top: 14, left: Math.max(4, window.innerWidth - TOOLS_BUTTON_SIZE - 88) };
+
+    // 같은 값을 다시 쓰면 그것만으로도 화면이 한 번 흔들린다.
+    if (tools.dataset.zrmTop !== String(spot.top)) {
+      tools.dataset.zrmTop = String(spot.top);
+      tools.style.top = spot.top + 'px';
+    }
+    if (tools.dataset.zrmLeft !== String(spot.left)) {
+      tools.dataset.zrmLeft = String(spot.left);
+      tools.style.left = spot.left + 'px';
     }
   }
 
@@ -3194,6 +3207,12 @@
         cursor: pointer;
       }
       #${COLLECTION_BANNER_ID} .zrm-banner-stop:hover { background: #e6e6ea; }
+      #${PLOT_TOOLS_ID}.zrm-tools-fixed {
+        position: fixed;
+        top: 14px;
+        left: auto;
+        right: auto;
+      }
       #${PLOT_TOOLS_ID}.zrm-tools-fallback {
         position: fixed;
         top: 14px;
@@ -4429,6 +4448,12 @@
 
     installPassiveNativeDataCapture();
     injectStyle();
+
+    // 화면 크기나 방향이 바뀌면 헤더 위치도 바뀐다.
+    window.addEventListener('resize', () => {
+      const tools = document.getElementById(PLOT_TOOLS_ID);
+      if (tools) placeCollectionTools(tools);
+    });
 
     window.addEventListener('pagehide', saveStateNow);
     window.addEventListener('beforeunload', saveStateNow);
