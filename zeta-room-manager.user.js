@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.11
+// @version      0.23.12
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1093,7 +1093,7 @@
   const PROFILE_WORKERS = 4;
   const MOBILE_PROFILE_WORKERS = 3;
   const PROFILE_FRAME_RECYCLE = 10;
-  const PROFILE_SETTLE_MS = 700;
+  const PROFILE_SETTLE_MS = 200;
   const PROFILE_BATCH_DESKTOP = 160;
   const PROFILE_BATCH_MOBILE = 80;
   let lastProfileFailures = [];
@@ -1236,7 +1236,7 @@
   }
 
   async function profileWorker(queue, onResult, options = {}) {
-    const pauseMs = options.mobile ? 350 : 250;
+    const pauseMs = options.mobile ? 120 : 80;
     let frame = null;
     let used = 0;
 
