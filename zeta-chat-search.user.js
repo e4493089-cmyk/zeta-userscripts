@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.0
+// @version      0.1.1
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.0';
+  const SCRIPT_VERSION = '0.1.1';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -522,21 +522,32 @@
     document.getElementById(MENU_ROW_ID)?.remove();
     injectStyle();
 
+    // 메뉴 항목 붙이기는 가볍다. 색인 쌓기에 딸려 늦어지면 메뉴를 열었을 때
+    // '대화 검색'만 한 박자 늦게 튀어나온다. 둘을 따로 돌린다.
+    let menuTimer = null;
+    const scheduleMenu = () => {
+      if (menuTimer) return;
+      menuTimer = setTimeout(() => {
+        menuTimer = null;
+        renderMenuRow();
+      }, 120);
+    };
+
     let captureTimer = null;
     const scheduleCapture = () => {
       if (captureTimer) return;
       captureTimer = setTimeout(() => {
         captureTimer = null;
         void captureRendered();
-        renderMenuRow();
       }, 700);
     };
 
-    new MutationObserver(scheduleCapture).observe(document.documentElement, {
-      childList: true,
-      subtree: true
-    });
+    new MutationObserver(() => {
+      scheduleMenu();
+      scheduleCapture();
+    }).observe(document.documentElement, { childList: true, subtree: true });
 
+    renderMenuRow();
     scheduleCapture();
   }
 
