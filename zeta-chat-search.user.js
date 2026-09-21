@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.16
+// @version      0.1.17
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.16';
+  const SCRIPT_VERSION = '0.1.17';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -457,11 +457,13 @@
         item.addEventListener('click', async () => {
           // 이동 중에는 긴 결과 목록을 접고 상태만 보이는 작은 창으로 만든다.
           const card = panel.querySelector('.zcs-card');
+          panel.classList.add('zcs-jumping-overlay');
           card.classList.add('zcs-jumping');
           const found = await jumpToMessage(row, status);
           if (found) {
             closePanel();
           } else {
+            panel.classList.remove('zcs-jumping-overlay');
             card.classList.remove('zcs-jumping');
             status('그 대화까지 가지 못했어요. 전체 색인을 돌린 뒤 다시 눌러 주세요.');
           }
@@ -720,19 +722,45 @@
         cursor: pointer;
       }
       #${PANEL_ID} .zcs-more:hover { filter: brightness(.96); }
+      #${PANEL_ID}.zcs-jumping-overlay {
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
       #${PANEL_ID} .zcs-card.zcs-jumping {
+        width: min(280px, calc(100% - 48px));
         height: auto;
         max-height: none;
+        border-radius: 16px;
       }
+      #${PANEL_ID} .zcs-card.zcs-jumping .zcs-grip,
+      #${PANEL_ID} .zcs-card.zcs-jumping .zcs-head,
       #${PANEL_ID} .zcs-card.zcs-jumping .zcs-field,
       #${PANEL_ID} .zcs-card.zcs-jumping .zcs-list,
       #${PANEL_ID} .zcs-card.zcs-jumping .zcs-foot {
         display: none;
       }
       #${PANEL_ID} .zcs-card.zcs-jumping .zcs-status {
-        padding: 8px 18px 22px;
-        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 22px 18px;
+        color: var(--kt-text, #fff);
+        font-size: 13px;
+        text-align: center;
       }
+      #${PANEL_ID} .zcs-card.zcs-jumping .zcs-status::before {
+        content: '';
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        border: 2px solid var(--kt-line, rgba(255,255,255,.2));
+        border-top-color: var(--kt-yellow, #6d52ff);
+        border-radius: 50%;
+        animation: zcs-spin .75s linear infinite;
+      }
+      @keyframes zcs-spin { to { transform: rotate(360deg); } }
 
       /* 좁은 화면에서는 제타처럼 아래에서 올라오는 시트로 */
       @media (max-width: 600px) {
