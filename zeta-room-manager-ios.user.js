@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.40
+// @version      0.20.41
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1099,6 +1099,49 @@
     renderCollectionTools();
   }
 
+  // 끝내 읽히지 않는 방은 몇 번 시도한 뒤 접어둔다.
+  const PROFILE_FAIL_LIMIT = 2;
+  const PROFILE_FAIL_COOLDOWN = 7 * 24 * 60 * 60 * 1000;
+
+  function profileFailCount(entry, meta) {
+    return Math.max(
+      Number((meta && meta.profileFailCount) || 0),
+      Number((entry && entry.profileFailCount) || 0)
+    );
+  }
+
+  function profileFailedAt(entry, meta) {
+    return Math.max(
+      Number((meta && meta.profileFailedAt) || 0),
+      Number((entry && entry.profileFailedAt) || 0)
+    );
+  }
+
+  // 프로필을 열어봤는데 한쪽이 비어 있으면, 그 플롯에는 그 이름이 없는 것이다.
+  // 비었다는 사실을 남기지 않으면 그 방은 매번 다시 대상이 되고,
+  // 남은 개수가 줄지 않아 새로고침이 끝나지 않는다.
+  function profileSettled(entry, meta, characters, creators) {
+    const creatorDone = creators.length > 0 ||
+      Boolean((meta && meta.creatorUnavailable) || (entry && entry.creatorUnavailable));
+    const characterDone = characters.length > 0 ||
+      Boolean((meta && meta.characterUnavailable) || (entry && entry.characterUnavailable));
+    return creatorDone && characterDone;
+  }
+
+  // 한 방이 이름 수집 대상인지는 여기 한 곳에서만 판단한다.
+  function entryNeedsProfile(entry, force = false) {
+    if (!entry || entry.type !== 'room' || !ROOM_UUID.test(entry.id || '')) return false;
+    if (force || entry.needsProfileRefresh) return true;
+
+    const meta = plotMetaForEntry(entry);
+    const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
+    const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
+    if (profileSettled(entry, meta, characters, creators)) return false;
+    if (profileFailCount(entry, meta) >= PROFILE_FAIL_LIMIT &&
+      Date.now() - profileFailedAt(entry, meta) < PROFILE_FAIL_COOLDOWN) return false;
+    return true;
+  }
+
   // 같은 플롯을 쓰는 방이 여럿이면 한 번만 연다.
   // 이미 이름을 아는 플롯(항목이든 plotMeta든)은 건너뛴다.
   function profileCollectionTargets(force = false, roomKeys = null) {
@@ -1109,16 +1152,8 @@
       if (!entry || entry.type !== 'room' || !ROOM_UUID.test(entry.id || '')) continue;
       if (roomKeys && !roomKeys.has(entryKey)) continue;
 
-      const meta = plotMetaForEntry(entry);
-      const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
-      const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
       const needsProfileRefresh = Boolean(entry.needsProfileRefresh);
-      if (!force && !needsProfileRefresh && characters.length && creators.length) continue;
-
-      if (!force && !needsProfileRefresh && characters.length && meta && meta.creatorUnavailable) continue;
-
-      if (!force && meta && Number(meta.profileFailCount || 0) >= 2 &&
-        Date.now() - Number(meta.profileFailedAt || 0) < 7 * 24 * 60 * 60 * 1000) continue;
+      if (!entryNeedsProfile(entry, force)) continue;
 
       const keys = [normalizeText(entry.plotId), normalizeText(entry.originatedId)].filter(Boolean);
       if (keys.length) {
@@ -1267,9 +1302,33 @@
 
   function applyProfileResult(target, result, options = {}) {
     const canonicalId = target.plotId || normalizeText(result.profileId) || target.originatedId;
-    if (!canonicalId) return;
-
     const replaceNames = Boolean(options.replaceNames);
+
+    // 플롯 아이디를 끝내 못 찾은 방은 방 자체에 적어둔다.
+    // 그냥 돌아서면 읽어낸 이름이 버려지고,
+    // 그 방은 다음 수집에서 또 대상이 되어 수집이 끝나지 않는다.
+    if (!canonicalId) {
+      const roomEntry = state.index[keyOf('room', target.roomId)];
+      if (!roomEntry) return;
+
+      roomEntry.characterNames = replaceNames
+        ? uniqueTexts(result.characters)
+        : uniqueTexts(roomEntry.characterNames, result.characters);
+      roomEntry.creatorNames = replaceNames
+        ? uniqueTexts(result.creators)
+        : uniqueTexts(roomEntry.creatorNames, result.creators);
+
+      if (roomEntry.characterNames.length) delete roomEntry.characterUnavailable;
+      else roomEntry.characterUnavailable = true;
+      if (roomEntry.creatorNames.length) delete roomEntry.creatorUnavailable;
+      else roomEntry.creatorUnavailable = true;
+
+      delete roomEntry.profileFailCount;
+      delete roomEntry.profileFailedAt;
+      delete roomEntry.needsProfileRefresh;
+      return;
+    }
+
     const previous = state.plotMeta[canonicalId] || {};
     const meta = {
       ...previous,
@@ -1285,8 +1344,11 @@
       updatedAt: Date.now()
     };
 
-    if (result.partial) meta.creatorUnavailable = true;
-    else delete meta.creatorUnavailable;
+    // 읽어낸 쪽이 비어 있으면 '없음'으로 못 박는다. 그래야 대상에서 빠진다.
+    if (meta.creatorNames.length) delete meta.creatorUnavailable;
+    else meta.creatorUnavailable = true;
+    if (meta.characterNames.length) delete meta.characterUnavailable;
+    else meta.characterUnavailable = true;
     delete meta.profileFailCount;
     delete meta.profileFailedAt;
 
@@ -1296,11 +1358,25 @@
       replaceNames,
       strictIds: replaceNames
     });
+
+    const roomEntry = state.index[keyOf('room', target.roomId)];
+    if (roomEntry) {
+      delete roomEntry.profileFailCount;
+      delete roomEntry.profileFailedAt;
+    }
   }
 
   // 프로필을 아예 못 연 플롯(삭제된 플롯 등)은 몇 번 시도한 뒤 접어둔다.
   // 매번 되풀이하면 시간만 쓴다.
   function notePlotProfileFailure(target) {
+    // 플롯 아이디가 없는 방도 세어둬야 한다.
+    // 아무 데도 적지 않으면 그 방은 영원히 대상으로 남는다.
+    const roomEntry = state.index[keyOf('room', target.roomId)];
+    if (roomEntry) {
+      roomEntry.profileFailCount = Number(roomEntry.profileFailCount || 0) + 1;
+      roomEntry.profileFailedAt = Date.now();
+    }
+
     const canonicalId = target.plotId || target.originatedId;
     if (!canonicalId) return;
 
@@ -1640,6 +1716,16 @@
     }
   }
 
+  // 한 바퀴 돌았는데 남은 개수가 줄지 않으면 더 돌려도 똑같다.
+  // 두 바퀴 연속 제자리면 새로고침을 멈추고 마무리한다.
+  const PROFILE_STALL_LIMIT = 2;
+
+  function profileStallCount(previousResume, remaining) {
+    const before = Number(previousResume && previousResume.lastRemaining);
+    if (!Number.isFinite(before) || remaining < before) return 0;
+    return Number((previousResume && previousResume.stalls) || 0) + 1;
+  }
+
   function remainingText(startedAt, completed, total) {
     if (completed < 3) return '';
     const perItem = (Date.now() - startedAt) / completed;
@@ -1696,6 +1782,11 @@
       if (result) {
         applyProfileResult(target, result, { replaceNames: force || Boolean(target.replaceNames) });
         done++;
+        // 열어보긴 했는데 여전히 대상으로 남는다면 다음 바퀴도 결과가 같다.
+        // 세어두지 않으면 남은 개수가 줄지 않아 새로고침이 끝나지 않는다.
+        if (entryNeedsProfile(state.index[keyOf('room', target.roomId)], false)) {
+          notePlotProfileFailure(target);
+        }
       } else {
         failed++;
         const reason = normalizeText((error && error.message) || error) || '알 수 없는 오류';
@@ -1895,12 +1986,15 @@
 
       const total = roomCollectionCount();
 
-      // 한 바퀴 돌았는데 하나도 처리하지 못했다면 다시 새로고침해도 같다.
-      // 여기서 멈추지 않으면 새로고침이 끝나지 않는다.
-      if (profiles.limited && !collectionAborted && profiles.attempted <= 0) {
+      // 한 바퀴 돌았는데 하나도 처리하지 못했거나 남은 개수가 그대로면,
+      // 다시 새로고침해도 결과가 같다. 여기서 멈추지 않으면 새로고침이 끝나지 않는다.
+      const previousResume = readProfileResume() || {};
+      const stalls = profileStallCount(previousResume, profiles.remaining);
+      const stalled = profiles.attempted <= 0 || stalls >= PROFILE_STALL_LIMIT;
+
+      if (profiles.limited && !collectionAborted && stalled) {
         clearProfileResume();
       } else if (profiles.limited && !collectionAborted) {
-        const previousResume = readProfileResume() || {};
         writeProfileResume({
           active: true,
           force: Boolean(previousResume.force || force),
@@ -1908,6 +2002,8 @@
           done: Number(previousResume.done || 0) + profiles.done,
           failed: Number(previousResume.failed || 0) + profiles.failed,
           startedAt: Number(previousResume.startedAt || Date.now()),
+          stalls,
+          lastRemaining: profiles.remaining,
           targets: force ? profiles.remainingTargets : undefined
         });
         saveStateNow();
@@ -2017,16 +2113,20 @@
         ? (Array.isArray(resume.targets) ? resume.targets : profileCollectionTargets(true))
         : null;
       const profiles = await collectProfilesForEmptyPlots(forceResume, resumeTargets);
+      const stalls = profileStallCount(resume, profiles.remaining);
       const next = {
         ...resume,
         active: true,
         attempted: Number(resume.attempted || 0) + profiles.attempted,
         done: Number(resume.done || 0) + profiles.done,
         failed: Number(resume.failed || 0) + profiles.failed,
+        stalls,
+        lastRemaining: profiles.remaining,
         targets: forceResume ? profiles.remainingTargets : undefined
       };
 
-      if (profiles.limited && !collectionAborted && profiles.attempted <= 0) {
+      if (profiles.limited && !collectionAborted &&
+        (profiles.attempted <= 0 || stalls >= PROFILE_STALL_LIMIT)) {
         clearProfileResume();
       } else if (profiles.limited && !collectionAborted) {
         writeProfileResume(next);
@@ -2081,7 +2181,8 @@
         ' · 저장된 방 ' + total + '개' +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 총 ' + next.attempted + '개 처리 · 성공 ' + next.done + '개' +
-        (next.failed ? ' · 실패 ' + next.failed + '개' : '')
+        (next.failed ? ' · 실패 ' + next.failed + '개' : '') +
+        (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개 (더 읽히지 않아 접어둠)' : '')
       );
       closeBookmarkletController();
       return true;
