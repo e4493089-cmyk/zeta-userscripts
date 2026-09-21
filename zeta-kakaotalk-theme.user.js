@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.13
+// @version      3.50.14
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7788,6 +7788,93 @@
       background: #E7EAEC !important;
       color: #A0A8AC !important;
     }
+
+
+    /* =========================================================
+       피스 충전 / 결제 바텀시트
+       PiecePurchaseBottomSheet.tsx
+    ========================================================= */
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
+      ) > [role="presentation"] {
+      background: rgba(43,57,66,.28) !important;
+      backdrop-filter: blur(6px) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
+      ) > div[class*="bg-gray-sub1"] {
+      background: #FFFFFF !important;
+      color: #202124 !important;
+      box-shadow: 0 -8px 24px rgba(39,55,64,.12) !important;
+    }
+
+    /* 위쪽 드래그 손잡이 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
+      ) > div[class*="bg-gray-sub1"] > div:first-child svg {
+      color: #CBD3D8 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"],
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] > div {
+      background: transparent !important;
+      color: #202124 !important;
+    }
+
+    /* 어두운 배경을 전제로 한 흰 계열 글자를 밝은 시트용으로 낮춘다 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] [class*="text-white"],
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PieceChargeItemList"] [class*="text-white"],
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PieceChargeItem"] [class*="text-white"] {
+      color: #53636C !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] :is(span,div,p,li,h1,h2,h3,h4) {
+      color: inherit;
+    }
+
+    /* 구분선 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] [class*="border-white"],
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PieceChargeItem"] {
+      border-color: #E7EAEC !important;
+    }
+
+    /* 금액 버튼 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] button[class*="bg-primary-400"],
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PieceChargeItem"] button[class*="bg-primary-400"] {
+      background: var(--kt-yellow) !important;
+      color: #191919 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] button[class*="bg-primary-400"]:hover,
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PieceChargeItem"] button[class*="bg-primary-400"]:hover {
+      background: var(--kt-yellow-hover) !important;
+    }
+
+    /* 결제 안내 문구 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] [class*="text-white/50"],
+    html.${ACTIVE} #portal-container
+      [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"] [class*="text-gray-"] {
+      color: #6B7A82 !important;
+    }
+
 
   `;
 
