@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.11
+// @version      0.1.12
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.11';
+  const SCRIPT_VERSION = '0.1.12';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -262,6 +262,10 @@
   }
 
   async function jumpToMessage(row, status) {
+    // openPanel()은 기존 패널/작업을 정리하면서 중지 플래그를 켠다.
+    // 새 결과를 누른 시점에는 이동 작업을 새로 시작해야 한다.
+    deepLoadAborted = false;
+
     const existing = document.getElementById(row.id);
     if (existing) {
       existing.scrollIntoView({ block: 'center', behavior: 'smooth' });
