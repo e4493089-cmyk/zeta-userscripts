@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.6
+// @version      0.1.7
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.6';
+  const SCRIPT_VERSION = '0.1.7';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -365,10 +365,21 @@
       list.textContent = '';
 
       if (!query) {
+        // 색인이 도는 동안에는 창을 닫으면 멈춘다는 것부터 알려야 한다.
+        if (deepLoadRunning) {
+          list.dataset.zcsView = 'indexing';
+          list.appendChild(emptyView(
+            '대화를 색인하는 중이에요',
+            '끝날 때까지 이 창을 닫지 말아 주세요. 멈추려면 아래 중지를 누르세요.'
+          ));
+          return;
+        }
+        list.dataset.zcsView = 'idle';
         status('이 대화방에 색인된 메시지 ' + rows.length.toLocaleString() + '개');
         list.appendChild(emptyView('찾을 말을 입력해 주세요', '지금까지 읽은 대화에서 바로 찾습니다.'));
         return;
       }
+      list.dataset.zcsView = 'hits';
 
       const hits = matchRows(rows, query);
       status(hits.length
@@ -419,14 +430,19 @@
         return;
       }
       moreButton.textContent = '중지';
-      const added = await deepIndex((count, phase) => status(
-        (phase === 'up' ? '옛 대화를 불러오는 중' : '내려오며 꼼꼼히 읽는 중') +
-        ' · 새로 색인 ' + count + '개'
-      ));
+      render();
+      const added = await deepIndex((count, phase) => {
+        status((phase === 'up' ? '옛 대화를 불러오는 중' : '내려오며 꼼꼼히 읽는 중') +
+          ' · 새로 색인 ' + count.toLocaleString() + '개');
+        // 색인 안내는 한 번만 그린다. 진행할 때마다 다시 그리면 화면이 떤다.
+        if (!clean(input.value) && list.dataset.zcsView !== 'indexing') render();
+      });
       moreButton.textContent = '이 방 전체 색인하기';
       await reload();
-      status('새로 색인 ' + added + '개 · 전체 ' + rows.length + '개');
+      // render가 상태줄을 다시 쓰므로 결과 요약은 그 뒤에 적는다.
       render();
+      status((deepLoadAborted ? '색인 중지됨 · ' : '색인 완료 · ') +
+        '새로 색인 ' + added.toLocaleString() + '개 · 전체 ' + rows.length.toLocaleString() + '개');
     });
 
     status('색인을 읽는 중…');
