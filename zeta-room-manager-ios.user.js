@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.13
+// @version      0.20.14
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1456,6 +1456,7 @@
       };
       renderCollectionTools();
 
+      const mobileList = isMobileProfileDevice();
       let host = roomCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
       let lastHeight = 0;
@@ -1473,7 +1474,7 @@
         // 모바일/Monkey에서는 가상 목록이 페이지를 추가하면서 스크롤 컨테이너
         // 자체를 교체하는 경우가 있다. 시작할 때 잡은 낡은 host를 계속 쓰면
         // 중간 지점에서 더 이상 내려가지 못하므로 현재 DOM의 host를 다시 잡는다.
-        if (force) {
+        if (force && (!mobileList || round % 6 === 0 || barrenRounds >= 2)) {
           const liveHost = roomCollectionScrollHost();
           if (liveHost && liveHost !== host) {
             const oldTop = scrollMetrics(host).top;
@@ -1481,7 +1482,7 @@
             const live = scrollMetrics(host);
             setScrollTop(host, Math.min(live.height, Math.max(live.top, oldTop)));
             stableRounds = 0;
-            await sleep(120);
+            await sleep(mobileList ? 60 : 120);
           }
         }
 
@@ -1489,12 +1490,12 @@
         const before = scrollMetrics(host);
         const count = roomCollectionCount();
         roomCollectionProgress.count = count;
-        renderCollectionTools();
+        if (!mobileList || round % 4 === 0 || count !== lastCount) renderCollectionTools();
 
         const nearBottom = before.top + before.client >= before.height - Math.max(80, before.client * 0.15);
         if (nearBottom) {
           setScrollTop(host, before.height);
-          await sleep(force ? 1200 : 700);
+          await sleep(force ? (mobileList ? 700 : 1200) : 700);
 
           if (force) {
             const liveHost = roomCollectionScrollHost();
@@ -1518,11 +1519,11 @@
             if (force && stableRounds % 2 === 0) {
               const nudge = Math.max(240, Math.floor(after.client * 0.45));
               setScrollTop(host, Math.max(0, after.top - nudge));
-              await sleep(250);
+              await sleep(mobileList ? 120 : 250);
               harvestRoomDocument(document);
               const nudged = scrollMetrics(host);
               setScrollTop(host, nudged.height);
-              await sleep(900);
+              await sleep(mobileList ? 500 : 900);
               harvestRoomDocument(document);
               after = scrollMetrics(host);
               afterCount = roomCollectionCount();
@@ -1538,10 +1539,14 @@
           stableRounds = 0;
           // 이미 아는 방만 지나가는 구간은 크게 건너뛴다.
           // 다시 수집할 때 목록 전체를 처음부터 훑는 시간을 줄인다.
-          const factor = !force && barrenRounds >= 3 ? 2.6 : 0.78;
-          const step = Math.max(320, Math.floor(before.client * factor));
+          const factor = !force && barrenRounds >= 3
+            ? 2.6
+            : (force && mobileList ? 0.96 : 0.78);
+          const step = Math.max(force && mobileList ? 420 : 320, Math.floor(before.client * factor));
           setScrollTop(host, Math.min(before.height, before.top + step));
-          await sleep(!force && barrenRounds >= 3 ? 170 : 320);
+          await sleep(!force && barrenRounds >= 3
+            ? 170
+            : (force && mobileList ? 160 : 320));
         }
 
         const now = scrollMetrics(host);
