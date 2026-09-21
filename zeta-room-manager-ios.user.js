@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.47
+// @version      0.20.48
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -36,119 +36,6 @@
   const API_BASE = 'https://api.zeta-ai.io';
   const WEB_CLIENT_VERSION = '3.44.7';
   let roomApiUnavailableUntil = 0;
-  const PROFILE_RESUME_KEY = 'zeta-room-manager:profile-resume:v1';
-  const BOOKMARKLET_MODE = Boolean(
-    window.__zetaRoomManagerBookmarklet ||
-    window.__zetaRoomManagerIosBookmarklet
-  );
-
-  function bookmarkletControllerReady() {
-    if (!BOOKMARKLET_MODE || !window.__zrmBookmarkletControllerReady) return false;
-    try {
-      return Boolean(window.__zrmBookmarkletController && !window.__zrmBookmarkletController.closed);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function closeBookmarkletController() {
-    if (!BOOKMARKLET_MODE) return;
-    try {
-      const controller = window.__zrmBookmarkletController;
-      window.__zrmBookmarkletControllerReady = false;
-      if (controller && !controller.closed) controller.close();
-    } catch (_) {}
-  }
-
-  function requestBookmarkletAutoResume() {
-    return new Promise(resolve => {
-      const old = document.getElementById('zrm-auto-resume-prompt');
-      if (old) old.remove();
-
-      const wrap = document.createElement('div');
-      wrap.id = 'zrm-auto-resume-prompt';
-      wrap.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(18,28,34,.48);display:flex;align-items:center;justify-content:center;padding:20px';
-      wrap.innerHTML =
-        '<div style="width:min(340px,100%);background:#fff;color:#233139;border-radius:18px;padding:20px;box-shadow:0 18px 55px #0005;font:14px/1.5 -apple-system,BlinkMacSystemFont,\'Noto Sans KR\',sans-serif">' +
-          '<b style="display:block;font-size:17px;margin-bottom:8px">자동 이어받기 연결</b>' +
-          '<div style="color:#52636b;margin-bottom:16px">보조 탭이 연결되지 않았습니다. 아래 버튼을 직접 누르면 보조 탭을 열고 남은 수집을 자동으로 이어갑니다.</div>' +
-          '<div style="display:flex;gap:8px">' +
-            '<button type="button" data-zrm-helper-cancel style="flex:1;border:0;border-radius:11px;padding:12px;background:#edf1f3;color:#26343c;font-weight:700">이번엔 멈춤</button>' +
-            '<button type="button" data-zrm-helper-enable style="flex:1;border:0;border-radius:11px;padding:12px;background:#fee500;color:#171717;font-weight:800">자동 이어받기 켜기</button>' +
-          '</div>' +
-        '</div>';
-
-      const finish = value => {
-        wrap.remove();
-        resolve(value);
-      };
-      wrap.querySelector('[data-zrm-helper-cancel]').addEventListener('click', () => finish(false));
-      wrap.querySelector('[data-zrm-helper-enable]').addEventListener('click', async event => {
-        const button = event.currentTarget;
-        button.disabled = true;
-        button.textContent = '연결 중…';
-        const ok = await enableBookmarkletAutoResume();
-        if (!ok) {
-          button.disabled = false;
-          button.textContent = '다시 시도';
-          return;
-        }
-        finish(true);
-      });
-      document.body.appendChild(wrap);
-    });
-  }
-
-  async function enableBookmarkletAutoResume() {
-    if (!BOOKMARKLET_MODE) return false;
-    if (bookmarkletControllerReady()) return true;
-
-    const key = window.__zetaRoomManagerIosBookmarklet
-      ? '__zetaRoomManagerIosBookmarklet'
-      : '__zetaRoomManagerBookmarklet';
-    const name = window.__zetaRoomManagerIosBookmarklet ? 'Room Manager (iOS)' : 'Room Manager';
-    const sourceUrl = window.__zetaRoomManagerIosBookmarklet
-      ? 'https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js'
-      : 'https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js';
-    const controllerUrl = 'https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts-site/main/zeta-room-manager-bookmarklet-controller.js';
-
-    let helper = null;
-    try {
-      helper = window.open('', 'zeta-room-manager-auto-resume', 'popup,width=390,height=260');
-      if (!helper) return false;
-      helper.document.open();
-      helper.document.write(
-        '<!doctype html><meta charset="utf-8"><title>Room Manager 자동 이어받기</title>' +
-        '<body style="font-family:sans-serif;padding:24px">자동 이어받기 준비 중…</body>'
-      );
-      helper.document.close();
-
-      const [controllerResponse, sourceResponse] = await Promise.all([
-        fetch(controllerUrl + '?bm=' + Date.now(), { cache: 'no-store' }),
-        fetch(sourceUrl + '?bm=' + Date.now(), { cache: 'no-store' })
-      ]);
-      if (!controllerResponse.ok) throw new Error('controller HTTP ' + controllerResponse.status);
-      if (!sourceResponse.ok) throw new Error('HTTP ' + sourceResponse.status);
-
-      (0, eval)(await controllerResponse.text());
-      const installer = window.__zrmBookmarkletControllerInstall;
-      if (!installer) throw new Error('자동 이어받기 컨트롤러를 불러오지 못했습니다');
-
-      const ready = Boolean(installer(helper, {
-        key,
-        name,
-        source: await sourceResponse.text()
-      }));
-      window.__zrmBookmarkletControllerReady = ready;
-      if (!ready && helper && !helper.closed) helper.close();
-      return ready;
-    } catch (_) {
-      window.__zrmBookmarkletControllerReady = false;
-      try { if (helper && !helper.closed) helper.close(); } catch (_) {}
-      return false;
-    }
-  }
-
   // 방 목록을 그리는 데 필요한 건 별명뿐이다.
   // 캐릭터명·제작자명이 든 큰 덩어리는 검색을 시작할 때 읽는다.
   let dataIndex = {};
@@ -175,25 +62,6 @@
   let plotCollectionProgress = { running: false, count: 0 };
   let roomCollectionPromise = null;
   let roomCollectionProgress = { running: false, count: 0 };
-
-  function readProfileResume() {
-    try {
-      return JSON.parse(sessionStorage.getItem(PROFILE_RESUME_KEY) || 'null');
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function writeProfileResume(value) {
-    try { sessionStorage.setItem(PROFILE_RESUME_KEY, JSON.stringify(value)); } catch (_) {}
-  }
-
-  function clearProfileResume() {
-    try { sessionStorage.removeItem(PROFILE_RESUME_KEY); } catch (_) {}
-  }
-  // iOS에서는 목록 스크롤 때 MutationObserver가 매 프레임 refresh()를 다시 불러
-  // 수집기가 같은 방을 두 번 분석하기 쉽다. 수집 중에는 수동 harvest만 사용한다.
-  let suspendObserverRefresh = false;
 
   // 별명 파일이 아직 없으면(업데이트 직후) 이번 한 번만 통째로 읽어 떼어낸다.
   function loadAliases() {
@@ -418,7 +286,6 @@
       '\n· 캐릭터명/제작자명' +
       '\n· 별명' +
       '\n· 수집 기록' +
-      '\n· 자동 이어받기 상태' +
       '\n\n이 작업은 되돌릴 수 없습니다.'
     )) return false;
 
@@ -426,9 +293,6 @@
       clearTimeout(saveTimer);
       saveTimer = null;
     }
-
-    clearProfileResume();
-    closeBookmarkletController();
 
     state.aliases = {};
     state.index = {};
@@ -831,7 +695,6 @@
   }
 
   function inspectNativeResponsePayload(payload) {
-    if (suspendPassiveNativeCapture) return;
     const count = harvestPlotDataTree(payload, { maxDepth: 10, maxNodes: 12000 });
     if (count) saveState();
   }
@@ -848,7 +711,7 @@
         try {
           const first = arguments[0];
           const url = typeof first === 'string' ? first : first && first.url;
-          if (!suspendPassiveNativeCapture && shouldInspectNativeResponse(url)) {
+          if (shouldInspectNativeResponse(url)) {
             const clone = response.clone();
             clone.json().then(inspectNativeResponsePayload).catch(() => {});
           }
@@ -869,7 +732,7 @@
     XMLHttpRequest.prototype.send = function () {
       const xhr = this;
       const url = xhrUrl.get(xhr) || '';
-      if (!suspendPassiveNativeCapture && shouldInspectNativeResponse(url)) {
+      if (shouldInspectNativeResponse(url)) {
         xhr.addEventListener('load', () => {
           try {
             if (xhr.responseType === 'json' && xhr.response) {
@@ -1278,29 +1141,17 @@
   }
 
 
-  // ── 숨긴 대화방을 거쳐 플롯 이름 채우기 ─────────────────────────────
-  // 방 목록 데이터에는 characters가 빈 배열이고 creator 키가 아예 없다.
-  // 대화방 → 플롯 프로필에는 있으므로 필요한 플롯을 숨긴 iframe으로 열어 읽는다.
-  // 요청이나 프로필 주소를 직접 만들지 않고 제타 화면이 이동하는 대로 둔다.
-  const PROFILE_BUTTON = 'button[data-testid="chat-header-profile"][aria-label="Open plot profile"]';
-  const PROFILE_PATH = /^\/(?:[^/]+\/)?plots\/([a-f\d-]{36})\/profile\/?$/i;
+  // ── 대화방 수집 공용 상태 ─────────────────────────────────────────────
   const ROOM_UUID = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
   let collectionAborted = false;
   let forceReconcileSeenRoomKeys = null;
   let wakeLock = null;
   let wakeStatus = '';
-  // 숨김 프로필을 연속으로 읽는 동안 fetch/XHR 응답까지 복제하면 메모리 사용량이 크게 늘어난다.
-  let suspendPassiveNativeCapture = false;
-
-  function plotProfileId(pathname) {
-    return normalizeText((String(pathname || '').match(PROFILE_PATH) || [])[1]);
-  }
 
   function collectionRunning() {
     return Boolean(roomCollectionProgress.running || plotCollectionProgress.running);
   }
 
-  // 모바일은 화면이 꺼지면 브라우저가 멈춘다. 수집 동안 화면을 붙잡는다.
   async function holdScreenAwake() {
     if (!navigator.wakeLock || !navigator.wakeLock.request) {
       wakeStatus = '이 브라우저는 화면 꺼짐 방지를 지원하지 않아요. 화면이 꺼지면 멈춥니다.';
@@ -1312,15 +1163,12 @@
       const lock = await navigator.wakeLock.request('screen');
       wakeLock = lock;
       wakeStatus = '';
-      // 탭을 가리면 브라우저가 알아서 놓는다. 돌아오면 다시 잡는다.
       lock.addEventListener('release', () => {
-        if (wakeLock !== lock) return;
-        wakeLock = null;
-      });
+        if (wakeLock === lock) wakeLock = null;
+      }, { once: true });
     } catch (_) {
-      wakeStatus = '화면 꺼짐 방지를 켜지 못했어요. 화면이 꺼지면 멈춥니다.';
+      wakeStatus = '화면 꺼짐 방지를 켜지 못했습니다. 수집 중에는 화면을 켜 두세요.';
     }
-    renderCollectionBanner();
   }
 
   async function releaseScreenAwake() {
@@ -1332,7 +1180,6 @@
     }
   }
 
-  // 현재 주소의 언어 구간(/ko/...)을 그대로 쓴다.
   function localeSegment() {
     const first = location.pathname.split('/').filter(Boolean)[0] || 'ko';
     return /^[a-z]{2}(?:-[a-z]{2})?$/i.test(first) ? first : 'ko';
@@ -1340,8 +1187,6 @@
 
   function abortCollection() {
     collectionAborted = true;
-    clearProfileResume();
-    closeBookmarkletController();
     saveStateNow();
 
     if (roomCollectionProgress.running) {
@@ -1353,28 +1198,7 @@
     renderCollectionTools();
   }
 
-  // 끝내 읽히지 않는 방은 몇 번 시도한 뒤 접어둔다.
-  const PROFILE_FAIL_LIMIT = 2;
-  const PROFILE_FAIL_COOLDOWN = 7 * 24 * 60 * 60 * 1000;
-
-  function profileFailCount(entry, meta) {
-    return Math.max(
-      Number((meta && meta.profileFailCount) || 0),
-      Number((entry && entry.profileFailCount) || 0)
-    );
-  }
-
-  function profileFailedAt(entry, meta) {
-    return Math.max(
-      Number((meta && meta.profileFailedAt) || 0),
-      Number((entry && entry.profileFailedAt) || 0)
-    );
-  }
-
-  // 프로필을 열어봤는데 한쪽이 비어 있으면, 그 플롯에는 그 이름이 없는 것이다.
-  // 비었다는 사실을 남기지 않으면 그 방은 매번 다시 대상이 되고,
-  // 남은 개수가 줄지 않아 새로고침이 끝나지 않는다.
-  function profileSettled(entry, meta, characters, creators) {
+  function roomMetaSettled(entry, meta, characters, creators) {
     const creatorDone = creators.length > 0 ||
       Boolean((meta && meta.creatorUnavailable) || (entry && entry.creatorUnavailable));
     const characterDone = characters.length > 0 ||
@@ -1382,420 +1206,10 @@
     return creatorDone && characterDone;
   }
 
-  // 한 방이 이름 수집 대상인지는 여기 한 곳에서만 판단한다.
-  function entryNeedsProfile(entry, force = false) {
-    if (!entry || entry.type !== 'room' || !ROOM_UUID.test(entry.id || '')) return false;
-    if (force || entry.needsProfileRefresh) return true;
-
-    const meta = plotMetaForEntry(entry);
-    const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
-    const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
-    if (profileSettled(entry, meta, characters, creators)) return false;
-    if (profileFailCount(entry, meta) >= PROFILE_FAIL_LIMIT &&
-      Date.now() - profileFailedAt(entry, meta) < PROFILE_FAIL_COOLDOWN) return false;
-    return true;
-  }
-
-  // 같은 플롯을 쓰는 방이 여럿이면 한 번만 연다.
-  // 이미 이름을 아는 플롯(항목이든 plotMeta든)은 건너뛴다.
-  function profileCollectionTargets(force = false, roomKeys = null) {
-    const handledPlots = new Set();
-    const targets = [];
-
-    for (const [entryKey, entry] of Object.entries(state.index || {})) {
-      if (!entry || entry.type !== 'room' || !ROOM_UUID.test(entry.id || '')) continue;
-      if (roomKeys && !roomKeys.has(entryKey)) continue;
-
-      const needsProfileRefresh = Boolean(entry.needsProfileRefresh);
-      if (!entryNeedsProfile(entry, force)) continue;
-
-      const keys = [normalizeText(entry.plotId), normalizeText(entry.originatedId)].filter(Boolean);
-      if (keys.length) {
-        if (keys.some(key => handledPlots.has(key))) continue;
-        for (const key of keys) handledPlots.add(key);
-      }
-
-      targets.push({
-        roomId: entry.id,
-        plotId: normalizeText(entry.plotId),
-        originatedId: normalizeText(entry.originatedId),
-        replaceNames: needsProfileRefresh
-      });
-    }
-    return targets;
-  }
-
-  // 숨긴 화면에서 confirm()이 뜨면 그 창의 스크립트가 통째로 멈춘다.
-  // "비공개로 전환할까요?" 같은 물음이 뜨면 수집이 거기서 정지한다.
-  function muteFrameDialogs(win) {
-    try {
-      if (!win || win.__zrmNoDialogs) return;
-      win.__zrmNoDialogs = true;
-      win.alert = () => {};
-      win.confirm = () => false;
-      win.prompt = () => null;
-      win.onbeforeunload = null;
-    } catch (_) {}
-  }
-
-  // 숨긴 화면에서 제일 많이 먹는 건 그림이다. 캐릭터 프사 한 장이
-  // 펼쳐지면 수십 MB가 되고, 수백 번 띄우면 renderer가 Out of Memory로 죽는다.
-  // 이름은 img의 alt에서 읽으므로 그림 자체는 받지 않아도 된다.
-  const MEDIA_TAGS = /^(?:IMG|SOURCE|VIDEO|AUDIO)$/;
-  const MEDIA_ATTRS = /^(?:src|srcset|poster)$/;
-  let blockFrameMedia = true;
-
-  function stripMediaElement(el) {
-    try {
-      for (const name of ['src', 'srcset', 'poster']) {
-        const value = el.getAttribute && el.getAttribute(name);
-        if (value === null || value === undefined) continue;
-        el.removeAttribute(name);
-        el.setAttribute('data-zrm-' + name, value);
-      }
-    } catch (_) {}
-  }
-
-  function stripFrameMedia(win) {
-    if (!blockFrameMedia) return;
-    try {
-      const doc = win && win.document;
-      if (!doc || doc.__zrmNoMedia) return;
-      doc.__zrmNoMedia = true;
-
-      // 문서가 바뀌면 생성자도 새로 생긴다. 문서마다 다시 건다.
-      const setAttribute = win.Element.prototype.setAttribute;
-      win.Element.prototype.setAttribute = function (name, value) {
-        const lower = String(name).toLowerCase();
-        if (MEDIA_ATTRS.test(lower) && MEDIA_TAGS.test(this.tagName || '')) {
-          return setAttribute.call(this, 'data-zrm-' + lower, value);
-        }
-        return setAttribute.call(this, name, value);
-      };
-
-      const image = win.HTMLImageElement && win.HTMLImageElement.prototype;
-      for (const name of ['src', 'srcset']) {
-        const own = image && Object.getOwnPropertyDescriptor(image, name);
-        if (!own || !own.set) continue;
-        Object.defineProperty(image, name, {
-          configurable: true,
-          enumerable: own.enumerable,
-          get() { return this.getAttribute('data-zrm-' + name) || ''; },
-          set(value) { setAttribute.call(this, 'data-zrm-' + name, value); }
-        });
-      }
-
-      doc.querySelectorAll('img, source, video, audio').forEach(stripMediaElement);
-
-      const observer = new win.MutationObserver(records => {
-        for (const record of records) {
-          for (const node of record.addedNodes) {
-            if (!node || node.nodeType !== 1) continue;
-            if (MEDIA_TAGS.test(node.tagName || '')) stripMediaElement(node);
-            if (node.querySelectorAll) node.querySelectorAll('img, source, video, audio').forEach(stripMediaElement);
-          }
-        }
-      });
-      observer.observe(doc.documentElement, { childList: true, subtree: true });
-    } catch (_) {}
-  }
-
-  // 화면이 바뀌는 순간을 놓치면 그림이 이미 떠 버린다.
-  // 주소를 바꾼 직후 잠깐만 촘촘히 확인한다.
-  function armMediaGuard(frame) {
-    if (!blockFrameMedia || !frame) return;
-    let left = 80;
-    const timer = setInterval(() => {
-      if (--left <= 0 || !frame.isConnected) {
-        clearInterval(timer);
-        return;
-      }
-      try {
-        const win = frame.contentWindow;
-        if (win && win.document && !win.document.__zrmNoMedia) stripFrameMedia(win);
-      } catch (_) {}
-    }, 25);
-  }
-
-  async function readInFrame(frame, read, timeoutMs) {
-    const end = Date.now() + timeoutMs;
-    while (Date.now() < end) {
-      if (collectionAborted) throw new Error('중지됨');
-      if (!frame || !frame.isConnected) throw new Error('숨김 화면을 다시 여는 중');
-      try {
-        const win = frame.contentWindow;
-        if (win && win.document) {
-          muteFrameDialogs(win);
-          stripFrameMedia(win);
-          const value = read(win);
-          if (value) return value;
-        }
-      } catch (error) {
-        if (error && error.name === 'SecurityError') throw new Error('숨김 화면 접근이 막혔습니다');
-        throw error;
-      }
-      await sleep(100);
-    }
-    throw new Error('시간 초과');
-  }
-
-  // "@" 처럼 쪼개진 조각이나 지나치게 긴 글자는 제작자명이 아니다.
-  function usefulCreatorName(text) {
-    const value = normalizeText(text);
-    if (!value || value.length > 40) return false;
-    return /[0-9A-Za-z가-힣]/.test(value.replace(/^@/, ''));
-  }
-
-  function readPlotProfile(win) {
-    const root = win.document.querySelector('[data-sentry-component="PlotProfile"]');
-    if (!root) return null;
-
-    // 이름이 여러 span으로 쪼개진 경우(@ 와 아이디가 따로)를 대비해 링크 전체 글자도 본다.
-    const creators = uniqueTexts(
-      Array.from(root.querySelectorAll('a[href*="/creators/"][href*="/profile"]'))
-        .reduce((out, a) => {
-          out.push(a.querySelector('span.caption1:not([data-sentry-element="Span"])')?.textContent);
-          out.push(a.textContent);
-          return out;
-        }, [])
-    ).filter(usefulCreatorName);
-
-    const characters = uniqueTexts(
-      Array.from(root.querySelectorAll('img[alt^="Profile image of "]'))
-        .map(img => normalizeText(img.getAttribute('alt')).slice('Profile image of '.length))
-    );
-
-    // 닉네임 아래의 @아이디는 탈퇴한 계정에도 남는다.
-    // 닉네임으로 못 찾을 때의 대안이자, 아이디로도 검색할 수 있게 함께 담는다.
-    const handles = uniqueTexts(
-      Array.from(root.querySelectorAll('span, a'))
-        .map(el => normalizeText(el.textContent))
-        .filter(text => /^@[^\s@]{1,40}$/.test(text))
-    );
-    for (const handle of handles) {
-      if (!creators.includes(handle)) creators.push(handle);
-    }
-
-    // 제작자가 탈퇴하면 프로필 링크가 사라지고 "탈퇴한 계정"만 남는다.
-    // 링크가 있어야만 읽은 것으로 치면 캐릭터명까지 통째로 버리게 된다.
-    if (!creators.length && /탈퇴한 계정/.test(root.textContent || '')) {
-      creators.push('탈퇴한 계정');
-    }
-    const profileId = plotProfileId(win.location.pathname);
-    if (creators.length) return { creators, characters, profileId };
-
-    // 제작자를 끝내 못 읽어도 캐릭터명까지 버릴 이유는 없다.
-    // 다만 그리는 중일 수 있으므로 화면이 안정된 뒤에만 받는다(readProfileIn이 판단).
-    if (characters.length) return { creators: [], characters, profileId, partial: true };
-    return null;
-  }
-
-  function hiddenFrame() {
-    const frame = document.createElement('iframe');
-    frame.setAttribute('aria-hidden', 'true');
-    // allow-modals를 주지 않으면 그 안에서 alert/confirm이 무시된다.
-    // "비공개로 전환할까요?" 같은 물음이 뜨면 창 전체가 멈추기 때문에 막아 둔다.
-    frame.setAttribute('sandbox', 'allow-same-origin allow-scripts allow-forms');
-    frame.tabIndex = -1;
-    frame.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:390px;height:850px;opacity:0;pointer-events:none;border:0';
-    document.body.appendChild(frame);
-    return frame;
-  }
-
-  // 숨긴 화면 하나가 제타 앱 전체를 들고 있다. 수백 번 띄우면 메모리가 쌓여
-  // 브라우저가 Out of Memory로 죽는다. 버리기 전에 안을 확실히 비운다.
-  function dropFrame(frame) {
-    if (!frame) return;
-    try {
-      const win = frame.contentWindow;
-      if (win) {
-        // 앱이 걸어둔 타이머를 끊어 문서가 붙잡히지 않게 한다.
-        const highest = win.setTimeout(() => {}, 0);
-        for (let id = highest; id >= 0 && id > highest - 800; id--) {
-          win.clearTimeout(id);
-          win.clearInterval(id);
-        }
-      }
-    } catch (_) {}
-
-    try { frame.src = 'about:blank'; } catch (_) {}
-    try { frame.srcdoc = ''; } catch (_) {}
-    if (frame.isConnected) frame.remove();
-  }
-
-  // 남은 메모리가 빠듯하면 모두 정리하고 숨을 돌린다.
-  function memoryPressure() {
-    try {
-      const memory = performance && performance.memory;
-      if (!memory || !memory.jsHeapSizeLimit) return 0;
-      return memory.usedJSHeapSize / memory.jsHeapSizeLimit;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  function applyProfileResult(target, result, options = {}) {
-    const canonicalId = target.plotId || normalizeText(result.profileId) || target.originatedId;
-    const replaceNames = Boolean(options.replaceNames);
-
-    // 플롯 아이디를 끝내 못 찾은 방은 방 자체에 적어둔다.
-    // 그냥 돌아서면 읽어낸 이름이 버려지고,
-    // 그 방은 다음 수집에서 또 대상이 되어 수집이 끝나지 않는다.
-    if (!canonicalId) {
-      const roomEntry = state.index[keyOf('room', target.roomId)];
-      if (!roomEntry) return;
-
-      roomEntry.characterNames = replaceNames
-        ? uniqueTexts(result.characters)
-        : uniqueTexts(roomEntry.characterNames, result.characters);
-      roomEntry.creatorNames = replaceNames
-        ? uniqueTexts(result.creators)
-        : uniqueTexts(roomEntry.creatorNames, result.creators);
-
-      if (roomEntry.characterNames.length) delete roomEntry.characterUnavailable;
-      else roomEntry.characterUnavailable = true;
-      if (roomEntry.creatorNames.length) delete roomEntry.creatorUnavailable;
-      else roomEntry.creatorUnavailable = true;
-
-      delete roomEntry.profileFailCount;
-      delete roomEntry.profileFailedAt;
-      delete roomEntry.needsProfileRefresh;
-      return;
-    }
-
-    const previous = state.plotMeta[canonicalId] || {};
-    const meta = {
-      ...previous,
-      canonicalId,
-      plotId: target.plotId || previous.plotId || '',
-      originatedId: target.originatedId || previous.originatedId || '',
-      characterNames: replaceNames
-        ? uniqueTexts(result.characters)
-        : uniqueTexts(previous.characterNames, result.characters),
-      creatorNames: replaceNames
-        ? uniqueTexts(result.creators)
-        : uniqueTexts(previous.creatorNames, result.creators),
-      updatedAt: Date.now()
-    };
-
-    // 읽어낸 쪽이 비어 있으면 '없음'으로 못 박는다. 그래야 대상에서 빠진다.
-    if (meta.creatorNames.length) delete meta.creatorUnavailable;
-    else meta.creatorUnavailable = true;
-    if (meta.characterNames.length) delete meta.characterUnavailable;
-    else meta.characterUnavailable = true;
-    delete meta.profileFailCount;
-    delete meta.profileFailedAt;
-
-    state.plotMeta[canonicalId] = meta;
-    plotLookupDirty = true;
-    mergeMetaIntoIndex(meta, {
-      replaceNames,
-      strictIds: replaceNames
-    });
-
-    const roomEntry = state.index[keyOf('room', target.roomId)];
-    if (roomEntry) {
-      delete roomEntry.profileFailCount;
-      delete roomEntry.profileFailedAt;
-    }
-  }
-
-  // 프로필을 아예 못 연 플롯(삭제된 플롯 등)은 몇 번 시도한 뒤 접어둔다.
-  // 매번 되풀이하면 시간만 쓴다.
-  function notePlotProfileFailure(target) {
-    // 플롯 아이디가 없는 방도 세어둬야 한다.
-    // 아무 데도 적지 않으면 그 방은 영원히 대상으로 남는다.
-    const roomEntry = state.index[keyOf('room', target.roomId)];
-    if (roomEntry) {
-      roomEntry.profileFailCount = Number(roomEntry.profileFailCount || 0) + 1;
-      roomEntry.profileFailedAt = Date.now();
-    }
-
-    const canonicalId = target.plotId || target.originatedId;
-    if (!canonicalId) return;
-
-    const previous = state.plotMeta[canonicalId] || {};
-    state.plotMeta[canonicalId] = {
-      ...previous,
-      canonicalId,
-      plotId: target.plotId || previous.plotId || '',
-      originatedId: target.originatedId || previous.originatedId || '',
-      characterNames: previous.characterNames || [],
-      creatorNames: previous.creatorNames || [],
-      profileFailCount: Number(previous.profileFailCount || 0) + 1,
-      profileFailedAt: Date.now()
-    };
-    plotLookupDirty = true;
-  }
-
-  // 플롯마다 iframe을 새로 띄우면 제타 앱을 매번 처음부터 부팅한다.
-  // 손으로 할 때처럼, 앱은 한 번만 띄우고 그 안에서 화면만 바꾼다.
-  const PROFILE_WORKERS = 2;
-  const MOBILE_PROFILE_WORKERS = 2;
-  const PROFILE_FRAME_RECYCLE = 8;
-  // 이 비율을 넘기면 화면을 모두 버리고 잠시 쉰다.
-  // 다만 performance.memory는 JS 힙만 본다. 문서·이미지가 차지하는
-  // renderer 메모리는 여기에 잡히지 않으므로, 이것만 믿으면 안 된다.
-  const MEMORY_PAUSE_RATIO = 0.7;
-  const WORKERS_KEY = 'zeta-room-manager:workers:v1';
-
-  function configuredWorkers(mobile) {
-    let saved = 0;
-    try { saved = Number(localStorage.getItem(WORKERS_KEY) || 0); } catch (_) {}
-    if (saved >= 1 && saved <= 6) return saved;
-    return mobile ? MOBILE_PROFILE_WORKERS : PROFILE_WORKERS;
-  }
-
-  // 메모리가 빠듯하면 1~2, 빠르게 돌리고 싶으면 3~4.
-  window.zrmSetWorkers = function (count) {
-    const value = Math.max(1, Math.min(6, Number(count) || 0));
-    try { localStorage.setItem(WORKERS_KEY, String(value)); } catch (_) {}
-    return '동시 수집을 ' + value + '개로 맞췄어요. 다음 수집부터 적용됩니다. (기본값으로 되돌리려면 zrmSetWorkers(0))';
-  };
-  const PROFILE_SETTLE_MS = 200;
-  // 한 번에 너무 많이 돌면 renderer 메모리가 회복될 틈이 없다.
-  // 끊어서 돌리고, 남은 개수는 완료 알림에 알려 다시 누르게 한다.
-  // 한 배치를 마치면 새로고침으로 renderer 메모리를 비우는 구조인데,
-  // 한 배치가 크면 새로고침 전에 바닥난다. 도입 당시 모바일 80은 문제가
-  // 없었으므로 PC도 그 선까지 내린다.
-  const PROFILE_BATCH_DESKTOP = 100;
-  const PROFILE_BATCH_MOBILE = 100;
-  const BATCH_KEY = 'zeta-room-manager:batch:v1';
-
-  function configuredBatch(mobile) {
-    let saved = 0;
-    try { saved = Number(localStorage.getItem(BATCH_KEY) || 0); } catch (_) {}
-    if (saved >= 10 && saved <= 200) return saved;
-    return mobile ? PROFILE_BATCH_MOBILE : PROFILE_BATCH_DESKTOP;
-  }
-
-  // 그래도 메모리가 터지면 한 번에 도는 개수를 줄인다.
-  window.zrmSetBatch = function (count) {
-    const value = Math.max(0, Math.min(200, Number(count) || 0));
-    try {
-      if (value) localStorage.setItem(BATCH_KEY, String(value));
-      else localStorage.removeItem(BATCH_KEY);
-    } catch (_) {}
-    return value
-      ? '한 번에 ' + value + '개씩 돌게 맞췄어요. 다음 수집부터 적용됩니다. (기본값으로 되돌리려면 zrmSetBatch(0))'
-      : '기본값으로 되돌렸어요.';
-  };
-
-  // 그림 차단이 수집을 망가뜨리면 이걸로 끈다.
-  window.zrmBlockImages = function (on) {
-    blockFrameMedia = on !== false;
-    return blockFrameMedia
-      ? '숨김 화면에서 그림을 받지 않습니다.'
-      : '숨김 화면에서 그림을 그대로 받습니다. (메모리를 더 씁니다)';
-  };
-
-  let lastProfileFailures = [];
-
-  function isMobileProfileDevice() {
+  function isMobileCollectionDevice() {
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
   }
 
-  // ID만으로는 어느 방인지 알 수 없다. 이름과 주소를 남겨 바로 열어볼 수 있게 한다.
   function describeFailure(target, reason) {
     const entry = state.index[keyOf('room', target.roomId)];
     const meta = entry ? plotMetaForEntry(entry) : null;
@@ -1811,818 +1225,13 @@
     };
   }
 
-  // 실패 사유별로 묶는다. 같은 이유가 반복되는 경우가 대부분이다.
   function failureSummary(failures) {
     const counts = new Map();
     for (const item of failures) counts.set(item.reason, (counts.get(item.reason) || 0) + 1);
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([reason, count]) => reason + ' ' + count + '건');
+      .map(([reason, count]) => reason + (count > 1 ? ' × ' + count : ''));
   }
-
-  // 실패 목록 전체를 파일로 받는다.
-  window.zrmFailures = function () {
-    if (!lastProfileFailures.length) return '마지막 수집에서 실패한 항목이 없어요.';
-
-    const lines = ['Zeta Room Manager 이름 수집 실패 목록', new Date().toISOString(), ''];
-    for (const item of failureSummary(lastProfileFailures)) lines.push('- ' + item);
-    lines.push('');
-
-    // 사유별로 묶어서, 각 항목은 플롯 이름과 대화방 주소로 적는다.
-    const groups = new Map();
-    for (const item of lastProfileFailures) {
-      if (!groups.has(item.reason)) groups.set(item.reason, []);
-      groups.get(item.reason).push(item);
-    }
-    for (const [reason, items] of groups) {
-      lines.push('════ ' + reason + ' (' + items.length + '건)', '');
-      for (const item of items) {
-        lines.push(item.name);
-        lines.push('  ' + item.url);
-        if (item.plotId) lines.push('  플롯 ' + item.plotId);
-        lines.push('');
-      }
-    }
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'zeta-room-manager-failures-' + new Date().toISOString().slice(0, 10) + '.txt';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return lastProfileFailures.length + '건을 파일로 내려받았어요.';
-  };
-  // 실패했을 때 어디까지 갔는지 알아야 원인을 말해줄 수 있다.
-  function profileFailureReason(error, trace, plotId) {
-    const message = normalizeText((error && error.message) || error);
-    if (message !== '시간 초과') return message || '알 수 없는 오류';
-    if (!trace.path) return '화면이 열리지 않음';
-    if (!trace.path.includes(plotId)) return '프로필 주소로 이동하지 않음';
-    if (!trace.root) return '프로필 화면이 그려지지 않음';
-    return '제작자명을 찾지 못함';
-  }
-
-  async function readProfileIn(frame, plotId, timeoutMs) {
-    const trace = { path: '', root: false };
-    const end = Date.now() + timeoutMs;
-    let settledAt = 0;
-    let fullResultSignature = '';
-    let fullResultSince = 0;
-
-    while (Date.now() < end) {
-      if (collectionAborted) throw new Error('중지됨');
-      if (!frame || !frame.isConnected) throw new Error('숨김 화면을 다시 여는 중');
-
-      try {
-        const win = frame.contentWindow;
-        if (win && win.document) {
-          trace.path = win.location.pathname;
-
-          if (trace.path.includes(plotId)) {
-            const root = win.document.querySelector('[data-sentry-component="PlotProfile"]');
-            trace.root = Boolean(root);
-
-            let result = root ? readPlotProfile(win) : null;
-            if (result && !result.partial) {
-              // URL만 먼저 바뀌고 React 프로필 내용이 직전 플롯 값으로 잠깐 남는
-              // 순간을 피한다. 같은 결과가 일정 시간 유지될 때만 확정한다.
-              const signature = JSON.stringify([
-                result.profileId || '',
-                ...(result.characters || []),
-                '|',
-                ...(result.creators || [])
-              ]);
-              if (signature !== fullResultSignature) {
-                fullResultSignature = signature;
-                fullResultSince = Date.now();
-              } else if (Date.now() - fullResultSince >= PROFILE_SETTLE_MS) {
-                return result;
-              }
-            } else {
-              fullResultSignature = '';
-              fullResultSince = 0;
-            }
-
-            // 주소도 맞고 문서도 다 불렸는데 없으면 오래 기다릴 이유가 없다.
-            // 실패 하나가 제한 시간을 다 쓰면 전체가 크게 느려진다.
-            if (win.document.readyState === 'complete') {
-              if (!settledAt) settledAt = Date.now();
-              else if (Date.now() - settledAt > 2000) {
-                // 제작자가 끝내 안 나오면 캐릭터명만이라도 챙긴다.
-                if (result && result.partial) return result;
-                if (Date.now() - settledAt > 3500) break;
-              }
-            }
-          }
-        }
-      } catch (error) {
-        if (error && error.name === 'SecurityError') throw new Error('숨김 화면 접근이 막혔습니다');
-        throw error;
-      }
-
-      await sleep(100);
-    }
-
-    throw new Error(profileFailureReason(new Error('시간 초과'), trace, plotId));
-  }
-
-  async function profileWorker(queue, onResult, options = {}) {
-    const onPressure = typeof options.onPressure === 'function' ? options.onPressure : () => {};
-    const pauseMs = options.mobile ? 120 : 80;
-    const recycleEvery = options.mobile ? 6 : PROFILE_FRAME_RECYCLE;
-    const targetBudgetMs = options.mobile ? 22000 : 48000;
-    let frame = null;
-    let used = 0;
-
-    const ensureFrame = () => {
-      if (!frame || !frame.isConnected) frame = hiddenFrame();
-      return frame;
-    };
-
-    // iframe을 만들었다 지우기를 반복하면 떼어낸 문서가 회수되지 않고 쌓인다.
-    // 하나를 계속 쓰되, 다음 화면을 띄우기 전에 반드시 비워서
-    // 무거운 문서가 두 개 동시에 살아 있지 않게 한다.
-    const blankFrame = async (delayMs = 120) => {
-      if (frame && frame.isConnected) {
-        try {
-          const win = frame.contentWindow;
-          if (win) {
-            const highest = win.setTimeout(() => {}, 0);
-            for (let id = highest; id >= 0 && id > highest - 800; id--) {
-              win.clearTimeout(id);
-              win.clearInterval(id);
-            }
-          }
-        } catch (_) {}
-        try { frame.src = 'about:blank'; } catch (_) {}
-        if (delayMs) await sleep(delayMs);
-      }
-    };
-
-    const resetFrame = async (delayMs = 120) => {
-      // 완전히 버려야 할 때만 요소까지 새로 만든다.
-      await blankFrame(0);
-      dropFrame(frame);
-      frame = null;
-      used = 0;
-      if (delayMs) await sleep(delayMs);
-    };
-
-    const timeLeft = (deadline, cap) => {
-      const left = deadline - Date.now();
-      if (left <= 800) throw new Error('프로필 처리 시간 초과');
-      return Math.max(800, Math.min(cap, left));
-    };
-
-    // 제작자명은 대화방에서 플롯 프로필 버튼을 눌러 들어가야 안정적으로 보인다.
-    // 직접 /plots/.../profile 주소를 여는 우회 경로는 쓰지 않는다.
-    const navigateRoom = async (roomId, deadline) => {
-      await blankFrame();
-      const active = ensureFrame();
-      active.src = '/' + localeSegment() + '/rooms/' + roomId;
-      armMediaGuard(active);
-
-      const button = await readInFrame(active, win => {
-        if (!win.location.pathname.includes(roomId)) return null;
-        return win.document.querySelector(PROFILE_BUTTON);
-      }, timeLeft(deadline, options.mobile ? 6500 : 10000));
-      button.click();
-
-      const profileId = await readInFrame(active, win => {
-        if (!PROFILE_PATH.test(win.location.pathname)) return null;
-        return plotProfileId(win.location.pathname) || null;
-      }, timeLeft(deadline, options.mobile ? 6500 : 10000));
-
-      return await readProfileIn(
-        active,
-        profileId,
-        timeLeft(deadline, options.mobile ? 10000 : 18000)
-      );
-    };
-
-    // 프로필 주소로 바로 가면 화면을 한 번만 불러도 된다.
-    // 제작자가 안 잡히는 경우에만 방을 거치는 느린 경로로 넘어간다.
-    const navigateProfile = async (plotId, deadline) => {
-      await blankFrame();
-      const active = ensureFrame();
-      active.src = '/' + localeSegment() + '/plots/' + plotId + '/profile';
-      armMediaGuard(active);
-      // 직행은 빨리 뜨거나 안 뜨거나다. 오래 기다리면 느린 경로로 넘어가는 게 손해다.
-      return await readProfileIn(active, plotId, timeLeft(deadline, options.mobile ? 4500 : 6000));
-    };
-
-    const collectOne = async (target, deadline) => {
-      if (target.plotId) {
-        try {
-          const quick = await navigateProfile(target.plotId, deadline);
-          if (quick && quick.creators && quick.creators.length) return quick;
-          // 캐릭터만 얻었으면 제작자를 얻으러 방을 거쳐 본다.
-          try {
-            await resetFrame(0);
-            return await navigateRoom(target.roomId, deadline);
-          } catch (_) {
-            if (quick) return quick;
-            throw _;
-          }
-        } catch (error) {
-          await resetFrame(0);
-        }
-      }
-      return await navigateRoom(target.roomId, deadline);
-    };
-
-    try {
-      for (;;) {
-        const target = queue.next();
-        if (!target) return;
-
-        // 모바일은 메모리가 빠듯하므로 iframe을 조금 더 자주 갈아준다.
-        // 평상시 속도는 3-worker 그대로 두고, 오래 붙잡힌 worker만 복구한다.
-        if (used >= recycleEvery) {
-          await resetFrame(180);
-        }
-
-        const deadline = Date.now() + targetBudgetMs;
-
-        try {
-          // 내부 대기가 어떤 이유로 풀리지 않아도 예산이 지나면 넘어간다.
-          const result = await Promise.race([
-            collectOne(target, deadline),
-            (async () => {
-              await sleep(targetBudgetMs + 1500);
-              throw new Error('시간 초과 — 건너뜀');
-            })()
-          ]);
-          onResult(target, result, null);
-        } catch (error) {
-          // 어떤 실패든 다음 타깃은 깨끗한 iframe에서 시작한다.
-          await resetFrame();
-          onResult(target, null, error);
-        }
-
-        // 결과를 얻었으면 더 들고 있을 이유가 없다. 즉시 비운다.
-        await blankFrame(0);
-        used++;
-
-        // 메모리가 빠듯하면 화면을 버리고 회수될 틈을 준다.
-        if (memoryPressure() > MEMORY_PAUSE_RATIO) {
-          await resetFrame(0);
-          onPressure();
-          await sleep(1200);
-        }
-
-        await sleep(pauseMs);
-      }
-    } finally {
-      dropFrame(frame);
-    }
-  }
-
-  // 한 바퀴 돌았는데 남은 개수가 줄지 않으면 더 돌려도 똑같다.
-  // 두 바퀴 연속 제자리면 새로고침을 멈추고 마무리한다.
-  const PROFILE_STALL_LIMIT = 2;
-
-  function newProfileRunId() {
-    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-  }
-
-  // 제자리걸음은 같은 회차 안에서만 센다.
-  // 지난 회차가 남긴 숫자를 이어받으면, 새로 시작한 수집이
-  // 첫 묶음만 하고 끝나 버린다.
-  function profileStallCount(previousResume, remaining, runId) {
-    if (!previousResume || !runId || previousResume.runId !== runId) return 0;
-    const before = Number(previousResume.lastRemaining);
-    if (!Number.isFinite(before) || remaining < before) return 0;
-    return Number(previousResume.stalls || 0) + 1;
-  }
-
-  function remainingText(startedAt, completed, total) {
-    if (completed < 3) return '';
-    const perItem = (Date.now() - startedAt) / completed;
-    const left = Math.round(perItem * (total - completed) / 1000);
-    const speed = ' · ' + (perItem / 1000).toFixed(1) + '초/건';
-    if (left < 60) return '약 ' + left + '초 남음' + speed;
-    return '약 ' + Math.round(left / 60) + '분 남음' + speed;
-  }
-
-  async function collectProfilesForEmptyPlots(force = false, explicitTargets = null) {
-    const hasExplicitTargets = Array.isArray(explicitTargets);
-    const allTargets = hasExplicitTargets ? explicitTargets : profileCollectionTargets(false);
-    if (!allTargets.length) {
-      return {
-        targets: 0, attempted: 0, done: 0, failed: 0,
-        remaining: 0, limited: false, failures: [], remainingTargets: []
-      };
-    }
-
-    const mobile = isMobileProfileDevice();
-    const batchLimit = configuredBatch(mobile);
-    const targets = allTargets.slice(0, batchLimit);
-    const queuedRemainingTargets = allTargets.slice(targets.length);
-    const startedAt = Date.now();
-    const failures = [];
-    let cursor = 0;
-    let done = 0;
-    let failed = 0;
-
-    const queue = {
-      next() {
-        if (collectionAborted || currentSection() !== 'room') return null;
-        return cursor < targets.length ? targets[cursor++] : null;
-      }
-    };
-
-    const progressNote = completed => {
-      const eta = remainingText(startedAt, completed, targets.length);
-      const guard = BOOKMARKLET_MODE && !bookmarkletControllerReady()
-        ? '메모리 정리 · 이번 ' + targets.length + '개'
-        : '메모리 정리 · ' + targets.length + '개마다 자동 새로고침';
-      return eta ? eta + ' · ' + guard : guard;
-    };
-
-    const onResult = (target, result, error) => {
-      // 재검증 표시는 시도한 순간 내린다. 결과와 무관하다.
-      // 성공했을 때만 내리면, 끝내 못 읽는 방이 영원히 대상으로 남아
-      // 새로고침이 끝나지 않는다.
-      const attemptedEntry = state.index[keyOf('room', target.roomId)];
-      if (attemptedEntry && attemptedEntry.needsProfileRefresh) {
-        delete attemptedEntry.needsProfileRefresh;
-      }
-
-      if (result) {
-        applyProfileResult(target, result, { replaceNames: force || Boolean(target.replaceNames) });
-        done++;
-        // 열어보긴 했는데 여전히 대상으로 남는다면 다음 바퀴도 결과가 같다.
-        // 세어두지 않으면 남은 개수가 줄지 않아 새로고침이 끝나지 않는다.
-        if (entryNeedsProfile(state.index[keyOf('room', target.roomId)], false)) {
-          notePlotProfileFailure(target);
-        }
-      } else {
-        failed++;
-        // 그림 차단 때문에 화면이 안 그려지는 제타 화면일 수도 있다.
-        // 앞부분이 전부 실패하면 차단을 스스로 풀고 그대로 이어간다.
-        if (blockFrameMedia && done === 0 && failed >= 8) {
-          blockFrameMedia = false;
-          try { console.warn('[zrm] 그림 차단을 껐습니다 — 앞 ' + failed + '개가 모두 실패했습니다.'); } catch (_) {}
-        }
-        const reason = normalizeText((error && error.message) || error) || '알 수 없는 오류';
-        const record = describeFailure(target, reason);
-        failures.push(record);
-        notePlotProfileFailure(target);
-        try { console.warn('[zrm] 이름 수집 실패 ·', record.name, '·', record.url, '·', reason); } catch (_) {}
-      }
-
-      const completed = done + failed;
-      roomCollectionProgress = {
-        running: true,
-        count: roomCollectionCount(),
-        roomTotal: roomCollectionCount(),
-        phase: force ? '다시 이름 수집' : '이름 수집',
-        current: completed,
-        total: allTargets.length,
-        note: progressNote(completed)
-      };
-      renderCollectionTools();
-
-      if (completed % 5 === 0) saveStateNow();
-    };
-
-    roomCollectionProgress = {
-      running: true,
-      count: roomCollectionCount(),
-      roomTotal: roomCollectionCount(),
-      phase: force ? '다시 이름 수집' : '이름 수집',
-      current: 0,
-      total: allTargets.length,
-      note: progressNote(0)
-    };
-    renderCollectionTools();
-
-    const workerLimit = configuredWorkers(mobile);
-    let memoryPauses = 0;
-    suspendPassiveNativeCapture = true;
-    try {
-      const workers = [];
-      for (let i = 0; i < Math.min(workerLimit, targets.length); i++) {
-        workers.push(profileWorker(queue, onResult, {
-          force,
-          mobile,
-          onPressure: () => {
-            memoryPauses++;
-            roomCollectionProgress = { ...roomCollectionProgress, note: '메모리 정리 중…' };
-            renderCollectionTools();
-          }
-        }));
-      }
-      await Promise.all(workers);
-    } finally {
-      suspendPassiveNativeCapture = false;
-      saveStateNow();
-    }
-
-    scheduleRefresh();
-    lastProfileFailures = failures;
-
-    const remainingTargets = hasExplicitTargets
-      ? queuedRemainingTargets
-      : (collectionAborted ? queuedRemainingTargets : profileCollectionTargets(false));
-    const remainingAfter = remainingTargets.length;
-
-    return {
-      targets: allTargets.length,
-      attempted: done + failed,
-      done,
-      failed,
-      remaining: remainingAfter,
-      limited: remainingAfter > 0 && !collectionAborted,
-      failures,
-      memoryPauses,
-      remainingTargets: hasExplicitTargets ? remainingTargets : []
-    };
-  }
-
-  // ── 본 페이지 이동으로 이름 수집 ─────────────────────────────────────
-  // 숨김 화면을 쓰면 한 탭 안에 무거운 문서가 계속 쌓여 renderer가 죽는다.
-  // 화면을 실제로 옮기면 이동할 때마다 브라우저가 이전 문서를 통째로 버린다.
-  // 새로고침으로 메모리를 비우던 걸, 아예 한 건마다 하는 셈이다.
-  const NAV_RUN_KEY = 'zeta-room-manager:nav-run:v1';
-  const NAV_DONE_KEY = 'zeta-room-manager:nav-done:v1';
-  const NAV_OVERLAY_ID = 'zeta-room-manager-nav-progress';
-  const NAV_READ_TIMEOUT = 14000;
-  const NAV_FAILURE_KEEP = 200;
-  let navStopped = false;
-
-  function readNavRun() {
-    try { return JSON.parse(sessionStorage.getItem(NAV_RUN_KEY) || 'null'); } catch (_) { return null; }
-  }
-
-  function writeNavRun(run) {
-    try { sessionStorage.setItem(NAV_RUN_KEY, JSON.stringify(run)); } catch (_) {}
-  }
-
-  function clearNavRun() {
-    try { sessionStorage.removeItem(NAV_RUN_KEY); } catch (_) {}
-  }
-
-  function navRunActive() {
-    const run = readNavRun();
-    return Boolean(run && run.active && run.mode === 'navigate');
-  }
-
-  // 팝업이 사라지지 않거나 화면이 계속 넘어갈 때 손으로 끄는 비상구.
-  window.zrmStopCollect = function () {
-    clearNavRun();
-    clearProfileResume();
-    navStopped = false;
-    document.getElementById(NAV_OVERLAY_ID)?.remove();
-    return '수집을 멈췄습니다. 화면을 새로고침해 주세요.';
-  };
-
-  // 프로필 주소로 바로 가는 게 빠르지만, 제작자는 방에서 프로필 버튼을 눌러야
-  // 안정적으로 나온다. 직행이 안 되면 방을 거치는 길로 한 번 더 간다.
-  function navTargetUrl(target, stage) {
-    if (stage !== 'room' && target.plotId) {
-      return '/' + localeSegment() + '/plots/' + target.plotId + '/profile';
-    }
-    return '/' + localeSegment() + '/rooms/' + target.roomId;
-  }
-
-  function atNavTarget(target, stage) {
-    const path = location.pathname;
-    if (stage !== 'room' && target.plotId) return path.includes('/plots/' + target.plotId + '/profile');
-    return path.includes('/rooms/' + target.roomId);
-  }
-
-  function stopNavRun() {
-    navStopped = true;
-    const run = readNavRun();
-    if (run) {
-      run.stopRequested = true;
-      writeNavRun(run);
-    }
-    const box = document.getElementById(NAV_OVERLAY_ID);
-    const note = box && box.querySelector('[data-zrm-nav-note]');
-    if (note) note.textContent = '중지하는 중…';
-  }
-
-  function navStopRequested() {
-    if (navStopped) return true;
-    const run = readNavRun();
-    return Boolean(run && run.stopRequested);
-  }
-
-  function renderNavOverlay(run, note) {
-    let box = document.getElementById(NAV_OVERLAY_ID);
-    if (!box) {
-      box = document.createElement('div');
-      box.id = NAV_OVERLAY_ID;
-      box.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;' +
-        'align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
-      box.innerHTML =
-        '<div style="width:min(320px,86vw);background:#fff;border-radius:16px;padding:20px 20px 16px;' +
-          'text-align:center;color:#171717;box-shadow:0 12px 40px rgba(0,0,0,.3);' +
-          'font-family:-apple-system,BlinkMacSystemFont,sans-serif">' +
-          '<div style="font-size:15px;font-weight:800;margin-bottom:8px">이름 수집 중</div>' +
-          '<div data-zrm-nav-count style="font-size:24px;font-weight:800;margin-bottom:6px"></div>' +
-          '<div data-zrm-nav-note style="font-size:12px;color:#52636b;margin-bottom:16px;line-height:1.5"></div>' +
-          '<button type="button" data-zrm-nav-stop style="width:100%;border:0;border-radius:11px;' +
-            'padding:12px;background:#171717;color:#fff;font-weight:800;font-size:14px">중지</button>' +
-        '</div>';
-      (document.body || document.documentElement).appendChild(box);
-      box.querySelector('[data-zrm-nav-stop]').addEventListener('click', stopNavRun);
-    }
-
-    const total = run.queue.length;
-    const done = Number(run.cursor || 0);
-    box.querySelector('[data-zrm-nav-count]').textContent = done + ' / ' + total;
-    box.querySelector('[data-zrm-nav-note]').textContent =
-      [note, remainingText(Number(run.startedAt || Date.now()), done, total)]
-        .filter(Boolean).join(' · ');
-    return box;
-  }
-
-  function startNavigationRun(targets, options = {}) {
-    const queue = targets.map(target => ({
-      roomId: target.roomId,
-      plotId: normalizeText(target.plotId),
-      originatedId: normalizeText(target.originatedId),
-      replaceNames: Boolean(target.replaceNames)
-    }));
-
-    const run = {
-      active: true,
-      mode: 'navigate',
-      runId: newProfileRunId(),
-      force: Boolean(options.force),
-      queue,
-      cursor: 0,
-      attempted: 0,
-      done: 0,
-      failed: 0,
-      failures: [],
-      steps: 0,
-      startedAt: Date.now(),
-      returnUrl: location.pathname,
-      batch: configuredBatch(isMobileProfileDevice())
-    };
-
-    writeNavRun(run);
-    saveStateNow();
-    renderNavOverlay(run, '시작하는 중…');
-    goToNavTarget(run);
-  }
-
-  function goToNavTarget(run) {
-    const target = run.queue[run.cursor];
-    if (!target) {
-      finishNavRun(run);
-      return;
-    }
-    run.steps = Number(run.steps || 0) + 1;
-    writeNavRun(run);
-    // replace를 쓰면 뒤로 가기 기록이 수백 개 쌓이지 않는다.
-    location.replace(navTargetUrl(target, run.stage));
-  }
-
-  // 지금 화면에서 프로필이 다 그려질 때까지 기다렸다 읽는다.
-  async function waitForProfileHere(timeoutMs) {
-    const end = Date.now() + timeoutMs;
-    let signature = '';
-    let since = 0;
-    let settledAt = 0;
-
-    while (Date.now() < end) {
-      if (navStopRequested()) throw new Error('중지됨');
-
-      const root = document.querySelector('[data-sentry-component="PlotProfile"]');
-      const result = root ? readPlotProfile(window) : null;
-
-      if (result && !result.partial) {
-        // 주소만 먼저 바뀌고 내용이 직전 플롯인 순간을 피한다.
-        const next = JSON.stringify([
-          result.profileId || '',
-          ...(result.characters || []),
-          '|',
-          ...(result.creators || [])
-        ]);
-        if (next !== signature) {
-          signature = next;
-          since = Date.now();
-        } else if (Date.now() - since >= PROFILE_SETTLE_MS) {
-          return result;
-        }
-      } else {
-        signature = '';
-        since = 0;
-      }
-
-      if (document.readyState === 'complete') {
-        if (!settledAt) settledAt = Date.now();
-        else if (Date.now() - settledAt > 2000) {
-          // 제작자를 끝내 못 읽어도 캐릭터명은 챙긴다.
-          if (result && result.partial) return result;
-          if (Date.now() - settledAt > 3500) {
-            throw new Error(root ? '프로필에서 이름을 읽지 못했습니다' : '프로필 화면이 열리지 않았습니다');
-          }
-        }
-      }
-
-      await sleep(100);
-    }
-
-    throw new Error('시간 초과 — 프로필이 열리지 않았습니다');
-  }
-
-  async function readProfileOnThisPage(target, stage) {
-    // 방을 거치는 길에서는 프로필 버튼을 눌러 연다(같은 문서 안에서 열린다).
-    if (stage === 'room' || !target.plotId) {
-      const end = Date.now() + NAV_READ_TIMEOUT;
-      let button = null;
-      while (Date.now() < end) {
-        if (navStopRequested()) throw new Error('중지됨');
-        button = document.querySelector(PROFILE_BUTTON);
-        if (button) break;
-        await sleep(120);
-      }
-      if (!button) throw new Error('방에서 프로필 버튼을 찾지 못했습니다');
-      button.click();
-    }
-    return await waitForProfileHere(NAV_READ_TIMEOUT);
-  }
-
-  function finishNavRun(run, note) {
-    clearNavRun();
-    navStopped = false;
-    lastProfileFailures = (run && run.failures) || [];
-    saveStateNow();
-    void releaseScreenAwake();
-    document.getElementById(NAV_OVERLAY_ID)?.remove();
-
-    try {
-      sessionStorage.setItem(NAV_DONE_KEY, JSON.stringify({
-        force: Boolean(run && run.force),
-        attempted: Number((run && run.attempted) || 0),
-        done: Number((run && run.done) || 0),
-        failed: Number((run && run.failed) || 0),
-        remaining: Math.max(0, ((run && run.queue) || []).length - Number((run && run.cursor) || 0)),
-        failures: ((run && run.failures) || []).slice(0, 10),
-        summary: failureSummary((run && run.failures) || []),
-        note: note || ''
-      }));
-    } catch (_) {}
-
-    const back = (run && run.returnUrl) || ('/' + localeSegment() + '/rooms');
-    if (location.pathname !== back) {
-      location.replace(back);
-      return;
-    }
-    showNavSummary();
-  }
-
-  function showNavSummary() {
-    let info = null;
-    try { info = JSON.parse(sessionStorage.getItem(NAV_DONE_KEY) || 'null'); } catch (_) {}
-    if (!info) return false;
-    try { sessionStorage.removeItem(NAV_DONE_KEY); } catch (_) {}
-
-    const total = roomCollectionCount();
-    const coverage = metadataCoverage('room');
-    const aliases = Object.values(state.index).filter(entry =>
-      entry && entry.type === 'room' && normalizeText(entry.alias)
-    ).length;
-
-    alert(
-      (info.note ? info.note : (info.force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료')) +
-      ' · 저장된 방 ' + total + '개' +
-      '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
-      '\n이름 수집: ' + info.attempted + '개 처리 · 성공 ' + info.done + '개' +
-      (info.failed ? ' · 실패 ' + info.failed + '개' : '') +
-      (info.remaining ? '\n남은 플롯 ' + info.remaining + '개' : '') +
-      (info.failed && info.summary && info.summary.length
-        ? '\n\n실패 사유\n' + info.summary.map(line => '· ' + line).join('\n') +
-          '\n\n실패한 대화방 (최대 10개 표시)\n' + (info.failures || [])
-            .map(item => '· ' + item.name + '\n  ' + item.url).join('\n') +
-          '\n\n전체 목록은 콘솔에서 zrmFailures()'
-        : '')
-    );
-    scheduleRefresh();
-    return true;
-  }
-
-  // 페이지가 열릴 때마다 한 걸음씩 나아간다.
-  async function driveNavigationRun() {
-    const run = readNavRun();
-    if (!run || !run.active || run.mode !== 'navigate') return;
-
-    // 이동 횟수가 목표 수보다 훨씬 많아지면 뭔가 잘못 돌고 있는 것이다.
-    if (Number(run.steps || 0) > run.queue.length * 3 + 80) {
-      finishNavRun(run, '이동이 너무 많아 멈췄습니다');
-      return;
-    }
-    if (run.stopRequested) {
-      finishNavRun(run, '이름 수집 중지됨');
-      return;
-    }
-
-    const target = run.queue[run.cursor];
-    if (!target) {
-      finishNavRun(run);
-      return;
-    }
-
-    const stage = run.stage === 'room' ? 'room' : 'direct';
-    renderNavOverlay(run, stage === 'room' ? '대화방을 거쳐 다시 읽는 중…' : '');
-    void holdScreenAwake();
-
-    // 아직 목표 화면이 아니면 옮기기만 한다. 읽는 건 다음 로드에서.
-    if (!atNavTarget(target, stage)) {
-      goToNavTarget(run);
-      return;
-    }
-
-    let result = null;
-    let error = null;
-    try {
-      result = await readProfileOnThisPage(target, stage);
-    } catch (caught) {
-      error = caught;
-    }
-
-    if (navStopRequested()) {
-      run.stopRequested = true;
-      finishNavRun(run, '이름 수집 중지됨');
-      return;
-    }
-
-    // 직행으로 제작자를 못 얻었으면 방을 거치는 길로 한 번 더 간다.
-    // 예전 숨김 화면 방식이 그렇게 해서 제작자를 얻었다.
-    const gotCreator = Boolean(result && (result.creators || []).length);
-    if (stage === 'direct' && target.plotId && !gotCreator) {
-      run.stage = 'room';
-      // 캐릭터명만 얻었으면 들고 간다. 방에서도 실패하면 그거라도 쓴다.
-      run.carry = result || null;
-      run.carryReason = normalizeText((error && error.message) || error) || '';
-      writeNavRun(run);
-      goToNavTarget(run);
-      return;
-    }
-
-    if (!result && run.carry) {
-      result = run.carry;
-      error = null;
-    }
-    run.stage = 'direct';
-    const carriedReason = run.carryReason || '';
-    run.carry = null;
-    run.carryReason = '';
-
-    run.attempted = Number(run.attempted || 0) + 1;
-    if (result) {
-      applyProfileResult(target, result, { replaceNames: run.force || Boolean(target.replaceNames) });
-      run.done = Number(run.done || 0) + 1;
-      // 읽기는 했는데 여전히 대상으로 남으면 다음에도 결과가 같다.
-      if (entryNeedsProfile(state.index[keyOf('room', target.roomId)], false)) {
-        notePlotProfileFailure(target);
-      }
-    } else {
-      run.failed = Number(run.failed || 0) + 1;
-      const raw = normalizeText((error && error.message) || error) || carriedReason || '알 수 없는 오류';
-      // 어디에서 실패했는지 남긴다. 원인을 찾을 때 이게 제일 중요하다.
-      const reason = raw + ' (' + location.pathname + ')';
-      const record = describeFailure(target, reason);
-      if ((run.failures || []).length < NAV_FAILURE_KEEP) run.failures.push(record);
-      notePlotProfileFailure(target);
-      try { console.warn('[zrm] 이름 수집 실패 ·', record.name, '·', record.url, '·', reason); } catch (_) {}
-    }
-
-    const attemptedEntry = state.index[keyOf('room', target.roomId)];
-    if (attemptedEntry && attemptedEntry.needsProfileRefresh) delete attemptedEntry.needsProfileRefresh;
-
-    run.cursor = Number(run.cursor || 0) + 1;
-    writeNavRun(run);
-    saveStateNow();
-
-    if (run.cursor >= run.queue.length) {
-      finishNavRun(run);
-      return;
-    }
-
-    renderNavOverlay(run, '');
-
-    // 정해진 개수마다 목록으로 한 번 돌아와 저장하고 이어간다.
-    if (run.batch && run.cursor % run.batch === 0) {
-      run.steps = Number(run.steps || 0) + 1;
-      writeNavRun(run);
-      location.replace(run.returnUrl || ('/' + localeSegment() + '/rooms'));
-      return;
-    }
-
-    goToNavTarget(run);
-  }
-
 
   function roomApiCollectionTargets(force = false, roomKeys = null) {
     const seenPlots = new Set();
@@ -2647,7 +1256,7 @@
         const meta = plotMetaForEntry(entry);
         const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
         const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
-        if (profileSettled(entry, meta, characters, creators)) continue;
+        if (roomMetaSettled(entry, meta, characters, creators)) continue;
       }
 
       targets.push({
@@ -2780,7 +1389,7 @@
       };
       renderCollectionTools();
 
-      const mobileList = isMobileProfileDevice();
+      const mobileList = isMobileCollectionDevice();
       let host = roomCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
       let listCompleted = false;
@@ -2877,70 +1486,15 @@
         done: apiProfiles.done,
         failed: apiProfiles.failed,
         remaining: apiProfiles.remaining,
-        limited: false,
         failures: apiProfiles.failures,
-        remainingTargets: [],
         apiLocked: apiProfiles.locked,
         noPlotId: apiProfiles.noPlotId
       };
 
       const total = roomCollectionCount();
-
-      // 버튼으로 시작한 수집은 언제나 새 회차다.
-      // 한 바퀴 돌았는데 하나도 처리하지 못했다면 다시 새로고침해도 같다.
-      if (profiles.limited && !collectionAborted && profiles.attempted <= 0) {
-        clearProfileResume();
-      } else if (profiles.limited && !collectionAborted) {
-        writeProfileResume({
-          active: true,
-          runId: newProfileRunId(),
-          force,
-          attempted: profiles.attempted,
-          done: profiles.done,
-          failed: profiles.failed,
-          startedAt: Date.now(),
-          stalls: 0,
-          lastRemaining: profiles.remaining,
-          targets: force ? profiles.remainingTargets : undefined
-        });
-        saveStateNow();
-
-        roomCollectionProgress = {
-          running: true,
-          count: total,
-          roomTotal: total,
-          phase: '이름 수집',
-          current: profiles.attempted,
-          total: profiles.attempted + profiles.remaining,
-          note: BOOKMARKLET_MODE && !bookmarkletControllerReady()
-            ? '저장 완료 · 새로고침 후 북마클릿을 다시 실행하세요'
-            : '메모리 정리 후 자동으로 계속합니다'
-        };
-        renderCollectionTools();
-
-        if (BOOKMARKLET_MODE && !bookmarkletControllerReady()) {
-          const turnOn = await requestBookmarkletAutoResume();
-          if (turnOn) {
-            // 기록은 위에서 이미 남겼다. 여기서 다시 쓰면 회차 번호가 지워진다.
-            await sleep(250);
-            location.reload();
-          }
-          return true;
-        }
-
-        await sleep(500);
-        if (collectionAborted) {
-          clearProfileResume();
-          closeBookmarkletController();
-          return true;
-        }
-        location.reload();
-        return true;
-      }
-
-      clearProfileResume();
       roomCollectionProgress = { running: false, count: total };
       renderCollectionTools();
+
       const coverage = metadataCoverage('room');
       const aliases = Object.values(state.index).filter(entry =>
         entry && entry.type === 'room' && normalizeText(entry.alias)
@@ -2951,6 +1505,7 @@
             ? (force ? '다시 전체 수집 일부 완료' : '대화방 목록 끝 확인 실패')
             : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료'));
       const shownFailures = profiles.failures.slice(0, 10);
+
       alert(
         resultTitle + ' · 저장된 방 ' + total + '개' +
         (force && seenRoomKeys ? ' · 이번 확인 ' + seenRoomKeys.size + '개' : '') +
@@ -2960,7 +1515,6 @@
           ? 'API 잠금 · 추가 호출 0개'
           : ('API ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개')) +
         (profiles.failed ? ' · 실패 ' + profiles.failed + '개' : '') +
-        (profiles.memoryPauses ? ' · 메모리 정리 ' + profiles.memoryPauses + '회' : '') +
         (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개' : '') +
         (profiles.noPlotId ? '\nplotId 없어 API 조회하지 못한 방 ' + profiles.noPlotId + '개' : '') +
         (profiles.failed
@@ -2973,7 +1527,6 @@
               : '')
           : '')
       );
-      closeBookmarkletController();
       return true;
     })().finally(() => {
       forceReconcileSeenRoomKeys = null;
@@ -2982,113 +1535,14 @@
       suspendObserverRefresh = false;
       void releaseScreenAwake();
       renderCollectionTools();
-      // 수집 중 미뤘던 별명/검색 UI 갱신은 마지막에 한 번만 한다.
       scheduleRefresh();
     });
 
     return roomCollectionPromise;
   }
 
-  async function resumeProfileCollectionIfNeeded() {
-    const resume = readProfileResume();
-    if (!resume || !resume.active || currentSection() !== 'room' || roomCollectionPromise) return false;
-
-    roomCollectionPromise = (async () => {
-      collectionAborted = false;
-      void holdScreenAwake();
-      await sleep(700);
-
-      const forceResume = Boolean(resume.force);
-      const nameOnlyResume = resume.mode === 'names';
-      const resumeTargets = forceResume
-        ? (Array.isArray(resume.targets) ? resume.targets : profileCollectionTargets(true))
-        : null;
-      const profiles = await collectProfilesForEmptyPlots(forceResume, resumeTargets);
-      const stalls = profileStallCount(resume, profiles.remaining, resume.runId);
-      const next = {
-        ...resume,
-        active: true,
-        attempted: Number(resume.attempted || 0) + profiles.attempted,
-        done: Number(resume.done || 0) + profiles.done,
-        failed: Number(resume.failed || 0) + profiles.failed,
-        stalls,
-        lastRemaining: profiles.remaining,
-        targets: forceResume ? profiles.remainingTargets : undefined
-      };
-
-      if (profiles.limited && !collectionAborted &&
-        (profiles.attempted <= 0 || stalls >= PROFILE_STALL_LIMIT)) {
-        clearProfileResume();
-      } else if (profiles.limited && !collectionAborted) {
-        writeProfileResume(next);
-        saveStateNow();
-        roomCollectionProgress = {
-          running: true,
-          count: roomCollectionCount(),
-          roomTotal: roomCollectionCount(),
-          phase: '이름 수집',
-          current: next.attempted,
-          total: next.attempted + profiles.remaining,
-          note: BOOKMARKLET_MODE && !bookmarkletControllerReady()
-            ? '저장 완료 · 새로고침 후 북마클릿을 다시 실행하세요'
-            : '메모리 정리 후 자동으로 계속합니다'
-        };
-        renderCollectionTools();
-
-        if (BOOKMARKLET_MODE && !bookmarkletControllerReady()) {
-          const turnOn = await requestBookmarkletAutoResume();
-          if (turnOn) {
-            writeProfileResume(next);
-            saveStateNow();
-            await sleep(250);
-            location.reload();
-          }
-          return true;
-        }
-
-        await sleep(500);
-        if (collectionAborted) {
-          clearProfileResume();
-          closeBookmarkletController();
-          return true;
-        }
-        location.reload();
-        return true;
-      }
-
-      clearProfileResume();
-      const total = roomCollectionCount();
-      const coverage = metadataCoverage('room');
-      const aliases = Object.values(state.index).filter(entry =>
-        entry && entry.type === 'room' && normalizeText(entry.alias)
-      ).length;
-      roomCollectionProgress = { running: false, count: total };
-      renderCollectionTools();
-
-      alert(
-        (collectionAborted
-          ? (nameOnlyResume ? '다시 이름 수집 중지됨' : (forceResume ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨'))
-          : (nameOnlyResume ? '다시 이름 수집 완료' : (forceResume ? '다시 전체 수집 완료' : '대화방 전체 수집 완료'))) +
-        ' · 저장된 방 ' + total + '개' +
-        '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
-        '\n이름 수집: 총 ' + next.attempted + '개 처리 · 성공 ' + next.done + '개' +
-        (next.failed ? ' · 실패 ' + next.failed + '개' : '') +
-        (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개 (더 읽히지 않아 접어둠)' : '')
-      );
-      closeBookmarkletController();
-      return true;
-    })().finally(() => {
-      roomCollectionPromise = null;
-      roomCollectionProgress.running = false;
-      void releaseScreenAwake();
-      renderCollectionTools();
-    });
-
-    return roomCollectionPromise;
-  }
-
   // ── 내 플롯 수동 전체 수집 / 백업 ───────────────────────────────────
-  // 이 플롯 수집 경로는 API를 직접 호출하지 않는다.
+  // 비공개/내 플롯 수집 경로는 API를 직접 호출하지 않는다.
   // 사용자가 '전체 수집'을 눌렀을 때 Creator Center 목록을 실제로 스크롤하고,
   // 제타가 화면에 렌더링한 항목만 로컬 인덱스에 누적 저장한다.
 
@@ -5140,11 +3594,6 @@
     observer = new MutationObserver(scheduleRefresh);
     bindSwipeOpenLock();
     refresh();
-
-    // 예전 대화방 이름 수집(nav/iframe) 이어받기는 더 이상 사용하지 않는다.
-    if (navRunActive()) clearNavRun();
-    if (readProfileResume()?.active) clearProfileResume();
-    try { sessionStorage.removeItem(NAV_DONE_KEY); } catch (_) {}
 
     let lastUrl = location.href;
     setInterval(() => {
