@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.67
+// @version      0.23.68
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.67';
+  const SCRIPT_VERSION = '0.23.68';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -3337,6 +3337,33 @@
       #${MODAL_ID} .zrm-cancel { background: #343438; color: #ddd; }
       #${MODAL_ID} .zrm-reset { background: #3a3030; color: #ffaaaa; }
       #${MODAL_ID} .zrm-save { background: #6d52ff; color: #fff; font-weight: 700; }
+
+      /* 카카오톡 테마가 켜져 있으면 그 색을 따라간다.
+         테마가 없으면 이 규칙은 아예 걸리지 않는다. */
+      html.kt-chat-theme-active #${MODAL_ID} .zrm-dialog {
+        border-color: var(--kt-line, #E7E7E7);
+        background: var(--kt-white, #fff);
+        color: var(--kt-text, #191919);
+      }
+      html.kt-chat-theme-active #${MODAL_ID} p { color: var(--kt-sub, #666); }
+      html.kt-chat-theme-active #${MODAL_ID} input {
+        border-color: var(--kt-line, #E7E7E7);
+        background: var(--kt-soft, #F5F5F5);
+        color: var(--kt-text, #191919);
+      }
+      html.kt-chat-theme-active #${MODAL_ID} input::placeholder { color: var(--kt-muted, #999); }
+      html.kt-chat-theme-active #${MODAL_ID} .zrm-cancel {
+        background: var(--kt-soft2, #EFEFEF);
+        color: var(--kt-sub, #666);
+      }
+      html.kt-chat-theme-active #${MODAL_ID} .zrm-reset {
+        background: #FDECEC;
+        color: #C0392B;
+      }
+      html.kt-chat-theme-active #${MODAL_ID} .zrm-save {
+        background: var(--kt-yellow, #FEE500);
+        color: var(--kt-text, #191919);
+      }
       @media (max-width: 600px) {
         #${COLLECTION_BANNER_ID} { padding: 14px; }
         #${COLLECTION_BANNER_ID} .zrm-banner-card {
