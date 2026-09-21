@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.70
+// @version      0.23.71
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.70';
+  const SCRIPT_VERSION = '0.23.71';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -2942,8 +2942,28 @@
 
   // 헤더의 검색 버튼 왼쪽에 나란히 세운다. 헤더가 없으면 화면 구석에 둔다.
   function placeCollectionTools(tools) {
+    const section = currentSection();
     const anchor = roomSearchControl() || creatorCenterSearchLink() || null;
-    const rect = anchor ? anchor.getBoundingClientRect() : null;
+    let rect = anchor ? anchor.getBoundingClientRect() : null;
+
+    // 제작자 센터는 검색 버튼 바로 왼쪽에 알림 버튼이 하나 더 있다.
+    // 검색 버튼 기준으로만 놓으면 룸매니저 버튼이 알림 아이콘 위에 겹치므로,
+    // 같은 헤더 행에서 검색보다 왼쪽에 있는 컨트롤까지 찾아 그 왼쪽에 둔다.
+    if (section === 'plot' && anchor?.parentElement && rect) {
+      const anchorRect = rect;
+      const leftControls = Array.from(anchor.parentElement.children)
+        .filter(el => el !== anchor && el !== tools)
+        .map(el => ({ el, rect: el.getBoundingClientRect?.() }))
+        .filter(item => item.rect && item.rect.width >= 18 && item.rect.height >= 18)
+        .filter(item => {
+          const cy = item.rect.top + item.rect.height / 2;
+          const ay = anchorRect.top + anchorRect.height / 2;
+          return item.rect.left < anchorRect.left && Math.abs(cy - ay) < 20;
+        })
+        .sort((a, b) => a.rect.left - b.rect.left);
+
+      if (leftControls.length) rect = leftControls[0].rect;
+    }
 
     const spot = rect && rect.width && rect.height
       ? {
