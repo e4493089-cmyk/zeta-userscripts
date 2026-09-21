@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.35
+// @version      0.20.36
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1992,9 +1992,9 @@
     else host.scrollTop = value;
   }
 
-  const COLLECTION_STEP_RATIO = 1.0;
+  const COLLECTION_STEP_RATIO = 0.85;
   const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.85;
-  const PLOT_COLLECTION_STEP_RATIO = 1.0;
+  const PLOT_COLLECTION_STEP_RATIO = 0.85;
   const PLOT_COLLECTION_SETTLE_MS = 80;
   const COLLECTION_CHANGE_TIMEOUT_MS = 380;
   const COLLECTION_BOTTOM_TIMEOUT_MS = 1300;
