@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.56
+// @version      0.23.57
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.56';
+  const SCRIPT_VERSION = '0.23.57';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1260,7 +1260,7 @@
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
   }
 
-  // ── 삭제된 플롯 방 비공개 전환 ───────────────────────────────────────
+  // ── 실패한 방 직접 열어 이름 수집 ─────────────────────────────────────
   // 제타는 방 주소로 바로 들어가는 딥링크가 막혀 있다.
   // 대신 앱 내부 라우터로 옮겨 다니면 페이지가 새로 뜨지 않아 스크립트도 살아 있다.
   let convertAborted = false;
@@ -1282,21 +1282,6 @@
     return false;
   }
 
-  function deletedPlotPanel() {
-    return document.querySelector('[data-sentry-component="DeletedPlotNudgePanel"]');
-  }
-
-  // 확인 팝업에서 '전환' 버튼만 고른다. '취소'를 누르면 안 된다.
-  function convertConfirmButton() {
-    for (const popup of document.querySelectorAll('[data-sentry-component="Popup"]')) {
-      if (!/비공개 대화로 전환/.test(popup.textContent || '')) continue;
-      for (const button of popup.querySelectorAll('button')) {
-        if (normalizeText(button.textContent) === '전환') return button;
-      }
-    }
-    return null;
-  }
-
   async function waitFor(check, timeout = 12000, step = 180) {
     const until = Date.now() + timeout;
     while (Date.now() < until) {
@@ -1308,37 +1293,62 @@
     return null;
   }
 
-  async function convertOneRoom(item) {
+  // 방을 열어보는 것만으로 캐릭터명이 쌓인다. 전환도, API 요청도 하지 않는다.
+  function headerCharacterName() {
+    const header = document.querySelector('[data-testid="chat-header-profile"]');
+    const text = normalizeText(header && header.textContent);
+    return text && text.length <= 40 ? text : '';
+  }
+
+  function roomCharacterCount(roomId) {
+    const entry = peekEntry(keyOf('room', roomId));
+    const names = entry && Array.isArray(entry.characterNames) ? entry.characterNames : [];
+    return names.length;
+  }
+
+  async function collectOneRoom(item) {
     const path = (() => {
       try { return new URL(item.url, location.origin).pathname; } catch (_) { return ''; }
     })();
     if (!path) return { ok: false, reason: '방 주소를 만들지 못했습니다' };
 
+    const roomId = (path.match(/\/rooms\/([^/?#]+)/i) || [])[1] || '';
+    if (!roomId) return { ok: false, reason: '방 주소를 만들지 못했습니다' };
+
     if (!routerNavigate(path)) return { ok: false, reason: '방으로 이동하지 못했습니다' };
 
-    // 주소가 실제로 바뀌기 전에 앞 방의 패널을 눌러버리면 엉뚱한 방이 전환된다.
+    // 주소가 실제로 바뀌기 전에 읽으면 앞 방의 이름이 들어간다.
     const moved = await waitFor(() => (location.pathname === path ? true : null), 8000);
     if (convertAborted) return { ok: false, reason: '중지됨' };
     if (!moved) return { ok: false, reason: '방으로 이동하지 못했습니다' };
 
-    const panel = await waitFor(deletedPlotPanel);
+    // 헤더의 캐릭터명이나 말풍선이 그려질 때까지 기다린다.
+    const rendered = await waitFor(
+      () => (headerCharacterName() || bubbleCharacterNames().length ? true : null),
+      12000
+    );
     if (convertAborted) return { ok: false, reason: '중지됨' };
-    // 패널이 없으면 이미 전환됐거나 삭제된 방이 아니다. 실패로 세지 않는다.
-    if (!panel) return { ok: true, skipped: true };
+    if (!rendered) return { ok: false, reason: '방 내용이 뜨지 않았습니다' };
 
-    const open = panel.querySelector('button');
-    if (!open) return { ok: false, reason: '전환 버튼을 찾지 못했습니다' };
-    open.click();
+    // 방당 한 번만 읽는 제한을 피해 지금 방을 바로 읽게 한다.
+    lastChatHarvest = { roomId: '', at: 0 };
+    harvestChatRoom();
 
-    const confirm = await waitFor(convertConfirmButton, 8000);
-    if (convertAborted) return { ok: false, reason: '중지됨' };
-    if (!confirm) return { ok: false, reason: '확인 창이 뜨지 않았습니다' };
-    confirm.click();
+    const header = headerCharacterName();
+    if (header) {
+      const key = keyOf('room', roomId);
+      const previous = peekEntry(key) || {};
+      putEntry(key, {
+        ...previous,
+        type: 'room',
+        id: roomId,
+        href: previous.href || location.pathname,
+        characterNames: uniqueTexts([header], previous.characterNames)
+      });
+      saveState();
+    }
 
-    // 전환이 끝나면 안내 패널이 사라진다. 그것만 성공 신호로 본다.
-    const done = await waitFor(() => (deletedPlotPanel() ? null : true), 20000);
-    if (convertAborted) return { ok: false, reason: '중지됨' };
-    if (!done) return { ok: false, reason: '전환이 끝나지 않았습니다 (제타패스/횟수 제한일 수 있습니다)' };
+    if (!roomCharacterCount(roomId)) return { ok: false, reason: '캐릭터명을 찾지 못했습니다' };
     return { ok: true };
   }
 
@@ -1350,7 +1360,7 @@
       modal.id = CONVERT_PROGRESS_ID;
       modal.innerHTML =
         '<div class="zrm-result-card" role="status" aria-live="polite">' +
-          '<div class="zrm-result-title">비공개 전환 중</div>' +
+          '<div class="zrm-result-title">방 열어 이름 수집 중</div>' +
           '<div class="zrm-convert-count"></div>' +
           '<div class="zrm-convert-name"></div>' +
           '<div class="zrm-result-buttons">' +
@@ -1426,18 +1436,18 @@
     });
   }
 
-  async function convertDeletedPlotRooms(failures) {
+  async function collectFailedRooms(failures) {
     const list = (Array.isArray(failures) ? failures : []).filter(item => item && item.url);
     if (!list.length) return;
     if (convertRunning) return;
     const agreed = await askCollectionConfirm({
-      title: '삭제된 플롯 방 ' + list.length + '개를 비공개로 전환할까요?',
+      title: '실패한 방 ' + list.length + '개를 직접 열어 이름을 수집할까요?',
       lines: [
-        '각 방이 내 비공개 대화로 바뀝니다. 되돌리려면 하나씩 지워야 합니다.',
-        '제타패스가 없으면 1개까지만 무료입니다.',
+        '방을 순서대로 열어 화면에 뜬 캐릭터명만 읽습니다.',
+        '대화를 보내거나 방을 바꾸지는 않습니다.',
         '진행 중에는 이 탭을 그대로 두세요. 끝나면 원래 화면으로 돌아옵니다.'
       ],
-      okLabel: '전환 시작'
+      okLabel: '수집 시작'
     });
     if (!agreed) return;
 
@@ -1455,7 +1465,7 @@
         if (convertAborted) break;
         const item = list[i];
         showConvertProgress(i + 1, list.length, item.name || '(제목 없음)');
-        const result = await convertOneRoom(item);
+        const result = await collectOneRoom(item);
         if (result.ok) {
           done++;
           if (result.skipped) skipped++;
@@ -1472,12 +1482,12 @@
     }
 
     showCollectionResult({
-      title: convertAborted ? '비공개 전환 중지됨' : '비공개 전환 완료',
-      okLabel: '전환 완료',
+      title: convertAborted ? '이름 수집 중지됨' : '이름 수집 완료',
+      okLabel: '수집 완료',
       okCount: done,
       failCount: failed.length,
       failures: failed,
-      failuresLabel: '전환 실패한 대화방'
+      failuresLabel: '이름을 못 받은 대화방'
     });
   }
 
@@ -2100,8 +2110,8 @@
         failures: profiles.failures,
         action: profiles.failures.length
           ? {
-              label: '삭제된 플롯 방 비공개로 전환',
-              run: () => convertDeletedPlotRooms(profiles.failures)
+              label: '실패한 방 직접 열어 이름 수집',
+              run: () => collectFailedRooms(profiles.failures)
             }
           : null
       });
