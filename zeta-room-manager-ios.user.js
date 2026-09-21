@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.46
+// @version      0.20.47
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -30,6 +30,12 @@
   const COLLECTION_MODAL_ID = 'zeta-room-manager-collection-modal';
   const PLOT_COLLECTION_STAMP_KEY = 'zeta-room-manager:plot-collection-at:v1';
   const ROOM_COLLECTION_STAMP_KEY = 'zeta-room-manager:room-collection-at:v1';
+  // 일반 전체 수집에서 능동 API 이름 보충을 한 번 끝내면 잠근다.
+  // '다시 전체 수집'만 이 잠금을 그 실행 동안 무시한다.
+  const ROOM_API_BACKFILL_LOCK_KEY = 'zeta-room-manager:room-api-backfill-locked:v1';
+  const API_BASE = 'https://api.zeta-ai.io';
+  const WEB_CLIENT_VERSION = '3.44.7';
+  let roomApiUnavailableUntil = 0;
   const PROFILE_RESUME_KEY = 'zeta-room-manager:profile-resume:v1';
   const BOOKMARKLET_MODE = Boolean(
     window.__zetaRoomManagerBookmarklet ||
@@ -388,6 +394,7 @@
     localStorage.removeItem('zeta-room-manager:last-plot-index-at:v2');
     localStorage.removeItem(PLOT_COLLECTION_STAMP_KEY);
     localStorage.removeItem(ROOM_COLLECTION_STAMP_KEY);
+    localStorage.removeItem(ROOM_API_BACKFILL_LOCK_KEY);
     localStorage.removeItem(CLEANUP_STAMP_KEY);
     saveStateNow();
   }
@@ -435,6 +442,7 @@
       BACKGROUND_INDEX_STAMP_KEY,
       PLOT_COLLECTION_STAMP_KEY,
       ROOM_COLLECTION_STAMP_KEY,
+      ROOM_API_BACKFILL_LOCK_KEY,
       CLEANUP_STAMP_KEY,
       NO_API_CLEANUP_STAMP_KEY,
       'zeta-room-manager:last-plot-index-at:v1',
@@ -879,6 +887,132 @@
     };
   }
 
+
+  // ── 대화방 이름 API 보충 ─────────────────────────────────────────────
+  // 옛 API 인덱서에서 검증했던 인증/GET 부분만 복구한다.
+  // /v2/rooms 로 방 목록을 가져오지 않고, 스크롤로 수집된 방의 /v1/plots/{id}만 조회한다.
+  function readCookie(name) {
+    try {
+      const wanted = name + '=';
+      for (const part of String(document.cookie || '').split(';')) {
+        const text = part.trim();
+        if (text.startsWith(wanted)) return decodeURIComponent(text.slice(wanted.length));
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  function tokenFromValue(value) {
+    let text = normalizeText(value);
+    if (!text) return '';
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed === 'string') text = parsed;
+      else if (parsed && typeof parsed === 'object') {
+        text = normalizeText(parsed.accessToken || parsed.access_token || parsed.token || parsed.TOKEN);
+      }
+    } catch (_) {}
+    text = text.replace(/^Bearer\s+/i, '');
+    const match = text.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+    return match ? match[0] : '';
+  }
+
+  function findStorageToken() {
+    for (const storage of [localStorage, sessionStorage]) {
+      try {
+        for (let i = 0; i < storage.length; i++) {
+          const key = storage.key(i) || '';
+          if (!/token|auth|session/i.test(key)) continue;
+          const token = tokenFromValue(storage.getItem(key));
+          if (token) return token;
+        }
+      } catch (_) {}
+    }
+    return '';
+  }
+
+  function zetaAccessToken() {
+    return tokenFromValue(readCookie('TOKEN')) || findStorageToken();
+  }
+
+  function jwtPayload(token) {
+    try {
+      const part = token.split('.')[1];
+      if (!part) return {};
+      const padded = part.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - part.length % 4) % 4);
+      const binary = atob(padded);
+      const bytes = Array.from(binary, ch => '%' + ('00' + ch.charCodeAt(0).toString(16)).slice(-2)).join('');
+      return JSON.parse(decodeURIComponent(bytes));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function zetaDeviceId(token) {
+    const cookie = normalizeText(readCookie('DEVICE_ID'));
+    if (cookie) return cookie;
+    for (const storage of [localStorage, sessionStorage]) {
+      for (const key of ['DEVICE_ID', 'deviceId', 'device_id']) {
+        try {
+          const value = normalizeText(storage.getItem(key));
+          if (value) return value.replace(/^"|"$/g, '');
+        } catch (_) {}
+      }
+    }
+    return normalizeText(jwtPayload(token).did);
+  }
+
+  function roomApiHeaders() {
+    const token = zetaAccessToken();
+    const deviceId = zetaDeviceId(token);
+    const headers = {
+      Accept: 'application/json',
+      'X-Client-Version': WEB_CLIENT_VERSION,
+      'X-Client-Native-Version': WEB_CLIENT_VERSION,
+      'X-Client-Type': 'web',
+      'X-Device-Type': /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'web' : 'pc_web',
+      'X-User-Language': 'KOREAN'
+    };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    if (deviceId) headers['X-Sticky'] = deviceId;
+    return headers;
+  }
+
+  async function roomApiRequest(plotId) {
+    if (Date.now() < roomApiUnavailableUntil) {
+      return { ok: false, status: 0, data: null, blocked: true };
+    }
+
+    try {
+      const response = await fetch(API_BASE + '/v1/plots/' + encodeURIComponent(plotId), {
+        method: 'GET',
+        headers: roomApiHeaders(),
+        credentials: 'include',
+        cache: 'no-store'
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        roomApiUnavailableUntil = Date.now() + 60000;
+        return { ok: false, status: response.status, data: null, blocked: true };
+      }
+      if (response.status === 429) {
+        roomApiUnavailableUntil = Date.now() + 30000;
+        return { ok: false, status: 429, data: null, blocked: true };
+      }
+      if (!response.ok) return { ok: false, status: response.status, data: null };
+      return { ok: true, status: response.status, data: await response.json() };
+    } catch (_) {
+      roomApiUnavailableUntil = Date.now() + 30000;
+      return { ok: false, status: 0, data: null, blocked: true };
+    }
+  }
+
+  function unwrapRoomApi(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) return payload.data;
+    return payload;
+  }
+
   function metadataCoverage(type) {
     let total = 0;
     let character = 0;
@@ -1115,8 +1249,8 @@
   }
 
   // ── 대화방 수동 전체 수집 ───────────────────────────────────────────
-  // API를 직접 호출하지 않고, 사용자가 버튼을 눌렀을 때 실제 방 목록을 끝까지
-  // 스크롤하면서 제타가 화면에 렌더링한 방만 로컬 인덱스에 누적 저장한다.
+  // 방 목록 자체는 API로 가져오지 않는다. 사용자가 버튼을 눌렀을 때 실제 목록을
+  // 끝까지 스크롤해 저장하고, 그 뒤 수집된 방의 고유 plotId만 제한적으로 API 조회한다.
 
   function roomCollectionCount() {
     return Object.values(state.index).filter(entry => entry && entry.type === 'room' && entry.id).length;
@@ -2489,6 +2623,135 @@
     goToNavTarget(run);
   }
 
+
+  function roomApiCollectionTargets(force = false, roomKeys = null) {
+    const seenPlots = new Set();
+    const targets = [];
+    let noPlotId = 0;
+
+    for (const [entryKey, entry] of Object.entries(state.index || {})) {
+      if (!entry || entry.type !== 'room' || !ROOM_UUID.test(entry.id || '')) continue;
+      if (roomKeys && !roomKeys.has(entryKey)) continue;
+
+      const plotId = normalizeText(entry.plotId);
+      const originatedId = normalizeText(entry.originatedId);
+      const canonicalId = canonicalPlotId(plotId, originatedId);
+      if (!canonicalId) {
+        noPlotId++;
+        continue;
+      }
+      if (seenPlots.has(canonicalId)) continue;
+      seenPlots.add(canonicalId);
+
+      if (!force) {
+        const meta = plotMetaForEntry(entry);
+        const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
+        const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
+        if (profileSettled(entry, meta, characters, creators)) continue;
+      }
+
+      targets.push({
+        roomId: entry.id,
+        plotId,
+        originatedId,
+        canonicalId
+      });
+    }
+
+    return { targets, noPlotId };
+  }
+
+  async function collectRoomMetaViaApi(force = false, roomKeys = null) {
+    const locked = !force && Boolean(localStorage.getItem(ROOM_API_BACKFILL_LOCK_KEY));
+    if (locked) {
+      return {
+        locked: true, targets: 0, attempted: 0, done: 0, failed: 0,
+        remaining: 0, failures: [], noPlotId: 0
+      };
+    }
+
+    // API를 쓰는 회차가 시작되는 즉시 잠근다.
+    // 중간에 탭이 닫히거나 사용자가 중지해도 일반 수집이 몰래 재호출하지 않는다.
+    try { localStorage.setItem(ROOM_API_BACKFILL_LOCK_KEY, String(Date.now())); } catch (_) {}
+
+    const picked = roomApiCollectionTargets(force, roomKeys);
+    const targets = picked.targets;
+    const failures = [];
+    let nextIndex = 0;
+    let attempted = 0;
+    let done = 0;
+    let failed = 0;
+    let stop = false;
+
+    roomCollectionProgress = {
+      running: true,
+      count: roomCollectionCount(),
+      roomTotal: roomCollectionCount(),
+      phase: '이름 API 조회',
+      current: 0,
+      total: targets.length,
+      note: '방 목록은 스크롤 수집 · 이름만 API로 1회 보충'
+    };
+    renderCollectionTools();
+
+    const worker = async () => {
+      while (!stop && !collectionAborted) {
+        const index = nextIndex++;
+        if (index >= targets.length) return;
+
+        const target = targets[index];
+        const lookupId = target.plotId || target.originatedId;
+        if (!lookupId) continue;
+
+        const result = await roomApiRequest(lookupId);
+        attempted++;
+
+        if (result.ok) {
+          const plot = unwrapRoomApi(result.data);
+          const meta = ingestPlotMeta(plot, target.plotId || lookupId, target.originatedId);
+          if (meta) {
+            mergeMetaIntoIndex(meta, { replaceNames: force, strictIds: true });
+            const roomEntry = state.index[keyOf('room', target.roomId)];
+            if (roomEntry && roomEntry.needsProfileRefresh) delete roomEntry.needsProfileRefresh;
+            done++;
+          } else {
+            failed++;
+            failures.push(describeFailure(target, 'API 응답에서 플롯 정보를 읽지 못했습니다'));
+          }
+        } else {
+          failed++;
+          const reason = result.status
+            ? 'API HTTP ' + result.status
+            : (result.blocked ? 'API 인증/속도 제한 또는 네트워크 문제' : 'API 요청 실패');
+          failures.push(describeFailure(target, reason));
+          if (result.blocked) stop = true;
+        }
+
+        roomCollectionProgress.current = attempted;
+        if (attempted % 5 === 0 || attempted === targets.length) {
+          saveStateNow();
+          renderCollectionTools();
+        }
+        await sleep(120);
+      }
+    };
+
+    // 예전 3 worker보다 보수적으로 2개만 사용한다. 요청 수는 고유 plotId당 최대 1회다.
+    await Promise.all([worker(), worker()]);
+    saveStateNow();
+
+    return {
+      locked: false,
+      targets: targets.length,
+      attempted,
+      done,
+      failed,
+      remaining: Math.max(0, targets.length - attempted),
+      failures,
+      noPlotId: picked.noPlotId
+    };
+  }
+
   async function collectAllRoomsByScrolling(options = {}) {
     const force = Boolean(options && options.force);
     if (currentSection() !== 'room') {
@@ -2599,23 +2862,26 @@
         : null;
       forceReconcileSeenRoomKeys = null;
 
-      // 다시 전체 수집은 이번에 실제로 확인한 모든 고유 플롯을 재검증한다.
-      const targets = collectionAborted
-        ? []
-        : (force ? profileCollectionTargets(true, seenRoomKeys) : profileCollectionTargets(false));
-
-      // 이름 수집은 여기서 끝나지 않는다. 화면을 한 건씩 옮겨 다니며 읽고,
-      // 다 끝나면 목록으로 돌아와 결과를 알린다.
-      if (targets.length) {
-        clearProfileResume();
-        roomCollectionProgress = { running: false, count: roomCollectionCount() };
-        startNavigationRun(targets, { force });
-        return true;
-      }
+      // 방 목록은 여기까지 스크롤로만 수집했다.
+      // 이름/제작자 보충은 일반 수집 최초 1회 또는 '다시 전체 수집'을 누른 그 회차에만 API를 쓴다.
+      const apiProfiles = collectionAborted
+        ? {
+            locked: false, targets: 0, attempted: 0, done: 0, failed: 0,
+            remaining: 0, failures: [], noPlotId: 0
+          }
+        : await collectRoomMetaViaApi(force, force ? seenRoomKeys : null);
 
       const profiles = {
-        targets: 0, attempted: 0, done: 0, failed: 0,
-        remaining: 0, limited: false, failures: [], remainingTargets: []
+        targets: apiProfiles.targets,
+        attempted: apiProfiles.attempted,
+        done: apiProfiles.done,
+        failed: apiProfiles.failed,
+        remaining: apiProfiles.remaining,
+        limited: false,
+        failures: apiProfiles.failures,
+        remainingTargets: [],
+        apiLocked: apiProfiles.locked,
+        noPlotId: apiProfiles.noPlotId
       };
 
       const total = roomCollectionCount();
@@ -2690,10 +2956,13 @@
         (force && seenRoomKeys ? ' · 이번 확인 ' + seenRoomKeys.size + '개' : '') +
         (!listCompleted && !collectionAborted ? ' (목록 끝 확인 실패)' : '') +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
-        '\n이름 수집: 이번 ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개' +
+        '\n이름 조회: ' + (profiles.apiLocked
+          ? 'API 잠금 · 추가 호출 0개'
+          : ('API ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개')) +
         (profiles.failed ? ' · 실패 ' + profiles.failed + '개' : '') +
         (profiles.memoryPauses ? ' · 메모리 정리 ' + profiles.memoryPauses + '회' : '') +
         (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개' : '') +
+        (profiles.noPlotId ? '\nplotId 없어 API 조회하지 못한 방 ' + profiles.noPlotId + '개' : '') +
         (profiles.failed
           ? '\n\n실패 사유\n' + failureSummary(profiles.failures).map(line => '· ' + line).join('\n') +
             '\n\n실패한 대화방 (최대 10개 표시)\n' + shownFailures
@@ -2819,7 +3088,7 @@
   }
 
   // ── 내 플롯 수동 전체 수집 / 백업 ───────────────────────────────────
-  // Room Manager가 플롯 API를 직접 호출하지 않는다.
+  // 이 플롯 수집 경로는 API를 직접 호출하지 않는다.
   // 사용자가 '전체 수집'을 눌렀을 때 Creator Center 목록을 실제로 스크롤하고,
   // 제타가 화면에 렌더링한 항목만 로컬 인덱스에 누적 저장한다.
 
@@ -4872,9 +5141,10 @@
     bindSwipeOpenLock();
     refresh();
 
-    if (navRunActive()) setTimeout(() => { void driveNavigationRun(); }, 400);
-    else if (showNavSummary()) { /* 방금 끝난 수집 결과를 알렸다 */ }
-    else if (readProfileResume()?.active) setTimeout(() => { void resumeProfileCollectionIfNeeded(); }, 350);
+    // 예전 대화방 이름 수집(nav/iframe) 이어받기는 더 이상 사용하지 않는다.
+    if (navRunActive()) clearNavRun();
+    if (readProfileResume()?.active) clearProfileResume();
+    try { sessionStorage.removeItem(NAV_DONE_KEY); } catch (_) {}
 
     let lastUrl = location.href;
     setInterval(() => {
