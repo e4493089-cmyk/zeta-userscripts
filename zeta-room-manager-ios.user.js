@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.26
+// @version      0.20.27
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -948,6 +948,9 @@
       const record = parseItem(item, 'room');
       if (!record) continue;
       if (forceReconcileSeenRoomKeys) forceReconcileSeenRoomKeys.add(record.key);
+      if (forceReconcileProfileRoomKeys && record.needsProfileVerification) {
+        forceReconcileProfileRoomKeys.add(record.key);
+      }
       applyAlias(record);
       harvested++;
     }
@@ -1032,6 +1035,7 @@
   const ROOM_UUID = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
   let collectionAborted = false;
   let forceReconcileSeenRoomKeys = null;
+  let forceReconcileProfileRoomKeys = null;
   let wakeLock = null;
   let wakeStatus = '';
   // 숨김 프로필을 연속으로 읽는 동안 fetch/XHR 응답까지 복제하면 메모리 사용량이 크게 늘어난다.
@@ -1701,8 +1705,10 @@
       collectionAborted = false;
       void holdScreenAwake();
 
-      // 다시 전체 수집은 기존 데이터를 지우지 않고, 실제로 다시 본 방만 비교·갱신한다.
+      // 다시 전체 수집은 기존 데이터를 지우지 않고 비교한다.
+      // 이름 프로필은 새 방/연결 변경/이름 누락처럼 필요한 방만 다시 연다.
       forceReconcileSeenRoomKeys = force ? new Set() : null;
+      forceReconcileProfileRoomKeys = force ? new Set() : null;
       // PC판과 같은 수집 흐름은 유지하되, iOS WebKit에서만 발생하는
       // MutationObserver → refresh → renderedItems 중복 분석을 막는다.
       suspendObserverRefresh = true;
@@ -1841,9 +1847,13 @@
       const seenRoomKeys = force && forceReconcileSeenRoomKeys
         ? new Set(forceReconcileSeenRoomKeys)
         : null;
+      const profileRoomKeys = force && forceReconcileProfileRoomKeys
+        ? new Set(forceReconcileProfileRoomKeys)
+        : null;
       forceReconcileSeenRoomKeys = null;
+      forceReconcileProfileRoomKeys = null;
 
-      const forceTargets = force ? profileCollectionTargets(true, seenRoomKeys) : null;
+      const forceTargets = force ? profileCollectionTargets(true, profileRoomKeys) : null;
       const profiles = collectionAborted
         ? {
             targets: 0, attempted: 0, done: 0, failed: 0,
@@ -1941,6 +1951,7 @@
       return true;
     })().finally(() => {
       forceReconcileSeenRoomKeys = null;
+      forceReconcileProfileRoomKeys = null;
       roomCollectionPromise = null;
       roomCollectionProgress.running = false;
       suspendObserverRefresh = false;
@@ -1953,6 +1964,32 @@
     return roomCollectionPromise;
   }
 
+  async function startFullNameRecollection() {
+    if (currentSection() !== 'room') {
+      alert('대화방 목록에서 실행해 주세요.');
+      return false;
+    }
+    if (roomCollectionPromise || roomCollectionProgress.running) return false;
+
+    const targets = profileCollectionTargets(true);
+    if (!targets.length) {
+      alert('다시 확인할 플롯이 없습니다.');
+      return true;
+    }
+
+    writeProfileResume({
+      active: true,
+      force: true,
+      mode: 'names',
+      attempted: 0,
+      done: 0,
+      failed: 0,
+      startedAt: Date.now(),
+      targets
+    });
+    return await resumeProfileCollectionIfNeeded();
+  }
+
   async function resumeProfileCollectionIfNeeded() {
     const resume = readProfileResume();
     if (!resume || !resume.active || currentSection() !== 'room' || roomCollectionPromise) return false;
@@ -1963,6 +2000,7 @@
       await sleep(700);
 
       const forceResume = Boolean(resume.force);
+      const nameOnlyResume = resume.mode === 'names';
       const resumeTargets = forceResume
         ? (Array.isArray(resume.targets) ? resume.targets : profileCollectionTargets(true))
         : null;
@@ -2024,8 +2062,8 @@
 
       alert(
         (collectionAborted
-          ? (forceResume ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨')
-          : (forceResume ? '다시 전체 수집 완료' : '대화방 전체 수집 완료')) +
+          ? (nameOnlyResume ? '다시 이름 수집 중지됨' : (forceResume ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨'))
+          : (nameOnlyResume ? '다시 이름 수집 완료' : (forceResume ? '다시 전체 수집 완료' : '대화방 전체 수집 완료'))) +
         ' · 저장된 방 ' + total + '개' +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 총 ' + next.attempted + '개 처리 · 성공 ' + next.done + '개' +
@@ -2412,6 +2450,7 @@
         '<div class="zrm-collection-actions">' +
           '<button type="button" data-zrm-action="collect"></button>' +
           (isRoom ? '<button type="button" data-zrm-action="force-collect">다시 전체 수집</button>' : '') +
+          (isRoom ? '<button type="button" data-zrm-action="force-names">다시 이름 수집</button>' : '') +
           '<button type="button" data-zrm-action="export">내보내기</button>' +
           '<button type="button" data-zrm-action="import">불러오기</button>' +
           '<button type="button" data-zrm-action="delete">데이터 삭제</button>' +
@@ -2424,10 +2463,12 @@
 
     const collect = modal.querySelector('[data-zrm-action="collect"]');
     const forceCollect = modal.querySelector('[data-zrm-action="force-collect"]');
+    const forceNames = modal.querySelector('[data-zrm-action="force-names"]');
     const deleteButton = modal.querySelector('[data-zrm-action="delete"]');
     collect.disabled = false;
     collect.textContent = progress.running ? '중지' : (isRoom ? '일반 전체 수집' : '전체 수집');
     if (forceCollect) forceCollect.disabled = progress.running;
+    if (forceNames) forceNames.disabled = progress.running;
     if (deleteButton) deleteButton.disabled = progress.running;
 
     modal.querySelector('.zrm-collection-close').addEventListener('click', closeCollectionPopup);
@@ -2447,6 +2488,11 @@
       closeCollectionPopup();
       if (progress.running) return;
       collectAllRoomsByScrolling({ force: true });
+    });
+    forceNames?.addEventListener('click', () => {
+      closeCollectionPopup();
+      if (progress.running) return;
+      void startFullNameRecollection();
     });
     modal.querySelector('[data-zrm-action="export"]').addEventListener('click', () => {
       closeCollectionPopup();
@@ -3064,17 +3110,50 @@
     // 제타가 실제로 그려준 방이면 사라진 방이 아니다.
     delete previous.missingSince;
 
-    // 이미 이름까지 수집된 항목은 화면을 지나갈 때마다 다시 훑지 않는다.
-    // 아래 fiber 탐색이 항목당 수천 노드라, 목록 수집 시간의 대부분이 여기서 나온다.
-    if (!forceReconcileSeenRoomKeys
-      && previous.type === type
+    // 다시 전체 수집도 기존 방이 그대로면 무거운 React 전체 분석을 반복하지 않는다.
+    // 방에 붙은 plot 객체만 얕게 확인해 연결/이름이 달라진 경우에만 깊게 본다.
+    let needsProfileVerification = false;
+    let forceQuickChanged = false;
+    if (forceReconcileSeenRoomKeys && type === 'room') {
+      const quickPlot = reactRoomPlotMeta(item);
+      const quickPlotId = normalizeText(quickPlot && (quickPlot.id || quickPlot.plotId));
+      const quickOriginatedId = normalizeText(quickPlot && (quickPlot.originatedId || quickPlot.originalId));
+      const quickCharacters = plotCharacterNames(quickPlot);
+      const quickCreators = plotCreatorNames(quickPlot);
+      const previousCharacters = uniqueTexts(previous.characterNames);
+      const previousCreators = uniqueTexts(previous.creatorNames);
+
+      const sameList = (a, b) =>
+        a.length === b.length && a.every((value, index) => value === b[index]);
+
+      const plotChanged = Boolean(
+        (quickPlotId && normalizeText(previous.plotId) && quickPlotId !== normalizeText(previous.plotId)) ||
+        (quickOriginatedId && normalizeText(previous.originatedId) && quickOriginatedId !== normalizeText(previous.originatedId))
+      );
+      const characterChanged = quickCharacters.length && !sameList(quickCharacters, previousCharacters);
+      const creatorChanged = quickCreators.length && !sameList(quickCreators, previousCreators);
+
+      forceQuickChanged = Boolean(plotChanged || characterChanged || creatorChanged);
+      needsProfileVerification = Boolean(
+        forceQuickChanged ||
+        !previousCharacters.length ||
+        !previousCreators.length
+      );
+    }
+
+    // 이미 이름까지 수집됐고 얕은 비교에서도 변화가 없으면 즉시 통과한다.
+    if (previous.type === type
       && normalizeText(previous.original) === original
       && uniqueTexts(previous.characterNames).length
-      && uniqueTexts(previous.creatorNames).length) {
+      && uniqueTexts(previous.creatorNames).length
+      && !forceQuickChanged) {
       previous.alias = alias;
       if (link && link.href) previous.href = link.href;
-      if (image && !previous.image) previous.image = image;
-      return { key, type, id, item, link, titleEl, original, alias };
+      if (image && normalizeText(previous.image) !== normalizeText(image)) previous.image = image;
+      return {
+        key, type, id, item, link, titleEl, original, alias,
+        needsProfileVerification
+      };
     }
 
     // 카드에 텍스트로 안 보여도 React props 안의 plot 데이터에서 이름을 보강한다.
@@ -3136,7 +3215,17 @@
       )
     };
 
-    return { key, type, id, item, link, titleEl, original, alias };
+    if (forceReconcileSeenRoomKeys && type === 'room') {
+      const current = state.index[key] || {};
+      if (!uniqueTexts(current.characterNames).length || !uniqueTexts(current.creatorNames).length) {
+        needsProfileVerification = true;
+      }
+    }
+
+    return {
+      key, type, id, item, link, titleEl, original, alias,
+      needsProfileVerification
+    };
   }
 
   function renderedItems() {
