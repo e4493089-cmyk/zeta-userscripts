@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.4
+// @version      0.1.5
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.4';
+  const SCRIPT_VERSION = '0.1.5';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -177,31 +177,55 @@
   let deepLoadRunning = false;
   let deepLoadAborted = false;
 
-  async function loadOlder(onProgress) {
+  function logIsReverse(log) {
+    try {
+      return getComputedStyle(log).flexDirection.includes('reverse');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // 대화 전체 저장이 쓰는 방식이다. 먼저 끝까지 빠르게 올라가 제타가 옛
+  // 대화를 붙이게 하고, 그다음 내려오며 꼼꼼히 읽는다. 가상 스크롤은 화면에
+  // 든 것만 그리므로, 올라가며 읽는 것만으로는 중간이 빈다.
+  async function deepIndex(onProgress) {
     const log = chatLog();
     if (!log || deepLoadRunning) return 0;
 
     deepLoadRunning = true;
     deepLoadAborted = false;
+    const reverse = logIsReverse(log);
     let added = 0;
-    let stable = 0;
 
     try {
+      // 1단계 — 끝까지 올라가기. 높이가 더 늘지 않으면 다 붙은 것이다.
+      let stable = 0;
       while (!deepLoadAborted && stable < 4) {
-        const beforeTop = log.scrollTop;
         const beforeHeight = log.scrollHeight;
-        const step = Math.max(320, log.clientHeight * 0.82);
+        log.scrollTo({
+          top: reverse ? -(log.scrollHeight + log.clientHeight) : 0,
+          behavior: 'auto'
+        });
+        await sleep(320);
+        added += await captureRendered();
+        stable = Math.abs(log.scrollHeight - beforeHeight) > 2 ? 0 : stable + 1;
+        onProgress?.(added, 'up');
+      }
 
-        log.scrollBy({ top: -step, behavior: 'auto' });
-        await sleep(140);
+      // 2단계 — 내려오며 읽기. 한 화면보다 좁게 움직여 걸러지는 것을 줄인다.
+      let guard = 0;
+      while (!deepLoadAborted && guard++ < 3000) {
+        const beforeTop = log.scrollTop;
+        log.scrollBy({ top: Math.max(240, log.clientHeight * 0.6), behavior: 'auto' });
+        await sleep(110);
         added += await captureRendered();
-        await sleep(60);
-        added += await captureRendered();
+        onProgress?.(added, 'down');
 
         const moved = Math.abs(log.scrollTop - beforeTop) > 2;
-        const resized = Math.abs(log.scrollHeight - beforeHeight) > 2;
-        stable = moved || resized ? 0 : stable + 1;
-        onProgress?.(added);
+        const atBottom = reverse
+          ? Math.abs(log.scrollTop) < 3
+          : log.scrollTop + log.clientHeight >= log.scrollHeight - 3;
+        if (atBottom || !moved) break;
       }
     } finally {
       deepLoadRunning = false;
@@ -289,7 +313,7 @@
         '<div class="zcs-status"></div>' +
         '<div class="zcs-list"></div>' +
         '<div class="zcs-foot">' +
-          '<button type="button" class="zcs-more">지난 대화 더 불러오기</button>' +
+          '<button type="button" class="zcs-more">이 방 전체 색인하기</button>' +
         '</div>' +
       '</div>';
 
@@ -341,7 +365,7 @@
           // 진행 상황을 보여 주고, 찾으면 그때 닫는다.
           const found = await jumpToMessage(row, status);
           if (found) closePanel();
-          else status('그 대화까지 가지 못했어요. 지난 대화를 더 불러온 뒤 다시 시도해 주세요.');
+          else status('그 대화까지 가지 못했어요. 전체 색인을 돌린 뒤 다시 눌러 주세요.');
         });
         list.appendChild(item);
       }
@@ -358,8 +382,11 @@
         return;
       }
       moreButton.textContent = '중지';
-      const added = await loadOlder(count => status('불러오는 중 · 새로 색인 ' + count + '개'));
-      moreButton.textContent = '지난 대화 더 불러오기';
+      const added = await deepIndex((count, phase) => status(
+        (phase === 'up' ? '옛 대화를 불러오는 중' : '내려오며 꼼꼼히 읽는 중') +
+        ' · 새로 색인 ' + count + '개'
+      ));
+      moreButton.textContent = '이 방 전체 색인하기';
       await reload();
       status('새로 색인 ' + added + '개 · 전체 ' + rows.length + '개');
       render();
