@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.55
+// @version      0.20.56
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,9 @@
 
   if (window.top !== window.self) return;
 
-  window.__zrmRoomManagerIosVersion = '0.20.55';
+  const SCRIPT_VERSION = '0.20.56';
+  window.__zrmRoomManagerVersion = SCRIPT_VERSION;
+  window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
   // 별명만 따로 둔다. 목록을 그리는 데는 이것만 있으면 된다.
@@ -1380,8 +1382,7 @@
       // 일반 수집은 새 방/연결 변경/이름 누락만 열고,
       // 다시 전체 수집은 기존 데이터를 지우지 않은 채 모든 고유 플롯을 재검증한다.
       forceReconcileSeenRoomKeys = force ? new Set() : null;
-      // PC판과 같은 수집 흐름은 유지하되, iOS WebKit에서만 발생하는
-      // MutationObserver → refresh → renderedItems 중복 분석을 막는다.
+      // 수집 중 MutationObserver → refresh → renderedItems 중복 분석을 막는다.
       suspendObserverRefresh = true;
       observer?.disconnect();
       roomCollectionProgress = {
@@ -1396,6 +1397,7 @@
       let host = roomCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
       let listCompleted = false;
+      let stableBottomRounds = 0;
       let checkpointAt = Date.now();
       let checkpointCount = roomCollectionCount();
 
@@ -1414,6 +1416,7 @@
       for (let round = 0; round < 2400; round++) {
         if (collectionAborted) break;
 
+        // 제타가 가상 목록의 scroll host를 갈아끼우면 매 이동 전에 새 host로 이어간다.
         const liveHost = roomCollectionScrollHost();
         if (liveHost && liveHost !== host) {
           const oldTop = scrollMetrics(host).top;
@@ -1443,14 +1446,22 @@
           );
           if (collectionAborted) break;
           host = waited.host;
+          if (waited.changed) await sleep(ROOM_COLLECTION_SETTLE_MS);
           harvestRoomDocument(document);
           const after = collectionSnapshot('room', host);
           const stillBottom = after.top + after.client >= after.height - Math.max(80, after.client * 0.15);
           if (!waited.changed && stillBottom && sameCollectionWindow(before, after)) {
-            listCompleted = true;
-            break;
+            stableBottomRounds += 1;
+            if (stableBottomRounds >= 2) {
+              listCompleted = true;
+              break;
+            }
+            await sleep(ROOM_COLLECTION_SETTLE_MS);
+          } else {
+            stableBottomRounds = 0;
           }
         } else {
+          stableBottomRounds = 0;
           const roomStepRatio = mobileList ? MOBILE_ROOM_COLLECTION_STEP_RATIO : COLLECTION_STEP_RATIO;
           const step = Math.max(320, Math.floor(before.client * roomStepRatio));
           const targetTop = Math.min(before.height, before.top + step);
@@ -1606,9 +1617,9 @@
     else host.scrollTop = value;
   }
 
-  const COLLECTION_STEP_RATIO = 0.65;
-  const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.65;
-  const PLOT_COLLECTION_STEP_RATIO = 0.65;
+  const COLLECTION_STEP_RATIO = 0.70;
+  const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.70;
+  const PLOT_COLLECTION_STEP_RATIO = 0.70;
   const PLOT_COLLECTION_SETTLE_MS = 160;
   const ROOM_COLLECTION_SETTLE_MS = 140;
   const COLLECTION_CHANGE_TIMEOUT_MS = 550;
@@ -1735,6 +1746,7 @@
       let host = plotCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
       let listCompleted = false;
+      let stableBottomRounds = 0;
       let checkpointAt = Date.now();
       let checkpointCount = plotCollectionCount();
 
@@ -1744,8 +1756,10 @@
           'plot', plotCollectionScrollHost, host, () => setScrollTop(host, 0)
         );
         host = moved.host;
+        if (moved.changed) await sleep(PLOT_COLLECTION_SETTLE_MS);
       } else {
         setScrollTop(host, 0);
+        await sleep(PLOT_COLLECTION_SETTLE_MS);
       }
       if (!collectionAborted) collectRenderedPlots();
 
@@ -1782,15 +1796,23 @@
           );
           if (collectionAborted) break;
           host = waited.host;
+          if (waited.changed) await sleep(PLOT_COLLECTION_SETTLE_MS);
           collectRenderedPlots();
 
           const after = collectionSnapshot('plot', host);
           const stillBottom = after.top + after.client >= after.height - Math.max(80, after.client * 0.15);
           if (!waited.changed && stillBottom && sameCollectionWindow(before, after)) {
-            listCompleted = true;
-            break;
+            stableBottomRounds += 1;
+            if (stableBottomRounds >= 2) {
+              listCompleted = true;
+              break;
+            }
+            await sleep(PLOT_COLLECTION_SETTLE_MS);
+          } else {
+            stableBottomRounds = 0;
           }
         } else {
+          stableBottomRounds = 0;
           const step = Math.max(280, Math.floor(before.client * PLOT_COLLECTION_STEP_RATIO));
           const targetTop = Math.min(before.height, before.top + step);
           const waited = await moveAndWaitForCollection(
@@ -2057,7 +2079,14 @@
           '</svg>' +
         '</button>';
 
-      tools.querySelector('.zrm-tools-trigger').addEventListener('click', event => {
+    }
+
+    const trigger = tools.querySelector('.zrm-tools-trigger');
+    if (trigger && trigger.dataset.zrmBoundVersion !== SCRIPT_VERSION) {
+      const replacement = trigger.cloneNode(true);
+      replacement.dataset.zrmBoundVersion = SCRIPT_VERSION;
+      trigger.replaceWith(replacement);
+      replacement.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
         closeCollectionPopup();
@@ -2268,9 +2297,9 @@
     }
 
     const trigger = tools.querySelector('.zrm-tools-trigger');
-    if (trigger && trigger.dataset.zrmBoundVersion !== '0.20.55') {
+    if (trigger && trigger.dataset.zrmBoundVersion !== SCRIPT_VERSION) {
       const replacement = trigger.cloneNode(true);
-      replacement.dataset.zrmBoundVersion = '0.20.55';
+      replacement.dataset.zrmBoundVersion = SCRIPT_VERSION;
       trigger.replaceWith(replacement);
       replacement.addEventListener('click', event => {
         event.preventDefault();
@@ -2737,7 +2766,6 @@
         #${MODAL_ID} .zrm-actions { padding: 0 15px 15px; }
         #${MODAL_ID} button { height: 36px; font-size: 11px; }
       }
-
     `;
     document.documentElement.appendChild(style);
   }
@@ -3673,9 +3701,7 @@
   }
 
   function start() {
-    // 북마클릿/Stay에서 같은 탭에 새 버전을 다시 주입하면 이전 UI DOM이 남을 수 있다.
-    // 남은 버튼에는 이전 클로저의 클릭 핸들러가 붙어 있어 "보이는데 안 눌리는" 상태가 된다.
-    // 데이터는 건드리지 않고 Room Manager가 만든 UI만 지워 새 이벤트를 다시 묶는다.
+    // 같은 탭에 새 버전을 다시 주입하면 남은 UI의 이전 이벤트를 새 버전으로 다시 묶는다.
     document.getElementById(PLOT_TOOLS_ID)?.remove();
     document.getElementById(COLLECTION_MODAL_ID)?.remove();
     document.getElementById(COLLECTION_BANNER_ID)?.remove();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.50
+// @version      0.23.51
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -14,6 +14,9 @@
   'use strict';
 
   if (window.top !== window.self) return;
+
+  const SCRIPT_VERSION = '0.23.51';
+  window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
   // 별명만 따로 둔다. 목록을 그리는 데는 이것만 있으면 된다.
@@ -1377,6 +1380,9 @@
       // 일반 수집은 새 방/연결 변경/이름 누락만 열고,
       // 다시 전체 수집은 기존 데이터를 지우지 않은 채 모든 고유 플롯을 재검증한다.
       forceReconcileSeenRoomKeys = force ? new Set() : null;
+      // 수집 중 MutationObserver → refresh → renderedItems 중복 분석을 막는다.
+      suspendObserverRefresh = true;
+      observer?.disconnect();
       roomCollectionProgress = {
         running: true,
         count: roomCollectionCount(),
@@ -1389,20 +1395,19 @@
       let host = roomCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
       let listCompleted = false;
+      let stableBottomRounds = 0;
       let checkpointAt = Date.now();
       let checkpointCount = roomCollectionCount();
-
-      // 수집기 자신의 UI MutationObserver가 같은 항목을 다시 무겁게 분석하지 않게 한다.
-      suspendObserverRefresh = true;
-      observer?.disconnect();
 
       if (originalTop > 1) {
         const moved = await moveAndWaitForCollection(
           'room', roomCollectionScrollHost, host, () => setScrollTop(host, 0)
         );
         host = moved.host;
+        if (moved.changed) await sleep(ROOM_COLLECTION_SETTLE_MS);
       } else {
         setScrollTop(host, 0);
+        await sleep(ROOM_COLLECTION_SETTLE_MS);
       }
       harvestRoomDocument(document);
 
@@ -1439,14 +1444,22 @@
           );
           if (collectionAborted) break;
           host = waited.host;
+          if (waited.changed) await sleep(ROOM_COLLECTION_SETTLE_MS);
           harvestRoomDocument(document);
           const after = collectionSnapshot('room', host);
           const stillBottom = after.top + after.client >= after.height - Math.max(80, after.client * 0.15);
           if (!waited.changed && stillBottom && sameCollectionWindow(before, after)) {
-            listCompleted = true;
-            break;
+            stableBottomRounds += 1;
+            if (stableBottomRounds >= 2) {
+              listCompleted = true;
+              break;
+            }
+            await sleep(ROOM_COLLECTION_SETTLE_MS);
+          } else {
+            stableBottomRounds = 0;
           }
         } else {
+          stableBottomRounds = 0;
           const roomStepRatio = mobileList ? MOBILE_ROOM_COLLECTION_STEP_RATIO : COLLECTION_STEP_RATIO;
           const step = Math.max(320, Math.floor(before.client * roomStepRatio));
           const targetTop = Math.min(before.height, before.top + step);
@@ -1456,6 +1469,7 @@
           );
           if (collectionAborted) break;
           host = waited.host;
+          if (waited.changed) await sleep(ROOM_COLLECTION_SETTLE_MS);
           harvestRoomDocument(document);
         }
       }
@@ -1601,12 +1615,13 @@
     else host.scrollTop = value;
   }
 
-  const COLLECTION_STEP_RATIO = 0.85;
-  const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.85;
-  const PLOT_COLLECTION_STEP_RATIO = 0.85;
-  const PLOT_COLLECTION_SETTLE_MS = 80;
-  const COLLECTION_CHANGE_TIMEOUT_MS = 380;
-  const COLLECTION_BOTTOM_TIMEOUT_MS = 1300;
+  const COLLECTION_STEP_RATIO = 0.70;
+  const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.70;
+  const PLOT_COLLECTION_STEP_RATIO = 0.70;
+  const PLOT_COLLECTION_SETTLE_MS = 160;
+  const ROOM_COLLECTION_SETTLE_MS = 140;
+  const COLLECTION_CHANGE_TIMEOUT_MS = 550;
+  const COLLECTION_BOTTOM_TIMEOUT_MS = 1800;
 
   // 무거운 React 분석 없이 현재 렌더링된 목록 창의 정체만 빠르게 읽는다.
   // 새 창이 그려졌는지 판단하는 용도라 ID가 없는 플롯은 href/텍스트를 대체 토큰으로 쓴다.
@@ -1729,6 +1744,7 @@
       let host = plotCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
       let listCompleted = false;
+      let stableBottomRounds = 0;
       let checkpointAt = Date.now();
       let checkpointCount = plotCollectionCount();
 
@@ -1738,8 +1754,10 @@
           'plot', plotCollectionScrollHost, host, () => setScrollTop(host, 0)
         );
         host = moved.host;
+        if (moved.changed) await sleep(PLOT_COLLECTION_SETTLE_MS);
       } else {
         setScrollTop(host, 0);
+        await sleep(PLOT_COLLECTION_SETTLE_MS);
       }
       if (!collectionAborted) collectRenderedPlots();
 
@@ -1776,15 +1794,23 @@
           );
           if (collectionAborted) break;
           host = waited.host;
+          if (waited.changed) await sleep(PLOT_COLLECTION_SETTLE_MS);
           collectRenderedPlots();
 
           const after = collectionSnapshot('plot', host);
           const stillBottom = after.top + after.client >= after.height - Math.max(80, after.client * 0.15);
           if (!waited.changed && stillBottom && sameCollectionWindow(before, after)) {
-            listCompleted = true;
-            break;
+            stableBottomRounds += 1;
+            if (stableBottomRounds >= 2) {
+              listCompleted = true;
+              break;
+            }
+            await sleep(PLOT_COLLECTION_SETTLE_MS);
+          } else {
+            stableBottomRounds = 0;
           }
         } else {
+          stableBottomRounds = 0;
           const step = Math.max(280, Math.floor(before.client * PLOT_COLLECTION_STEP_RATIO));
           const targetTop = Math.min(before.height, before.top + step);
           const waited = await moveAndWaitForCollection(
@@ -2051,7 +2077,14 @@
           '</svg>' +
         '</button>';
 
-      tools.querySelector('.zrm-tools-trigger').addEventListener('click', event => {
+    }
+
+    const trigger = tools.querySelector('.zrm-tools-trigger');
+    if (trigger && trigger.dataset.zrmBoundVersion !== SCRIPT_VERSION) {
+      const replacement = trigger.cloneNode(true);
+      replacement.dataset.zrmBoundVersion = SCRIPT_VERSION;
+      trigger.replaceWith(replacement);
+      replacement.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
         closeCollectionPopup();
@@ -2259,7 +2292,14 @@
             '<circle cx="19" cy="12" r="1.7" fill="currentColor"></circle>' +
           '</svg>' +
         '</button>';
-      tools.querySelector('.zrm-tools-trigger').addEventListener('click', event => {
+    }
+
+    const trigger = tools.querySelector('.zrm-tools-trigger');
+    if (trigger && trigger.dataset.zrmBoundVersion !== SCRIPT_VERSION) {
+      const replacement = trigger.cloneNode(true);
+      replacement.dataset.zrmBoundVersion = SCRIPT_VERSION;
+      trigger.replaceWith(replacement);
+      replacement.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
         openCollectionPopup();
@@ -3556,6 +3596,14 @@
   }
 
   function start() {
+    // 같은 탭에 새 버전을 다시 주입하면 남은 UI의 이전 이벤트를 새 버전으로 다시 묶는다.
+    document.getElementById(PLOT_TOOLS_ID)?.remove();
+    document.getElementById(COLLECTION_MODAL_ID)?.remove();
+    document.getElementById(COLLECTION_BANNER_ID)?.remove();
+    document.getElementById('zeta-room-manager-private-profile-tools')?.remove();
+    document.getElementById(NATIVE_RESULTS_ID)?.remove();
+    document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
+
     installPassiveNativeDataCapture();
     injectStyle();
 
