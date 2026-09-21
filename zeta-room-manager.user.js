@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.23
+// @version      0.23.24
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1121,6 +1121,7 @@
     const end = Date.now() + timeoutMs;
     while (Date.now() < end) {
       if (collectionAborted) throw new Error('중지됨');
+      if (!frame || !frame.isConnected) throw new Error('숨김 화면을 다시 여는 중');
       try {
         const win = frame.contentWindow;
         if (win && win.document) {
@@ -1375,6 +1376,7 @@
 
     while (Date.now() < end) {
       if (collectionAborted) throw new Error('중지됨');
+      if (!frame || !frame.isConnected) throw new Error('숨김 화면을 다시 여는 중');
 
       try {
         const win = frame.contentWindow;
@@ -1431,6 +1433,8 @@
 
   async function profileWorker(queue, onResult, options = {}) {
     const pauseMs = options.mobile ? 120 : 80;
+    const recycleEvery = options.mobile ? 6 : PROFILE_FRAME_RECYCLE;
+    const targetBudgetMs = options.mobile ? 22000 : 48000;
     let frame = null;
     let used = 0;
 
@@ -1439,26 +1443,39 @@
       return frame;
     };
 
+    const resetFrame = async (delayMs = 80) => {
+      dropFrame(frame);
+      frame = null;
+      used = 0;
+      if (delayMs) await sleep(delayMs);
+    };
+
+    const timeLeft = (deadline, cap) => {
+      const left = deadline - Date.now();
+      if (left <= 800) throw new Error('프로필 처리 시간 초과');
+      return Math.max(800, Math.min(cap, left));
+    };
+
     const navigatePlot = async (plotId, timeoutMs) => {
       const active = ensureFrame();
       active.src = profilePath(plotId);
       return await readProfileIn(active, plotId, timeoutMs);
     };
 
-    const navigateRoom = async roomId => {
+    const navigateRoom = async (roomId, deadline) => {
       const active = ensureFrame();
       active.src = '/' + localeSegment() + '/rooms/' + roomId;
 
       const button = await readInFrame(active, win => {
         if (!win.location.pathname.includes(roomId)) return null;
         return win.document.querySelector(PROFILE_BUTTON);
-      }, 10000);
+      }, timeLeft(deadline, options.mobile ? 6500 : 10000));
       button.click();
 
       return await readInFrame(active, win => {
         if (!PROFILE_PATH.test(win.location.pathname)) return null;
         return readPlotProfile(win);
-      }, 10000);
+      }, timeLeft(deadline, options.mobile ? 6500 : 10000));
     };
 
     try {
@@ -1466,18 +1483,22 @@
         const target = queue.next();
         if (!target) return;
 
-        // 한 iframe을 여러 프로필에 재사용하되 너무 오래 붙잡지 않는다.
-        // 10개마다 완전히 폐기해 메모리를 회수한다.
-        if (used >= PROFILE_FRAME_RECYCLE) {
-          dropFrame(frame);
-          frame = null;
-          used = 0;
-          await sleep(220);
+        // 모바일은 메모리가 빠듯하므로 iframe을 조금 더 자주 갈아준다.
+        // 평상시 속도는 3-worker 그대로 두고, 오래 붙잡힌 worker만 복구한다.
+        if (used >= recycleEvery) {
+          await resetFrame(180);
         }
+
+        const deadline = Date.now() + targetBudgetMs;
 
         try {
           if (!target.plotId) {
-            onResult(target, await navigateRoom(target.roomId), null);
+            try {
+              onResult(target, await navigateRoom(target.roomId, deadline), null);
+            } catch (error) {
+              await resetFrame();
+              throw error;
+            }
             used++;
             await sleep(pauseMs);
             continue;
@@ -1487,27 +1508,40 @@
           let directError = null;
 
           try {
-            result = await navigatePlot(target.plotId, 18000);
+            result = await navigatePlot(
+              target.plotId,
+              timeLeft(deadline, options.mobile ? 10000 : 18000)
+            );
           } catch (error) {
             directError = error;
+            // 한 번 멈춘 iframe은 다음 주소까지 끌고 가지 않는다.
+            await resetFrame();
           }
 
           if (!result && target.originatedId && target.originatedId !== target.plotId) {
             try {
-              result = await navigatePlot(target.originatedId, 15000);
-            } catch (_) {}
+              result = await navigatePlot(
+                target.originatedId,
+                timeLeft(deadline, options.mobile ? 7000 : 15000)
+              );
+            } catch (_) {
+              await resetFrame();
+            }
           }
 
           if (!result) {
             try {
-              result = await navigateRoom(target.roomId);
+              result = await navigateRoom(target.roomId, deadline);
             } catch (roomError) {
+              await resetFrame();
               throw roomError || directError || new Error('프로필을 열 수 없습니다');
             }
           }
 
           onResult(target, result, null);
         } catch (error) {
+          // 어떤 실패든 다음 타깃은 깨끗한 iframe에서 시작한다.
+          if (frame && frame.isConnected) await resetFrame();
           onResult(target, null, error);
         }
 
