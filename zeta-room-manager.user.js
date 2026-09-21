@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.64
+// @version      0.23.65
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.64';
+  const SCRIPT_VERSION = '0.23.65';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -3052,7 +3052,6 @@
         white-space: pre-wrap;
       }
       #${CHAT_RENAME_ID} { width: 100%; cursor: pointer; }
-      [data-testid="chat-header-profile"] span.zrm-has-alias { color: #cdbcff; }
       [data-zrm-dead="1"] a[href*="/rooms/"] { opacity: .45; }
       [data-zrm-dead="1"] a[href*="/rooms/"]::after {
         content: '플롯 삭제됨';
@@ -3756,16 +3755,14 @@
       saveState();
     }
 
-    // 별명은 헤더 이름에도 씌운다. 제타가 다시 그려도 원래 이름을 붙잡아 둔다.
+    // 헤더는 제타가 그린 원래 이름 그대로 둔다. 별명은 메뉴에서만 보여 준다.
+    // 이전 버전이 씌워 둔 별명이 남아 있으면 원래 이름으로 되돌린다.
     const title = document.querySelector('[data-testid="chat-header-profile"] span');
-    if (title) {
-      if (!title.dataset.zrmOriginal || !alias) {
-        const shown = normalizeText(title.textContent);
-        if (shown && shown !== alias) title.dataset.zrmOriginal = shown;
-      }
-      const next = alias || title.dataset.zrmOriginal || normalizeText(entry.original);
-      if (next && normalizeText(title.textContent) !== next) title.textContent = next;
-      title.classList.toggle('zrm-has-alias', !!alias);
+    if (title && title.dataset.zrmOriginal) {
+      const original = title.dataset.zrmOriginal;
+      delete title.dataset.zrmOriginal;
+      title.classList.remove('zrm-has-alias');
+      if (normalizeText(title.textContent) !== original) title.textContent = original;
     }
 
     // 메뉴가 닫혀 있으면 끼워 넣을 곳도 없다.
@@ -3803,9 +3800,8 @@
           key: entryKey,
           type: 'room',
           id,
-          original: (heading && heading.dataset.zrmOriginal)
+          original: normalizeText(heading && heading.textContent)
             || normalizeText(saved.original)
-            || normalizeText(heading && heading.textContent)
             || '이 대화방'
         });
       }, true);
