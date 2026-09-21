@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.19
+// @version      0.2.0
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
-// @run-at       document-idle
+// @run-at       document-start
 // @grant        none
 // ==/UserScript==
 
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.19';
+  const SCRIPT_VERSION = '0.2.0';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -29,10 +29,52 @@
   const DB_NAME = 'zeta-chat-search';
   const DB_VERSION = 1;
   const STORE = 'messages';
+  const JUMP_REQUEST_KEY = 'zcs-pending-api-jump';
+  const JUMP_HIGHLIGHT_KEY = 'zcs-pending-highlight';
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const clean = value => String(value || '').replace(/​/g, '').replace(/\s+/g, ' ').trim();
   const fold = value => clean(value).toLocaleLowerCase('ko-KR');
+
+  // 책갈피 이동과 동일하게 첫 메시지 요청에 roomId:MESSAGE-ID 커서를 넣는다.
+  // document-start에서 설치해야 제타의 초기 XHR보다 먼저 가로챌 수 있다.
+  function installJumpRequestInterceptor() {
+    let pending = null;
+    try { pending = JSON.parse(sessionStorage.getItem(JUMP_REQUEST_KEY) || 'null'); } catch (_) {}
+    if (!pending?.roomId || !pending?.cursor || pending.roomId !== currentRoomId()) return;
+
+    const proto = window.XMLHttpRequest?.prototype;
+    if (!proto || proto.open.__zcsJumpPatched) return;
+    const originalOpen = proto.open;
+
+    function wrappedOpen(method, value, ...rest) {
+      let nextValue = value;
+      try {
+        const url = new URL(String(value), location.href);
+        const expectedPath = '/v1/rooms/' + pending.roomId + '/messages';
+        const isInitialMessagesRequest =
+          String(method || 'GET').toUpperCase() === 'GET' &&
+          url.pathname === expectedPath &&
+          !url.searchParams.has('cursor') &&
+          !url.searchParams.has('prevCursor');
+
+        if (isInitialMessagesRequest) {
+          url.searchParams.set('limit', '10');
+          url.searchParams.set('cursor', pending.roomId + ':' + pending.cursor);
+          nextValue = url.href;
+          sessionStorage.removeItem(JUMP_REQUEST_KEY);
+          sessionStorage.setItem(JUMP_HIGHLIGHT_KEY, 'message-' + pending.cursor);
+          pending = null;
+        }
+      } catch (_) {}
+      return originalOpen.call(this, method, nextValue, ...rest);
+    }
+
+    Object.defineProperty(wrappedOpen, '__zcsJumpPatched', { value: true });
+    proto.open = wrappedOpen;
+  }
+
+  installJumpRequestInterceptor();
 
   // ── 색인 저장소 ──────────────────────────────────────────────────────
   // 대화 본문은 이름 몇 글자와 덩치가 다르다. localStorage로는 금방 넘친다.
@@ -266,83 +308,33 @@
     return match ? match[1] : '';
   }
 
-  function bookmarkUrl() {
-    return location.pathname.replace(/\/bookmarks\/?$/, '').replace(/\/$/, '') + '/bookmarks';
-  }
-
-  function cursorFromValue(value) {
-    let text = String(value || '');
-    for (let index = 0; index < 3; index += 1) {
-      try { text = decodeURIComponent(text); } catch (_) { break; }
-    }
-    const match = text.match(/MESSAGE-\d+-[A-Za-z0-9_-]+/);
-    return match ? match[0] : '';
-  }
-
-  let nativeUrlTemplate = '';
-
-  async function learnNativeUrlTemplate(status) {
-    if (nativeUrlTemplate) return nativeUrlTemplate;
-
-    status('이동 중');
-    const frame = document.createElement('iframe');
-    frame.setAttribute('aria-hidden', 'true');
-    frame.style.cssText =
-      'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
-    document.body.appendChild(frame);
-
-    try {
-      frame.src = bookmarkUrl();
-      let button = null;
-      for (let attempt = 0; attempt < 100 && !deepLoadAborted && !button; attempt += 1) {
-        await sleep(attempt ? 120 : 400);
-        try {
-          button = frame.contentDocument?.querySelector('[data-testid^="bookmark-item-"]') || null;
-        } catch (_) {}
-      }
-      if (!button) return '';
-
-      let navigatedUrl = '';
-      const frameWindow = frame.contentWindow;
-      for (const name of ['pushState', 'replaceState']) {
-        try {
-          const original = frameWindow.history[name].bind(frameWindow.history);
-          frameWindow.history[name] = (...args) => {
-            navigatedUrl = String(args[2] || navigatedUrl);
-            return original(...args);
-          };
-        } catch (_) {}
-      }
-      button.click();
-
-      for (let attempt = 0; attempt < 120 && !deepLoadAborted; attempt += 1) {
-        await sleep(80);
-        let currentUrl = '';
-        try { currentUrl = frameWindow.location.href; } catch (_) {}
-
-        for (const candidate of [navigatedUrl, currentUrl]) {
-          const cursor = cursorFromValue(candidate);
-          if (!cursor) continue;
-          const absolute = new URL(candidate, location.origin).href;
-          nativeUrlTemplate = absolute.replace(cursor, '__ZCS_MESSAGE__');
-          return nativeUrlTemplate;
-        }
-      }
-    } finally {
-      frame.remove();
-    }
-    return '';
-  }
-
   async function tryNativeCursor(row, status) {
+    const roomId = currentRoomId();
     const cursor = messageCursor(row.id);
-    if (!cursor) return false;
-
-    const template = await learnNativeUrlTemplate(status);
-    if (!template) return false;
+    if (!roomId || !cursor) return false;
 
     status('이동 중');
-    location.assign(template.replace('__ZCS_MESSAGE__', cursor));
+    try {
+      sessionStorage.setItem(JUMP_REQUEST_KEY, JSON.stringify({ roomId, cursor }));
+      sessionStorage.setItem(JUMP_HIGHLIGHT_KEY, row.id);
+    } catch (_) {
+      return false;
+    }
+    location.reload();
+    return true;
+  }
+
+  function revealPendingJump() {
+    let id = '';
+    try { id = sessionStorage.getItem(JUMP_HIGHLIGHT_KEY) || ''; } catch (_) {}
+    if (!id) return false;
+
+    const target = document.getElementById(id);
+    if (!target) return false;
+    target.scrollIntoView({ block: 'center', behavior: 'auto' });
+    target.classList.add(HIGHLIGHT_CLASS);
+    setTimeout(() => target.classList.remove(HIGHLIGHT_CLASS), 2600);
+    try { sessionStorage.removeItem(JUMP_HIGHLIGHT_KEY); } catch (_) {}
     return true;
   }
 
@@ -870,10 +862,12 @@
 
     new MutationObserver(() => {
       scheduleMenu();
+      revealPendingJump();
       if (!deepLoadRunning) scheduleCapture();
     }).observe(document.documentElement, { childList: true, subtree: true });
 
     renderMenuRow();
+    revealPendingJump();
     scheduleCapture();
   }
 
