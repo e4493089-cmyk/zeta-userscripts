@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.43
+// @version      0.23.44
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1621,8 +1621,8 @@
   // 한 배치를 마치면 새로고침으로 renderer 메모리를 비우는 구조인데,
   // 한 배치가 크면 새로고침 전에 바닥난다. 도입 당시 모바일 80은 문제가
   // 없었으므로 PC도 그 선까지 내린다.
-  const PROFILE_BATCH_DESKTOP = 80;
-  const PROFILE_BATCH_MOBILE = 50;
+  const PROFILE_BATCH_DESKTOP = 100;
+  const PROFILE_BATCH_MOBILE = 100;
   const BATCH_KEY = 'zeta-room-manager:batch:v1';
 
   function configuredBatch(mobile) {
@@ -2107,6 +2107,348 @@
     };
   }
 
+  // ── 본 페이지 이동으로 이름 수집 ─────────────────────────────────────
+  // 숨김 화면을 쓰면 한 탭 안에 무거운 문서가 계속 쌓여 renderer가 죽는다.
+  // 화면을 실제로 옮기면 이동할 때마다 브라우저가 이전 문서를 통째로 버린다.
+  // 새로고침으로 메모리를 비우던 걸, 아예 한 건마다 하는 셈이다.
+  const NAV_RUN_KEY = 'zeta-room-manager:nav-run:v1';
+  const NAV_DONE_KEY = 'zeta-room-manager:nav-done:v1';
+  const NAV_OVERLAY_ID = 'zeta-room-manager-nav-progress';
+  const NAV_READ_TIMEOUT = 14000;
+  const NAV_FAILURE_KEEP = 200;
+  let navStopped = false;
+
+  function readNavRun() {
+    try { return JSON.parse(sessionStorage.getItem(NAV_RUN_KEY) || 'null'); } catch (_) { return null; }
+  }
+
+  function writeNavRun(run) {
+    try { sessionStorage.setItem(NAV_RUN_KEY, JSON.stringify(run)); } catch (_) {}
+  }
+
+  function clearNavRun() {
+    try { sessionStorage.removeItem(NAV_RUN_KEY); } catch (_) {}
+  }
+
+  function navRunActive() {
+    const run = readNavRun();
+    return Boolean(run && run.active && run.mode === 'navigate');
+  }
+
+  function navTargetUrl(target) {
+    // 플롯 아이디를 알면 프로필로 바로 간다. 모르면 방을 거친다.
+    if (target.plotId) return '/' + localeSegment() + '/plots/' + target.plotId + '/profile';
+    return '/' + localeSegment() + '/rooms/' + target.roomId;
+  }
+
+  function atNavTarget(target) {
+    const path = location.pathname;
+    if (target.plotId) return path.includes('/plots/' + target.plotId + '/profile');
+    return path.includes('/rooms/' + target.roomId);
+  }
+
+  function stopNavRun() {
+    navStopped = true;
+    const run = readNavRun();
+    if (run) {
+      run.stopRequested = true;
+      writeNavRun(run);
+    }
+    const box = document.getElementById(NAV_OVERLAY_ID);
+    const note = box && box.querySelector('[data-zrm-nav-note]');
+    if (note) note.textContent = '중지하는 중…';
+  }
+
+  function navStopRequested() {
+    if (navStopped) return true;
+    const run = readNavRun();
+    return Boolean(run && run.stopRequested);
+  }
+
+  function renderNavOverlay(run, note) {
+    let box = document.getElementById(NAV_OVERLAY_ID);
+    if (!box) {
+      box = document.createElement('div');
+      box.id = NAV_OVERLAY_ID;
+      box.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;' +
+        'align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
+      box.innerHTML =
+        '<div style="width:min(320px,86vw);background:#fff;border-radius:16px;padding:20px 20px 16px;' +
+          'text-align:center;color:#171717;box-shadow:0 12px 40px rgba(0,0,0,.3);' +
+          'font-family:-apple-system,BlinkMacSystemFont,sans-serif">' +
+          '<div style="font-size:15px;font-weight:800;margin-bottom:8px">이름 수집 중</div>' +
+          '<div data-zrm-nav-count style="font-size:24px;font-weight:800;margin-bottom:6px"></div>' +
+          '<div data-zrm-nav-note style="font-size:12px;color:#52636b;margin-bottom:16px;line-height:1.5"></div>' +
+          '<button type="button" data-zrm-nav-stop style="width:100%;border:0;border-radius:11px;' +
+            'padding:12px;background:#171717;color:#fff;font-weight:800;font-size:14px">중지</button>' +
+        '</div>';
+      (document.body || document.documentElement).appendChild(box);
+      box.querySelector('[data-zrm-nav-stop]').addEventListener('click', stopNavRun);
+    }
+
+    const total = run.queue.length;
+    const done = Number(run.cursor || 0);
+    box.querySelector('[data-zrm-nav-count]').textContent = done + ' / ' + total;
+    box.querySelector('[data-zrm-nav-note]').textContent =
+      [note, remainingText(Number(run.startedAt || Date.now()), done, total)]
+        .filter(Boolean).join(' · ');
+    return box;
+  }
+
+  function startNavigationRun(targets, options = {}) {
+    const queue = targets.map(target => ({
+      roomId: target.roomId,
+      plotId: normalizeText(target.plotId),
+      originatedId: normalizeText(target.originatedId),
+      replaceNames: Boolean(target.replaceNames)
+    }));
+
+    const run = {
+      active: true,
+      mode: 'navigate',
+      runId: newProfileRunId(),
+      force: Boolean(options.force),
+      queue,
+      cursor: 0,
+      attempted: 0,
+      done: 0,
+      failed: 0,
+      failures: [],
+      steps: 0,
+      startedAt: Date.now(),
+      returnUrl: location.pathname,
+      batch: configuredBatch(isMobileProfileDevice())
+    };
+
+    writeNavRun(run);
+    saveStateNow();
+    renderNavOverlay(run, '시작하는 중…');
+    goToNavTarget(run);
+  }
+
+  function goToNavTarget(run) {
+    const target = run.queue[run.cursor];
+    if (!target) {
+      finishNavRun(run);
+      return;
+    }
+    run.steps = Number(run.steps || 0) + 1;
+    writeNavRun(run);
+    // replace를 쓰면 뒤로 가기 기록이 수백 개 쌓이지 않는다.
+    location.replace(navTargetUrl(target));
+  }
+
+  // 지금 화면에서 프로필이 다 그려질 때까지 기다렸다 읽는다.
+  async function waitForProfileHere(timeoutMs) {
+    const end = Date.now() + timeoutMs;
+    let signature = '';
+    let since = 0;
+    let settledAt = 0;
+
+    while (Date.now() < end) {
+      if (navStopRequested()) throw new Error('중지됨');
+
+      const root = document.querySelector('[data-sentry-component="PlotProfile"]');
+      const result = root ? readPlotProfile(window) : null;
+
+      if (result && !result.partial) {
+        // 주소만 먼저 바뀌고 내용이 직전 플롯인 순간을 피한다.
+        const next = JSON.stringify([
+          result.profileId || '',
+          ...(result.characters || []),
+          '|',
+          ...(result.creators || [])
+        ]);
+        if (next !== signature) {
+          signature = next;
+          since = Date.now();
+        } else if (Date.now() - since >= PROFILE_SETTLE_MS) {
+          return result;
+        }
+      } else {
+        signature = '';
+        since = 0;
+      }
+
+      if (document.readyState === 'complete') {
+        if (!settledAt) settledAt = Date.now();
+        else if (Date.now() - settledAt > 2000) {
+          // 제작자를 끝내 못 읽어도 캐릭터명은 챙긴다.
+          if (result && result.partial) return result;
+          if (Date.now() - settledAt > 3500) {
+            throw new Error(root ? '프로필에서 이름을 읽지 못했습니다' : '프로필 화면이 열리지 않았습니다');
+          }
+        }
+      }
+
+      await sleep(100);
+    }
+
+    throw new Error('시간 초과 — 프로필이 열리지 않았습니다');
+  }
+
+  async function readProfileOnThisPage(target) {
+    // 플롯 아이디를 모르면 방에서 프로필 버튼을 눌러 연다(같은 문서 안에서 열린다).
+    if (!target.plotId) {
+      const end = Date.now() + NAV_READ_TIMEOUT;
+      let button = null;
+      while (Date.now() < end) {
+        if (navStopRequested()) throw new Error('중지됨');
+        button = document.querySelector(PROFILE_BUTTON);
+        if (button) break;
+        await sleep(120);
+      }
+      if (!button) throw new Error('방에서 프로필 버튼을 찾지 못했습니다');
+      button.click();
+    }
+    return await waitForProfileHere(NAV_READ_TIMEOUT);
+  }
+
+  function finishNavRun(run, note) {
+    clearNavRun();
+    navStopped = false;
+    lastProfileFailures = (run && run.failures) || [];
+    saveStateNow();
+    void releaseScreenAwake();
+    document.getElementById(NAV_OVERLAY_ID)?.remove();
+
+    try {
+      sessionStorage.setItem(NAV_DONE_KEY, JSON.stringify({
+        force: Boolean(run && run.force),
+        attempted: Number((run && run.attempted) || 0),
+        done: Number((run && run.done) || 0),
+        failed: Number((run && run.failed) || 0),
+        remaining: Math.max(0, ((run && run.queue) || []).length - Number((run && run.cursor) || 0)),
+        failures: ((run && run.failures) || []).slice(0, 10),
+        summary: failureSummary((run && run.failures) || []),
+        note: note || ''
+      }));
+    } catch (_) {}
+
+    const back = (run && run.returnUrl) || ('/' + localeSegment() + '/rooms');
+    if (location.pathname !== back) {
+      location.replace(back);
+      return;
+    }
+    showNavSummary();
+  }
+
+  function showNavSummary() {
+    let info = null;
+    try { info = JSON.parse(sessionStorage.getItem(NAV_DONE_KEY) || 'null'); } catch (_) {}
+    if (!info) return false;
+    try { sessionStorage.removeItem(NAV_DONE_KEY); } catch (_) {}
+
+    const total = roomCollectionCount();
+    const coverage = metadataCoverage('room');
+    const aliases = Object.values(state.index).filter(entry =>
+      entry && entry.type === 'room' && normalizeText(entry.alias)
+    ).length;
+
+    alert(
+      (info.note ? info.note : (info.force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료')) +
+      ' · 저장된 방 ' + total + '개' +
+      '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
+      '\n이름 수집: ' + info.attempted + '개 처리 · 성공 ' + info.done + '개' +
+      (info.failed ? ' · 실패 ' + info.failed + '개' : '') +
+      (info.remaining ? '\n남은 플롯 ' + info.remaining + '개' : '') +
+      (info.failed && info.summary && info.summary.length
+        ? '\n\n실패 사유\n' + info.summary.map(line => '· ' + line).join('\n') +
+          '\n\n실패한 대화방 (최대 10개 표시)\n' + (info.failures || [])
+            .map(item => '· ' + item.name + '\n  ' + item.url).join('\n') +
+          '\n\n전체 목록은 콘솔에서 zrmFailures()'
+        : '')
+    );
+    scheduleRefresh();
+    return true;
+  }
+
+  // 페이지가 열릴 때마다 한 걸음씩 나아간다.
+  async function driveNavigationRun() {
+    const run = readNavRun();
+    if (!run || !run.active || run.mode !== 'navigate') return;
+
+    // 이동 횟수가 목표 수보다 훨씬 많아지면 뭔가 잘못 돌고 있는 것이다.
+    if (Number(run.steps || 0) > run.queue.length * 2 + 60) {
+      finishNavRun(run, '이동이 너무 많아 멈췄습니다');
+      return;
+    }
+    if (run.stopRequested) {
+      finishNavRun(run, '이름 수집 중지됨');
+      return;
+    }
+
+    const target = run.queue[run.cursor];
+    if (!target) {
+      finishNavRun(run);
+      return;
+    }
+
+    renderNavOverlay(run, '');
+    void holdScreenAwake();
+
+    // 아직 목표 화면이 아니면 옮기기만 한다. 읽는 건 다음 로드에서.
+    if (!atNavTarget(target)) {
+      goToNavTarget(run);
+      return;
+    }
+
+    let result = null;
+    let error = null;
+    try {
+      result = await readProfileOnThisPage(target);
+    } catch (caught) {
+      error = caught;
+    }
+
+    if (navStopRequested()) {
+      run.stopRequested = true;
+      finishNavRun(run, '이름 수집 중지됨');
+      return;
+    }
+
+    run.attempted = Number(run.attempted || 0) + 1;
+    if (result) {
+      applyProfileResult(target, result, { replaceNames: run.force || Boolean(target.replaceNames) });
+      run.done = Number(run.done || 0) + 1;
+      // 읽기는 했는데 여전히 대상으로 남으면 다음에도 결과가 같다.
+      if (entryNeedsProfile(state.index[keyOf('room', target.roomId)], false)) {
+        notePlotProfileFailure(target);
+      }
+    } else {
+      run.failed = Number(run.failed || 0) + 1;
+      const reason = normalizeText((error && error.message) || error) || '알 수 없는 오류';
+      const record = describeFailure(target, reason);
+      if ((run.failures || []).length < NAV_FAILURE_KEEP) run.failures.push(record);
+      notePlotProfileFailure(target);
+      try { console.warn('[zrm] 이름 수집 실패 ·', record.name, '·', record.url, '·', reason); } catch (_) {}
+    }
+
+    const attemptedEntry = state.index[keyOf('room', target.roomId)];
+    if (attemptedEntry && attemptedEntry.needsProfileRefresh) delete attemptedEntry.needsProfileRefresh;
+
+    run.cursor = Number(run.cursor || 0) + 1;
+    writeNavRun(run);
+    saveStateNow();
+
+    if (run.cursor >= run.queue.length) {
+      finishNavRun(run);
+      return;
+    }
+
+    renderNavOverlay(run, '');
+
+    // 정해진 개수마다 목록으로 한 번 돌아와 저장하고 이어간다.
+    if (run.batch && run.cursor % run.batch === 0) {
+      run.steps = Number(run.steps || 0) + 1;
+      writeNavRun(run);
+      location.replace(run.returnUrl || ('/' + localeSegment() + '/rooms'));
+      return;
+    }
+
+    goToNavTarget(run);
+  }
+
   async function collectAllRoomsByScrolling(options = {}) {
     const force = Boolean(options && options.force);
     if (currentSection() !== 'room') {
@@ -2218,14 +2560,24 @@
         : null;
       forceReconcileSeenRoomKeys = null;
 
-      // 다시 전체 수집은 이번에 실제로 확인한 모든 고유 플롯을 대화방 경유로 재검증한다.
-      const forceTargets = force ? profileCollectionTargets(true, seenRoomKeys) : null;
-      const profiles = collectionAborted
-        ? {
-            targets: 0, attempted: 0, done: 0, failed: 0,
-            remaining: 0, limited: false, failures: [], remainingTargets: []
-          }
-        : await collectProfilesForEmptyPlots(force, forceTargets);
+      // 다시 전체 수집은 이번에 실제로 확인한 모든 고유 플롯을 재검증한다.
+      const targets = collectionAborted
+        ? []
+        : (force ? profileCollectionTargets(true, seenRoomKeys) : profileCollectionTargets(false));
+
+      // 이름 수집은 여기서 끝나지 않는다. 화면을 한 건씩 옮겨 다니며 읽고,
+      // 다 끝나면 목록으로 돌아와 결과를 알린다.
+      if (targets.length) {
+        clearProfileResume();
+        roomCollectionProgress = { running: false, count: roomCollectionCount() };
+        startNavigationRun(targets, { force });
+        return true;
+      }
+
+      const profiles = {
+        targets: 0, attempted: 0, done: 0, failed: 0,
+        remaining: 0, limited: false, failures: [], remainingTargets: []
+      };
 
       const total = roomCollectionCount();
 
@@ -4374,7 +4726,10 @@
 
     observer = new MutationObserver(scheduleRefresh);
     refresh();
-    if (readProfileResume()?.active) setTimeout(() => { void resumeProfileCollectionIfNeeded(); }, 350);
+
+    if (navRunActive()) setTimeout(() => { void driveNavigationRun(); }, 400);
+    else if (showNavSummary()) { /* 방금 끝난 수집 결과를 알렸다 */ }
+    else if (readProfileResume()?.active) setTimeout(() => { void resumeProfileCollectionIfNeeded(); }, 350);
 
     let lastUrl = location.href;
     setInterval(() => {
