@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.20
+// @version      0.23.21
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -50,6 +50,45 @@
       window.__zrmBookmarkletControllerReady = false;
       if (controller && !controller.closed) controller.close();
     } catch (_) {}
+  }
+
+  function requestBookmarkletAutoResume() {
+    return new Promise(resolve => {
+      const old = document.getElementById('zrm-auto-resume-prompt');
+      if (old) old.remove();
+
+      const wrap = document.createElement('div');
+      wrap.id = 'zrm-auto-resume-prompt';
+      wrap.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(18,28,34,.48);display:flex;align-items:center;justify-content:center;padding:20px';
+      wrap.innerHTML =
+        '<div style="width:min(340px,100%);background:#fff;color:#233139;border-radius:18px;padding:20px;box-shadow:0 18px 55px #0005;font:14px/1.5 -apple-system,BlinkMacSystemFont,\'Noto Sans KR\',sans-serif">' +
+          '<b style="display:block;font-size:17px;margin-bottom:8px">자동 이어받기 연결</b>' +
+          '<div style="color:#52636b;margin-bottom:16px">보조 탭이 연결되지 않았습니다. 아래 버튼을 직접 누르면 보조 탭을 열고 남은 수집을 자동으로 이어갑니다.</div>' +
+          '<div style="display:flex;gap:8px">' +
+            '<button type="button" data-zrm-helper-cancel style="flex:1;border:0;border-radius:11px;padding:12px;background:#edf1f3;color:#26343c;font-weight:700">이번엔 멈춤</button>' +
+            '<button type="button" data-zrm-helper-enable style="flex:1;border:0;border-radius:11px;padding:12px;background:#fee500;color:#171717;font-weight:800">자동 이어받기 켜기</button>' +
+          '</div>' +
+        '</div>';
+
+      const finish = value => {
+        wrap.remove();
+        resolve(value);
+      };
+      wrap.querySelector('[data-zrm-helper-cancel]').addEventListener('click', () => finish(false));
+      wrap.querySelector('[data-zrm-helper-enable]').addEventListener('click', async event => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        button.textContent = '연결 중…';
+        const ok = await enableBookmarkletAutoResume();
+        if (!ok) {
+          button.disabled = false;
+          button.textContent = '다시 시도';
+          return;
+        }
+        finish(true);
+      });
+      document.body.appendChild(wrap);
+    });
   }
 
   async function enableBookmarkletAutoResume() {
@@ -1736,13 +1775,8 @@
         renderCollectionTools();
 
         if (BOOKMARKLET_MODE && !bookmarkletControllerReady()) {
-          const turnOn = confirm(
-            '이름 수집을 ' + profiles.attempted + '개 저장했습니다.' +
-            '\n남은 플롯 약 ' + profiles.remaining + '개' +
-            '\n\n자동 이어받기용 보조 탭이 없습니다.' +
-            '\n확인을 누르면 지금 보조 탭을 연결합니다.'
-          );
-          if (turnOn && await enableBookmarkletAutoResume()) {
+          const turnOn = await requestBookmarkletAutoResume();
+          if (turnOn) {
             writeProfileResume({
               active: true,
               force,
@@ -1844,13 +1878,8 @@
         renderCollectionTools();
 
         if (BOOKMARKLET_MODE && !bookmarkletControllerReady()) {
-          const turnOn = confirm(
-            '이름 수집을 추가로 ' + profiles.attempted + '개 저장했습니다.' +
-            '\n남은 플롯 약 ' + profiles.remaining + '개' +
-            '\n\n자동 이어받기용 보조 탭이 없습니다.' +
-            '\n확인을 누르면 지금 보조 탭을 연결합니다.'
-          );
-          if (turnOn && await enableBookmarkletAutoResume()) {
+          const turnOn = await requestBookmarkletAutoResume();
+          if (turnOn) {
             writeProfileResume(next);
             saveStateNow();
             await sleep(250);
