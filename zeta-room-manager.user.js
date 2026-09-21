@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.41
+// @version      0.23.42
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -16,6 +16,8 @@
   if (window.top !== window.self) return;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
+  // 별명만 따로 둔다. 목록을 그리는 데는 이것만 있으면 된다.
+  const ALIAS_KEY = 'zeta-room-manager:alias:v1';
   const STATE_VERSION = 3;
   const BACKGROUND_INDEX_STAMP_KEY = 'zeta-room-manager:last-full-index-at:v3';
   const STYLE_ID = 'zeta-room-manager-style';
@@ -141,7 +143,24 @@
     }
   }
 
-  const state = loadState();
+  // 방 목록을 그리는 데 필요한 건 별명뿐이다.
+  // 캐릭터명·제작자명이 든 큰 덩어리는 검색을 시작할 때 읽는다.
+  let dataIndex = {};
+  let dataPlotMeta = {};
+  let dataLoaded = false;
+  const pendingIndex = {};
+  const pendingPlotMeta = {};
+
+  const state = { version: STATE_VERSION, aliases: loadAliases() };
+  Object.defineProperty(state, 'index', {
+    get() { ensureDataLoaded(); return dataIndex; },
+    set(value) { ensureDataLoaded(); dataIndex = value || {}; }
+  });
+  Object.defineProperty(state, 'plotMeta', {
+    get() { ensureDataLoaded(); return dataPlotMeta; },
+    set(value) { ensureDataLoaded(); dataPlotMeta = value || {}; }
+  });
+
   let observer = null;
   let rafPending = false;
   let suspendObserverRefresh = false;
@@ -167,12 +186,97 @@
     try { sessionStorage.removeItem(PROFILE_RESUME_KEY); } catch (_) {}
   }
 
-  function loadState() {
+  // 별명 파일이 아직 없으면(업데이트 직후) 이번 한 번만 통째로 읽어 떼어낸다.
+  function loadAliases() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(ALIAS_KEY) || 'null');
+      if (parsed && parsed.aliases && typeof parsed.aliases === 'object') return parsed.aliases;
+    } catch (_) {}
+
+    try {
+      const whole = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      const aliases = whole.aliases && typeof whole.aliases === 'object' ? whole.aliases : {};
+      try {
+        localStorage.setItem(ALIAS_KEY, JSON.stringify({ version: STATE_VERSION, aliases }));
+      } catch (_) {}
+      return aliases;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  // 화면에서 주운 항목을 저장본과 합친다. 저장본의 이름을 지우지 않는다.
+  function mergeHarvestedEntry(stored, fresh) {
+    if (!stored) return fresh;
+    const merged = {
+      ...stored,
+      ...fresh,
+      href: fresh.href || stored.href || '',
+      image: fresh.image || stored.image || '',
+      plotId: fresh.plotId || stored.plotId || '',
+      originatedId: fresh.originatedId || stored.originatedId || '',
+      characterNames: uniqueTexts(fresh.characterNames, stored.characterNames),
+      creatorNames: uniqueTexts(fresh.creatorNames, stored.creatorNames)
+    };
+    if (!(stored.needsProfileRefresh || fresh.needsProfileRefresh)) delete merged.needsProfileRefresh;
+    else merged.needsProfileRefresh = true;
+    return merged;
+  }
+
+  // 큰 덩어리를 아직 안 읽었으면 화면에서 주운 건 잠시 손에 들고 있는다.
+  function peekEntry(key) {
+    return (dataLoaded ? dataIndex[key] : pendingIndex[key]) || null;
+  }
+
+  function putEntry(key, value) {
+    if (dataLoaded) dataIndex[key] = value;
+    else pendingIndex[key] = value;
+  }
+
+  function peekMeta(id) {
+    if (!id) return null;
+    return (dataLoaded ? dataPlotMeta[id] : pendingPlotMeta[id]) || null;
+  }
+
+  function putMeta(id, value) {
+    if (dataLoaded) dataPlotMeta[id] = value;
+    else pendingPlotMeta[id] = value;
+  }
+
+  function ensureDataLoaded() {
+    if (dataLoaded) return;
+    // 아래에서 state.index를 다시 건드려도 여기로 되돌아오지 않게 먼저 세운다.
+    dataLoaded = true;
+
+    const loaded = loadStoredData();
+    dataIndex = loaded.index;
+    dataPlotMeta = loaded.plotMeta;
+
+    for (const [key, entry] of Object.entries(pendingIndex)) {
+      dataIndex[key] = mergeHarvestedEntry(dataIndex[key], entry);
+      delete pendingIndex[key];
+    }
+    const heldMeta = Object.entries(pendingPlotMeta);
+    for (const [id, meta] of heldMeta) {
+      dataPlotMeta[id] = mergeHarvestedEntry(dataPlotMeta[id], meta);
+      delete pendingPlotMeta[id];
+    }
+    plotLookup = null;
+    plotLookupDirty = true;
+    // 대화방에서 주운 이름은 같은 플롯을 쓰는 다른 방에도 퍼뜨려야 한다.
+    for (const [, meta] of heldMeta) mergeMetaIntoIndex(dataPlotMeta[meta.canonicalId] || meta);
+
+    // 한 번만 도는 정리 작업도 여기서 돈다. 시작할 때 돌리면 큰 덩어리를 읽게 된다.
+    cleanupLegacyState();
+    cleanupOldApiFlags();
+    saveState();
+  }
+
+  function loadStoredData() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
       const loaded = {
         version: STATE_VERSION,
-        aliases: parsed.aliases && typeof parsed.aliases === 'object' ? parsed.aliases : {},
         index: parsed.index && typeof parsed.index === 'object' ? parsed.index : {},
         plotMeta: parsed.plotMeta && typeof parsed.plotMeta === 'object' ? parsed.plotMeta : {}
       };
@@ -218,7 +322,21 @@
   function saveStateNow() {
     saveTimer = null;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(ALIAS_KEY, JSON.stringify({
+        version: STATE_VERSION,
+        aliases: state.aliases
+      }));
+    } catch (_) {}
+
+    // 아직 안 읽은 덩어리는 건드리지 않는다. 저장본이 그대로 남아 있어야 한다.
+    if (!dataLoaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: STATE_VERSION,
+        aliases: state.aliases,
+        index: dataIndex,
+        plotMeta: dataPlotMeta
+      }));
     } catch (_) {}
   }
 
@@ -310,6 +428,7 @@
 
     const keys = [
       STORAGE_KEY,
+      ALIAS_KEY,
       BACKGROUND_INDEX_STAMP_KEY,
       PLOT_COLLECTION_STAMP_KEY,
       ROOM_COLLECTION_STAMP_KEY,
@@ -961,9 +1080,7 @@
     const canonicalId = canonicalPlotId(plotIdHint || plotId, originatedId);
     if (!canonicalId) return null;
 
-    const previous = state.plotMeta[canonicalId]
-      || (plotId && state.plotMeta[plotId])
-      || {};
+    const previous = peekMeta(canonicalId) || (plotId && peekMeta(plotId)) || {};
     const characters = plotCharacterNames(plot);
     const creators = plotCreatorNames(plot);
 
@@ -985,9 +1102,12 @@
     delete next.missingAt;
     delete next.emptyDetail;
 
-    state.plotMeta[canonicalId] = next;
+    putMeta(canonicalId, next);
     plotLookupDirty = true;
-    if (plotId && plotId !== canonicalId && state.plotMeta[plotId]) delete state.plotMeta[plotId];
+    if (plotId && plotId !== canonicalId && peekMeta(plotId)) {
+      if (dataLoaded) delete dataPlotMeta[plotId];
+      else delete pendingPlotMeta[plotId];
+    }
     return next;
   }
 
@@ -3326,7 +3446,7 @@
     if (!id) return null;
 
     const key = keyOf(type, id);
-    const previous = state.index[key] || {};
+    const previous = { ...(peekEntry(key) || {}) };
     const alias = normalizeText(state.aliases[key] || previous.alias);
     if (alias && state.aliases[key] !== alias) state.aliases[key] = alias;
     // 제타가 실제로 그려준 방이면 사라진 방이 아니다.
@@ -3404,9 +3524,9 @@
     const roomCanonicalId = canonicalPlotId(roomPlotId, roomOriginatedId);
     const roomMeta = roomPlot
       ? ingestPlotMeta(roomPlot, roomPlotId, roomOriginatedId)
-      : (roomCanonicalId ? state.plotMeta[roomCanonicalId] : null);
+      : peekMeta(roomCanonicalId);
 
-    state.index[key] = {
+    const record = {
       ...previous,
       type: type,
       id: id,
@@ -3437,9 +3557,11 @@
       )
     };
 
-    if (type === 'room' && plotConnectionChanged) {
-      state.index[key].needsProfileRefresh = true;
+    // 저장본을 아직 안 읽었으면 '연결이 바뀌었다'고 단정할 수 없다.
+    if (type === 'room' && plotConnectionChanged && dataLoaded) {
+      record.needsProfileRefresh = true;
     }
+    putEntry(key, record);
 
     return {
       key, type, id, item, link, titleEl, original, alias
@@ -3465,7 +3587,7 @@
   }
 
   function applyAlias(record) {
-    const indexed = state.index[record.key] || {};
+    const indexed = peekEntry(record.key) || {};
     const alias = normalizeText(state.aliases[record.key] || indexed.alias);
     if (alias && state.aliases[record.key] !== alias) state.aliases[record.key] = alias;
     record.alias = alias;
@@ -3482,7 +3604,7 @@
       alias,
       image: (record.link || record.item).querySelector('img')?.src || indexed.image || ''
     };
-    state.index[record.key] = next;
+    putEntry(record.key, next);
 
     // 삭제된 플롯의 방은 눌러도 열리지 않으므로 목록에서 미리 표시해 준다.
     if (record.type === 'room' && next.plotMissing) record.item.dataset.zrmDead = '1';
@@ -3712,9 +3834,9 @@
     if (!characters.length && !creators.length && !meta) return;
 
     const key = keyOf('room', roomId);
-    const previous = state.index[key] || {};
+    const previous = peekEntry(key) || {};
 
-    state.index[key] = {
+    putEntry(key, {
       ...previous,
       type: 'room',
       id: roomId,
@@ -3726,9 +3848,10 @@
       originatedId: originatedId || previous.originatedId || '',
       characterNames: uniqueTexts(characters, meta && meta.characterNames, previous.characterNames),
       creatorNames: uniqueTexts(creators, meta && meta.creatorNames, previous.creatorNames)
-    };
+    });
 
-    if (meta) mergeMetaIntoIndex(meta);
+    // 저장본을 안 읽었으면 퍼뜨릴 곳도 없다. 읽을 때 한꺼번에 퍼뜨린다.
+    if (meta && dataLoaded) mergeMetaIntoIndex(meta);
     saveState();
   }
 
@@ -3923,6 +4046,9 @@
     if (!input || input.dataset.zrmAliasSearchBound === '1') return;
     input.dataset.zrmAliasSearchBound = '1';
     const update = () => scheduleRefresh();
+    // 검색을 시작하려는 순간 읽어 둔다. 첫 글자에서 멈칫하지 않게.
+    input.addEventListener('focus', ensureDataLoaded);
+    input.addEventListener('pointerdown', ensureDataLoaded);
     input.addEventListener('input', update);
     input.addEventListener('search', update);
     input.addEventListener('change', update);
@@ -4115,8 +4241,6 @@
   }
 
   function start() {
-    cleanupLegacyState();
-    cleanupOldApiFlags();
     installPassiveNativeDataCapture();
     injectStyle();
 
