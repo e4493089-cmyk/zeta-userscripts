@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.23
+// @version      0.20.24
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -279,6 +279,61 @@
     resetCollectedIndex();
     return '인덱스를 비웠습니다. 별명은 그대로입니다. 대화방/플롯 목록에서 전체 수집을 다시 실행해 주세요.';
   };
+
+  function deleteAllRoomManagerData() {
+    if (roomCollectionPromise || plotCollectionPromise || roomCollectionProgress.running || plotCollectionProgress.running) {
+      alert('수집 중에는 데이터를 삭제할 수 없습니다. 먼저 중지를 눌러 주세요.');
+      return false;
+    }
+
+    if (!confirm(
+      'Room Manager 데이터를 전부 삭제할까요?' +
+      '\n\n삭제되는 항목' +
+      '\n· 저장된 대화방/플롯' +
+      '\n· 캐릭터명/제작자명' +
+      '\n· 별명' +
+      '\n· 수집 기록' +
+      '\n· 자동 이어받기 상태' +
+      '\n\n이 작업은 되돌릴 수 없습니다.'
+    )) return false;
+
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+
+    clearProfileResume();
+    closeBookmarkletController();
+
+    state.aliases = {};
+    state.index = {};
+    state.plotMeta = {};
+    plotLookup = null;
+    plotLookupDirty = true;
+
+    const keys = [
+      STORAGE_KEY,
+      BACKGROUND_INDEX_STAMP_KEY,
+      PLOT_COLLECTION_STAMP_KEY,
+      ROOM_COLLECTION_STAMP_KEY,
+      CLEANUP_STAMP_KEY,
+      NO_API_CLEANUP_STAMP_KEY,
+      'zeta-room-manager:last-plot-index-at:v1',
+      'zeta-room-manager:last-plot-index-at:v2'
+    ];
+    for (const key of keys) {
+      try { localStorage.removeItem(key); } catch (_) {}
+    }
+
+    roomCollectionProgress = { running: false, count: 0 };
+    plotCollectionProgress = { running: false, count: 0 };
+    renderCollectionTools();
+    scheduleRefresh();
+    alert('Room Manager 데이터를 전부 삭제했습니다.');
+    return true;
+  }
+
+  window.zrmDeleteAllData = deleteAllRoomManagerData;
 
   const NO_API_CLEANUP_STAMP_KEY = 'zeta-room-manager:no-api-cleanup:v1';
   function cleanupOldApiFlags() {
@@ -2308,6 +2363,7 @@
           (isRoom ? '<button type="button" data-zrm-action="force-collect">다시 전체 수집</button>' : '') +
           '<button type="button" data-zrm-action="export">내보내기</button>' +
           '<button type="button" data-zrm-action="import">불러오기</button>' +
+          '<button type="button" data-zrm-action="delete">데이터 삭제</button>' +
         '</div>' +
       '</div>';
 
@@ -2317,9 +2373,11 @@
 
     const collect = modal.querySelector('[data-zrm-action="collect"]');
     const forceCollect = modal.querySelector('[data-zrm-action="force-collect"]');
+    const deleteButton = modal.querySelector('[data-zrm-action="delete"]');
     collect.disabled = false;
     collect.textContent = progress.running ? '중지' : (isRoom ? '일반 전체 수집' : '전체 수집');
     if (forceCollect) forceCollect.disabled = progress.running;
+    if (deleteButton) deleteButton.disabled = progress.running;
 
     modal.querySelector('.zrm-collection-close').addEventListener('click', closeCollectionPopup);
     modal.addEventListener('click', event => {
@@ -2346,6 +2404,10 @@
     modal.querySelector('[data-zrm-action="import"]').addEventListener('click', () => {
       closeCollectionPopup();
       importRoomManagerData();
+    });
+    deleteButton?.addEventListener('click', () => {
+      closeCollectionPopup();
+      deleteAllRoomManagerData();
     });
 
     document.body.appendChild(modal);
