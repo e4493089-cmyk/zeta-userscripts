@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.18
+// @version      0.20.19
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -928,6 +928,17 @@
 
   function abortCollection() {
     collectionAborted = true;
+    clearProfileResume();
+    closeBookmarkletController();
+    saveStateNow();
+
+    if (roomCollectionProgress.running) {
+      roomCollectionProgress.note = '중지 요청됨 · 현재 작업을 정리하는 중';
+    }
+    if (plotCollectionProgress.running) {
+      plotCollectionProgress.note = '중지 요청됨 · 현재 작업을 정리하는 중';
+    }
+    renderCollectionTools();
   }
 
   // 같은 플롯을 쓰는 방이 여럿이면 한 번만 연다.
@@ -1532,6 +1543,8 @@
       harvestRoomDocument(document);
 
       for (let round = 0; round < 1600; round++) {
+        if (collectionAborted) break;
+
         // 모바일/Monkey에서는 가상 목록이 페이지를 추가하면서 스크롤 컨테이너
         // 자체를 교체하는 경우가 있다. 시작할 때 잡은 낡은 host를 계속 쓰면
         // 중간 지점에서 더 이상 내려가지 못하므로 현재 DOM의 host를 다시 잡는다.
@@ -1557,6 +1570,7 @@
         if (nearBottom) {
           setScrollTop(host, before.height);
           await sleep(force ? (mobileList ? 700 : 1200) : 700);
+          if (collectionAborted) break;
 
           if (force) {
             const liveHost = roomCollectionScrollHost();
@@ -1608,6 +1622,7 @@
           await sleep(!force && barrenRounds >= 3
             ? 170
             : (force && mobileList ? 160 : 320));
+          if (collectionAborted) break;
         }
 
         const now = scrollMetrics(host);
@@ -1635,7 +1650,9 @@
       await sleep(100);
 
       const freshRoomCount = roomCollectionCount();
-      const profiles = await collectProfilesForEmptyPlots(force);
+      const profiles = collectionAborted
+        ? { targets: 0, attempted: 0, done: 0, failed: 0, remaining: 0, limited: false, failures: [] }
+        : await collectProfilesForEmptyPlots(force);
 
       let restoredRooms = 0;
       if (force && freshRoomCount < forceOldRoomCount) {
@@ -1685,6 +1702,11 @@
         }
 
         await sleep(500);
+        if (collectionAborted) {
+          clearProfileResume();
+          closeBookmarkletController();
+          return true;
+        }
         location.reload();
         return true;
       }
@@ -1778,6 +1800,11 @@
         }
 
         await sleep(500);
+        if (collectionAborted) {
+          clearProfileResume();
+          closeBookmarkletController();
+          return true;
+        }
         location.reload();
         return true;
       }
@@ -1892,9 +1919,10 @@
       // 처음부터 훑어야 가상 목록에서 빠지는 항목이 없다.
       setScrollTop(host, 0);
       await sleep(450);
-      collectRenderedPlots();
+      if (!collectionAborted) collectRenderedPlots();
 
       for (let round = 0; round < 1600; round++) {
+        if (collectionAborted) break;
         collectRenderedPlots();
         const before = scrollMetrics(host);
         const count = plotCollectionCount();
@@ -1906,6 +1934,7 @@
         if (nearBottom) {
           setScrollTop(host, before.height);
           await sleep(700);
+          if (collectionAborted) break;
           collectRenderedPlots();
 
           const after = scrollMetrics(host);
@@ -1919,6 +1948,7 @@
           const step = Math.max(320, Math.floor(before.client * 0.78));
           setScrollTop(host, Math.min(before.height, before.top + step));
           await sleep(320);
+          if (collectionAborted) break;
         }
 
         const now = scrollMetrics(host);
@@ -1928,7 +1958,7 @@
         lastCount = nowCount;
       }
 
-      collectRenderedPlots();
+      if (!collectionAborted) collectRenderedPlots();
       saveStateNow();
       localStorage.setItem(PLOT_COLLECTION_STAMP_KEY, String(Date.now()));
 
@@ -1944,7 +1974,7 @@
         entry && entry.type === 'plot' && normalizeText(entry.alias)
       ).length;
       alert(
-        '전체 수집 완료 · 저장된 플롯 ' + total + '개' +
+        (collectionAborted ? '전체 수집 중지됨' : '전체 수집 완료') + ' · 저장된 플롯 ' + total + '개' +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개'
       );
       return true;
