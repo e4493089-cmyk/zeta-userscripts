@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.25
+// @version      0.20.26
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -599,7 +599,7 @@
     );
   }
 
-  function mergeMetaIntoIndex(meta) {
+  function mergeMetaIntoIndex(meta, options = {}) {
     if (!meta) return;
     const ids = new Set([
       normalizeText(meta.canonicalId),
@@ -609,6 +609,8 @@
     ].filter(Boolean));
     const metaName = normalizeText(meta.name).toLocaleLowerCase('ko-KR');
     const metaImage = imageKeyOf(meta.image);
+    const replaceNames = Boolean(options.replaceNames);
+    const strictIds = Boolean(options.strictIds);
 
     for (const entry of Object.values(state.index || {})) {
       if (!entry || typeof entry !== 'object') continue;
@@ -618,16 +620,21 @@
         normalizeText(entry.originatedId)
       ].filter(Boolean);
       const linkedById = entryIds.some(id => ids.has(id));
-      const linkedByName = !linkedById
+      const linkedByName = !strictIds && !linkedById
         && metaName
         && normalizeText(entry.original).toLocaleLowerCase('ko-KR') === metaName;
-      const linkedByImage = !linkedById && !linkedByName
+      const linkedByImage = !strictIds && !linkedById && !linkedByName
         && metaImage
         && imageKeyOf(entry.image) === metaImage;
       if (!linkedById && !linkedByName && !linkedByImage) continue;
 
-      entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
-      entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
+      if (replaceNames) {
+        entry.characterNames = uniqueTexts(meta.characterNames);
+        entry.creatorNames = uniqueTexts(meta.creatorNames);
+      } else {
+        entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
+        entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
+      }
     }
   }
 
@@ -940,6 +947,7 @@
     for (const item of roomItemsFromDocument(doc)) {
       const record = parseItem(item, 'room');
       if (!record) continue;
+      if (forceReconcileSeenRoomKeys) forceReconcileSeenRoomKeys.add(record.key);
       applyAlias(record);
       harvested++;
     }
@@ -1023,6 +1031,7 @@
   const PROFILE_PATH = /^\/(?:[^/]+\/)?plots\/[a-f\d-]{36}\/profile\/?$/i;
   const ROOM_UUID = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
   let collectionAborted = false;
+  let forceReconcileSeenRoomKeys = null;
   let wakeLock = null;
   let wakeStatus = '';
   // 숨김 프로필을 연속으로 읽는 동안 fetch/XHR 응답까지 복제하면 메모리 사용량이 크게 늘어난다.
@@ -1087,22 +1096,21 @@
 
   // 같은 플롯을 쓰는 방이 여럿이면 한 번만 연다.
   // 이미 이름을 아는 플롯(항목이든 plotMeta든)은 건너뛴다.
-  function profileCollectionTargets(force = false) {
+  function profileCollectionTargets(force = false, roomKeys = null) {
     const handledPlots = new Set();
     const targets = [];
 
-    for (const entry of Object.values(state.index || {})) {
+    for (const [entryKey, entry] of Object.entries(state.index || {})) {
       if (!entry || entry.type !== 'room' || !ROOM_UUID.test(entry.id || '')) continue;
+      if (roomKeys && !roomKeys.has(entryKey)) continue;
 
       const meta = plotMetaForEntry(entry);
       const characters = uniqueTexts(entry.characterNames, meta && meta.characterNames);
       const creators = uniqueTexts(entry.creatorNames, meta && meta.creatorNames);
       if (!force && characters.length && creators.length) continue;
 
-      // 제작자명이 프로필에 아예 없는 플롯은 캐릭터명만으로 충분하다.
       if (!force && characters.length && meta && meta.creatorUnavailable) continue;
 
-      // 두 번 넘게 못 연 플롯은 일주일 동안 건너뛴다.
       if (!force && meta && Number(meta.profileFailCount || 0) >= 2 &&
         Date.now() - Number(meta.profileFailedAt || 0) < 7 * 24 * 60 * 60 * 1000) continue;
 
@@ -1243,28 +1251,37 @@
   }
 
 
-  function applyProfileResult(target, result) {
+  function applyProfileResult(target, result, options = {}) {
     const canonicalId = target.plotId || normalizeText(result.profileId) || target.originatedId;
     if (!canonicalId) return;
 
+    const replaceNames = Boolean(options.replaceNames);
     const previous = state.plotMeta[canonicalId] || {};
     const meta = {
       ...previous,
       canonicalId,
       plotId: target.plotId || previous.plotId || '',
       originatedId: target.originatedId || previous.originatedId || '',
-      characterNames: uniqueTexts(previous.characterNames, result.characters),
-      creatorNames: uniqueTexts(previous.creatorNames, result.creators),
+      characterNames: replaceNames
+        ? uniqueTexts(result.characters)
+        : uniqueTexts(previous.characterNames, result.characters),
+      creatorNames: replaceNames
+        ? uniqueTexts(result.creators)
+        : uniqueTexts(previous.creatorNames, result.creators),
       updatedAt: Date.now()
     };
 
     if (result.partial) meta.creatorUnavailable = true;
     else delete meta.creatorUnavailable;
     delete meta.profileFailCount;
+    delete meta.profileFailedAt;
 
     state.plotMeta[canonicalId] = meta;
     plotLookupDirty = true;
-    mergeMetaIntoIndex(meta);
+    mergeMetaIntoIndex(meta, {
+      replaceNames,
+      strictIds: replaceNames
+    });
   }
 
   // 프로필을 아예 못 연 플롯(삭제된 플롯 등)은 몇 번 시도한 뒤 접어둔다.
@@ -1565,17 +1582,20 @@
     return '약 ' + Math.round(left / 60) + '분 남음';
   }
 
-  async function collectProfilesForEmptyPlots(force = false) {
-    // 목록에서 이미 이름을 확보한 플롯은 다시 열지 않는다.
-    const allTargets = profileCollectionTargets(false);
+  async function collectProfilesForEmptyPlots(force = false, explicitTargets = null) {
+    const hasExplicitTargets = Array.isArray(explicitTargets);
+    const allTargets = hasExplicitTargets ? explicitTargets : profileCollectionTargets(false);
     if (!allTargets.length) {
-      return { targets: 0, attempted: 0, done: 0, failed: 0, remaining: 0, limited: false, failures: [] };
+      return {
+        targets: 0, attempted: 0, done: 0, failed: 0,
+        remaining: 0, limited: false, failures: [], remainingTargets: []
+      };
     }
 
     const mobile = isMobileProfileDevice();
     const batchLimit = mobile ? PROFILE_BATCH_MOBILE : PROFILE_BATCH_DESKTOP;
     const targets = allTargets.slice(0, batchLimit);
-    const remaining = Math.max(0, allTargets.length - targets.length);
+    const queuedRemainingTargets = allTargets.slice(targets.length);
     const startedAt = Date.now();
     const failures = [];
     let cursor = 0;
@@ -1599,7 +1619,7 @@
 
     const onResult = (target, result, error) => {
       if (result) {
-        applyProfileResult(target, result);
+        applyProfileResult(target, result, { replaceNames: force });
         done++;
       } else {
         failed++;
@@ -1651,7 +1671,12 @@
 
     scheduleRefresh();
     lastProfileFailures = failures;
-    const remainingAfter = collectionAborted ? remaining : profileCollectionTargets(false).length;
+
+    const remainingTargets = hasExplicitTargets
+      ? queuedRemainingTargets
+      : (collectionAborted ? queuedRemainingTargets : profileCollectionTargets(false));
+    const remainingAfter = remainingTargets.length;
+
     return {
       targets: allTargets.length,
       attempted: done + failed,
@@ -1659,7 +1684,8 @@
       failed,
       remaining: remainingAfter,
       limited: remainingAfter > 0 && !collectionAborted,
-      failures
+      failures,
+      remainingTargets: hasExplicitTargets ? remainingTargets : []
     };
   }
 
@@ -1675,25 +1701,8 @@
       collectionAborted = false;
       void holdScreenAwake();
 
-      // 다시 전체 수집이 모바일에서 중간에 끊겨도 기존 방이 사라지지 않게
-      // 시작 전 방/플롯 목록을 보관한다. 새로 수집한 방은 깨끗한 상태로 덮어쓰고,
-      // 새 수집 수가 기존보다 적으면 못 본 기존 방만 마지막에 복원한다.
-      const forceBackupIndex = force ? { ...state.index } : null;
-      const forceOldRoomEntries = force
-        ? Object.fromEntries(Object.entries(forceBackupIndex).filter(([, entry]) => entry && entry.type === 'room'))
-        : null;
-      const forceOldPlotEntries = force
-        ? Object.fromEntries(Object.entries(forceBackupIndex).filter(([, entry]) => entry && entry.type === 'plot'))
-        : null;
-      const forceOldRoomCount = forceOldRoomEntries ? Object.keys(forceOldRoomEntries).length : 0;
-
-      if (force) {
-        resetCollectedIndex();
-        // 대화방 다시 수집 때문에 '만들기 → 비공개'에서 수집한 플롯 목록까지
-        // 지울 필요는 없다. 플롯 카드 자체는 그대로 보존한다.
-        Object.assign(state.index, forceOldPlotEntries || {});
-        saveStateNow();
-      }
+      // 다시 전체 수집은 기존 데이터를 지우지 않고, 실제로 다시 본 방만 비교·갱신한다.
+      forceReconcileSeenRoomKeys = force ? new Set() : null;
       // PC판과 같은 수집 흐름은 유지하되, iOS WebKit에서만 발생하는
       // MutationObserver → refresh → renderedItems 중복 분석을 막는다.
       suspendObserverRefresh = true;
@@ -1829,20 +1838,18 @@
       setScrollTop(host, originalTop);
       await sleep(100);
 
-      const freshRoomCount = roomCollectionCount();
-      const profiles = collectionAborted
-        ? { targets: 0, attempted: 0, done: 0, failed: 0, remaining: 0, limited: false, failures: [] }
-        : await collectProfilesForEmptyPlots(force);
+      const seenRoomKeys = force && forceReconcileSeenRoomKeys
+        ? new Set(forceReconcileSeenRoomKeys)
+        : null;
+      forceReconcileSeenRoomKeys = null;
 
-      let restoredRooms = 0;
-      if (force && freshRoomCount < forceOldRoomCount) {
-        for (const [key, entry] of Object.entries(forceOldRoomEntries || {})) {
-          if (state.index[key]) continue;
-          state.index[key] = entry;
-          restoredRooms++;
-        }
-        if (restoredRooms) saveStateNow();
-      }
+      const forceTargets = force ? profileCollectionTargets(true, seenRoomKeys) : null;
+      const profiles = collectionAborted
+        ? {
+            targets: 0, attempted: 0, done: 0, failed: 0,
+            remaining: 0, limited: false, failures: [], remainingTargets: []
+          }
+        : await collectProfilesForEmptyPlots(force, forceTargets);
 
       const total = roomCollectionCount();
 
@@ -1854,7 +1861,8 @@
           attempted: Number(previousResume.attempted || 0) + profiles.attempted,
           done: Number(previousResume.done || 0) + profiles.done,
           failed: Number(previousResume.failed || 0) + profiles.failed,
-          startedAt: Number(previousResume.startedAt || Date.now())
+          startedAt: Number(previousResume.startedAt || Date.now()),
+          targets: force ? profiles.remainingTargets : undefined
         });
         saveStateNow();
 
@@ -1880,7 +1888,8 @@
               attempted: profiles.attempted,
               done: profiles.done,
               failed: profiles.failed,
-              startedAt: Date.now()
+              startedAt: Date.now(),
+              targets: force ? profiles.remainingTargets : undefined
             });
             saveStateNow();
             await sleep(250);
@@ -1912,7 +1921,7 @@
       const shownFailures = profiles.failures.slice(0, 10);
       alert(
         resultTitle + ' · 저장된 방 ' + total + '개' +
-        (restoredRooms ? ' (이번에 못 본 기존 방 ' + restoredRooms + '개 보존)' : '') +
+        (force && seenRoomKeys ? ' · 이번 확인 ' + seenRoomKeys.size + '개' : '') +
         (skippedKnown ? ' (이미 수집된 구간은 건너뜀)' : '') +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 이번 ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개' +
@@ -1931,6 +1940,7 @@
       closeBookmarkletController();
       return true;
     })().finally(() => {
+      forceReconcileSeenRoomKeys = null;
       roomCollectionPromise = null;
       roomCollectionProgress.running = false;
       suspendObserverRefresh = false;
@@ -1952,13 +1962,18 @@
       void holdScreenAwake();
       await sleep(700);
 
-      const profiles = await collectProfilesForEmptyPlots(Boolean(resume.force));
+      const forceResume = Boolean(resume.force);
+      const resumeTargets = forceResume
+        ? (Array.isArray(resume.targets) ? resume.targets : profileCollectionTargets(true))
+        : null;
+      const profiles = await collectProfilesForEmptyPlots(forceResume, resumeTargets);
       const next = {
         ...resume,
         active: true,
         attempted: Number(resume.attempted || 0) + profiles.attempted,
         done: Number(resume.done || 0) + profiles.done,
-        failed: Number(resume.failed || 0) + profiles.failed
+        failed: Number(resume.failed || 0) + profiles.failed,
+        targets: forceResume ? profiles.remainingTargets : undefined
       };
 
       if (profiles.limited && !collectionAborted) {
@@ -2008,7 +2023,9 @@
       renderCollectionTools();
 
       alert(
-        (collectionAborted ? '대화방 수집 중지됨' : '대화방 전체 수집 완료') +
+        (collectionAborted
+          ? (forceResume ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨')
+          : (forceResume ? '다시 전체 수집 완료' : '대화방 전체 수집 완료')) +
         ' · 저장된 방 ' + total + '개' +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
         '\n이름 수집: 총 ' + next.attempted + '개 처리 · 성공 ' + next.done + '개' +
@@ -3049,7 +3066,8 @@
 
     // 이미 이름까지 수집된 항목은 화면을 지나갈 때마다 다시 훑지 않는다.
     // 아래 fiber 탐색이 항목당 수천 노드라, 목록 수집 시간의 대부분이 여기서 나온다.
-    if (previous.type === type
+    if (!forceReconcileSeenRoomKeys
+      && previous.type === type
       && normalizeText(previous.original) === original
       && uniqueTexts(previous.characterNames).length
       && uniqueTexts(previous.creatorNames).length) {
