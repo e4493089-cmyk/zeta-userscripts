@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.26
+// @version      0.23.27
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -2439,7 +2439,6 @@
         '<div class="zrm-collection-actions">' +
           '<button type="button" data-zrm-action="collect"></button>' +
           (isRoom ? '<button type="button" data-zrm-action="force-collect">다시 전체 수집</button>' : '') +
-          (isRoom ? '<button type="button" data-zrm-action="force-names">다시 이름 수집</button>' : '') +
           '<button type="button" data-zrm-action="export">내보내기</button>' +
           '<button type="button" data-zrm-action="import">불러오기</button>' +
           '<button type="button" data-zrm-action="delete">데이터 삭제</button>' +
@@ -2452,12 +2451,10 @@
 
     const collect = modal.querySelector('[data-zrm-action="collect"]');
     const forceCollect = modal.querySelector('[data-zrm-action="force-collect"]');
-    const forceNames = modal.querySelector('[data-zrm-action="force-names"]');
     const deleteButton = modal.querySelector('[data-zrm-action="delete"]');
     collect.disabled = false;
     collect.textContent = progress.running ? '중지' : (isRoom ? '일반 전체 수집' : '전체 수집');
     if (forceCollect) forceCollect.disabled = progress.running;
-    if (forceNames) forceNames.disabled = progress.running;
     if (deleteButton) deleteButton.disabled = progress.running;
 
     modal.querySelector('.zrm-collection-close').addEventListener('click', closeCollectionPopup);
@@ -2477,11 +2474,6 @@
       closeCollectionPopup();
       if (progress.running) return;
       collectAllRoomsByScrolling({ force: true });
-    });
-    forceNames?.addEventListener('click', () => {
-      closeCollectionPopup();
-      if (progress.running) return;
-      void startFullNameRecollection();
     });
     modal.querySelector('[data-zrm-action="export"]').addEventListener('click', () => {
       closeCollectionPopup();
