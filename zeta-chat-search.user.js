@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.12
+// @version      0.1.13
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.12';
+  const SCRIPT_VERSION = '0.1.13';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -261,6 +261,44 @@
     element.append(text.slice(0, at), mark, text.slice(at + query.length));
   }
 
+  function nativeCursorUrl(messageId) {
+    const match = String(messageId || '').match(/^message-(MESSAGE-\\d+-[A-Za-z0-9_-]+)/);
+    if (!match) return '';
+    const url = new URL(location.href);
+    url.searchParams.set('cursor', match[1]);
+    return url.href;
+  }
+
+  async function tryNativeCursor(row, status) {
+    const targetUrl = nativeCursorUrl(row.id);
+    if (!targetUrl) return false;
+
+    status('제타 이동 기능으로 대화를 여는 중…');
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText =
+      'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
+    document.body.appendChild(frame);
+
+    try {
+      frame.src = targetUrl;
+      for (let attempt = 0; attempt < 80 && !deepLoadAborted; attempt += 1) {
+        await sleep(attempt ? 100 : 350);
+        let target = null;
+        try { target = frame.contentDocument?.getElementById(row.id) || null; } catch (_) {}
+        if (!target) continue;
+
+        // 책갈피를 눌렀을 때와 같은 cursor 주소가 실제 메시지를 연 것을
+        // 확인한 뒤 현재 창도 그 주소로 이동한다.
+        location.assign(frame.contentWindow?.location?.href || targetUrl);
+        return true;
+      }
+    } finally {
+      frame.remove();
+    }
+    return false;
+  }
+
   async function jumpToMessage(row, status) {
     // openPanel()은 기존 패널/작업을 정리하면서 중지 플래그를 켠다.
     // 새 결과를 누른 시점에는 이동 작업을 새로 시작해야 한다.
@@ -274,7 +312,11 @@
       return true;
     }
 
-    // 아직 화면에 없는 옛 메시지면 거기까지 거슬러 올라간다.
+    // 제타 책갈피와 같은 cursor 이동을 먼저 쓴다. 전체 대화를 한 칸씩
+    // 훑는 것보다 빠르고, 가상 스크롤에서 메시지가 빠지는 문제도 피한다.
+    if (await tryNativeCursor(row, status)) return true;
+
+    // cursor 이동을 지원하지 않는 화면에서는 기존 스크롤 탐색으로 대체한다.
     status('그 대화까지 거슬러 올라가는 중…');
     const log = chatLog();
     if (!log) return false;
