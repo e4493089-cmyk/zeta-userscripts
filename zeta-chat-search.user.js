@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.7
+// @version      0.1.8
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.7';
+  const SCRIPT_VERSION = '0.1.8';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -648,13 +648,20 @@
         border-top: 1px solid var(--kt-line, rgba(255,255,255,.07));
       }
       #${PANEL_ID} .zcs-more {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         width: 100%;
         height: 44px;
+        padding: 0;
         border: 0;
         border-radius: 12px;
         background: var(--kt-yellow, #6d52ff);
         color: var(--kt-text, #fff);
-        font: 800 13px/1 inherit;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1;
         cursor: pointer;
       }
       #${PANEL_ID} .zcs-more:hover { filter: brightness(.96); }
