@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.38
+// @version      0.23.39
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -3202,6 +3202,9 @@
   // 스크롤을 내리면 같은 방이 몇 번이고 다시 화면에 들어오는데, 그때마다
   // 항목당 수천 노드를 재탐색하는 것이 첫 목록 수집이 느린 가장 큰 이유였다.
   const harvestedItems = new Map();
+  // 무거운 분석이 실제로 돌았는지 세어, 바뀐 게 없으면 저장을 건너뛴다.
+  let heavyParses = 0;
+  let savedHeavyParses = 0;
 
   function parseItem(item, type) {
     if (item.closest && item.closest('#' + NATIVE_RESULTS_ID + ', #' + PLOT_NATIVE_RESULTS_ID)) return null;
@@ -3277,6 +3280,7 @@
     }
 
     // 카드에 텍스트로 안 보여도 React props 안의 plot 데이터에서 이름을 보강한다.
+    heavyParses++;
     harvestReactPlotData(item);
     harvestedItems.set(key, original);
     const searchMeta = collectSearchMeta(item, titleEl);
@@ -3980,7 +3984,10 @@
     }
 
     injectRoomContextMenu();
-    saveState();
+    if (heavyParses !== savedHeavyParses) {
+      savedHeavyParses = heavyParses;
+      saveState();
+    }
 
     if (section === 'room') {
       bindNativeRoomSearch();
@@ -3992,14 +3999,22 @@
     observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  // 목록을 스크롤하면 제타가 매 프레임 DOM을 바꾼다. 그때마다 전체 갱신을
+  // 돌리면 스크롤이 끊긴다. 최소 간격을 두고 마지막 요청만 처리한다.
+  const REFRESH_MIN_GAP = 200;
+  let refreshTimer = null;
+  let lastRefreshAt = 0;
+
   function scheduleRefresh() {
     if (suspendObserverRefresh) return;
-    if (rafPending) return;
-    rafPending = true;
-    requestAnimationFrame(() => {
-      rafPending = false;
+    if (refreshTimer) return;
+
+    const wait = Math.max(0, REFRESH_MIN_GAP - (Date.now() - lastRefreshAt));
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      lastRefreshAt = Date.now();
       refresh();
-    });
+    }, wait);
   }
 
   function start() {
