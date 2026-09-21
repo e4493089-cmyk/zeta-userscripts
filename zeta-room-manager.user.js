@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.57
+// @version      0.23.58
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.57';
+  const SCRIPT_VERSION = '0.23.58';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1358,6 +1358,7 @@
     if (!modal) {
       modal = document.createElement('div');
       modal.id = CONVERT_PROGRESS_ID;
+      modal.className = 'zrm-modal';
       modal.innerHTML =
         '<div class="zrm-result-card" role="status" aria-live="polite">' +
           '<div class="zrm-result-title">방 열어 이름 수집 중</div>' +
@@ -1385,6 +1386,7 @@
     return new Promise(resolve => {
       const modal = document.createElement('div');
       modal.id = COLLECTION_RESULT_ID;
+      modal.className = 'zrm-modal';
 
       const card = document.createElement('div');
       card.className = 'zrm-result-card';
@@ -1503,7 +1505,7 @@
     const style = document.createElement('style');
     style.id = COLLECTION_RESULT_STYLE_ID;
     style.textContent = `
-      #${COLLECTION_RESULT_ID} {
+      .zrm-modal {
         position: fixed;
         inset: 0;
         z-index: 2147483646;
@@ -1514,7 +1516,7 @@
         background: rgba(0,0,0,.45);
         box-sizing: border-box;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-card {
+      .zrm-modal .zrm-result-card {
         width: min(340px, 100%);
         max-height: min(78vh, 560px);
         display: flex;
@@ -1528,33 +1530,33 @@
         box-shadow: 0 20px 60px rgba(0,0,0,.4);
         box-sizing: border-box;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-title { font-size: 13px; font-weight: 700; }
-      #${COLLECTION_RESULT_ID} .zrm-result-stats {
+      .zrm-modal .zrm-result-title { font-size: 13px; font-weight: 700; }
+      .zrm-modal .zrm-result-stats {
         display: flex;
         gap: 10px;
         margin: 12px 0 4px;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-stat {
+      .zrm-modal .zrm-result-stat {
         flex: 1 1 0;
         padding: 10px 6px;
         border-radius: 12px;
         background: #f5f4ff;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-stat.zrm-result-fail { background: #fff1f1; }
-      #${COLLECTION_RESULT_ID} .zrm-result-stat-label {
+      .zrm-modal .zrm-result-stat.zrm-result-fail { background: #fff1f1; }
+      .zrm-modal .zrm-result-stat-label {
         font-size: 11px;
         font-weight: 600;
         color: #6b6b74;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-stat-value {
+      .zrm-modal .zrm-result-stat-value {
         margin-top: 4px;
         font-size: 20px;
         font-weight: 800;
         letter-spacing: -.02em;
         color: #6d52ff;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-fail .zrm-result-stat-value { color: #b4232a; }
-      #${COLLECTION_RESULT_ID} .zrm-result-list {
+      .zrm-modal .zrm-result-fail .zrm-result-stat-value { color: #b4232a; }
+      .zrm-modal .zrm-result-list {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
@@ -1565,28 +1567,28 @@
         background: #f7f7fa;
         text-align: left;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-list-title {
+      .zrm-modal .zrm-result-list-title {
         margin-bottom: 6px;
         font-size: 11px;
         font-weight: 700;
         color: #45454e;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-item {
+      .zrm-modal .zrm-result-item {
         padding: 6px 0;
         border-top: 1px solid #e7e7ec;
         font-size: 11px;
         line-height: 1.45;
         word-break: break-all;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-item:first-child { border-top: 0; }
-      #${COLLECTION_RESULT_ID} .zrm-result-item b { font-weight: 700; }
-      #${COLLECTION_RESULT_ID} .zrm-result-item span { color: #6b6b74; }
-      #${COLLECTION_RESULT_ID} .zrm-result-buttons {
+      .zrm-modal .zrm-result-item:first-child { border-top: 0; }
+      .zrm-modal .zrm-result-item b { font-weight: 700; }
+      .zrm-modal .zrm-result-item span { color: #6b6b74; }
+      .zrm-modal .zrm-result-buttons {
         display: flex;
         gap: 8px;
         margin-top: 14px;
       }
-      #${COLLECTION_RESULT_ID} button {
+      .zrm-modal button {
         flex: 1 1 0;
         height: 40px;
         border: 0;
@@ -1594,7 +1596,7 @@
         font: 700 12px/1 system-ui, sans-serif;
         cursor: pointer;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-action {
+      .zrm-modal .zrm-result-action {
         width: 100%;
         height: 40px;
         margin-top: 12px;
@@ -1605,41 +1607,30 @@
         font: 700 12px/1 system-ui, sans-serif;
         cursor: pointer;
       }
-      #${CONVERT_PROGRESS_ID} {
-        position: fixed;
-        inset: 0;
-        z-index: 2147483646;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-        background: rgba(0,0,0,.45);
-        box-sizing: border-box;
-      }
-      #${CONVERT_PROGRESS_ID} .zrm-convert-count {
+      .zrm-modal .zrm-convert-count {
         margin: 12px 0 4px;
         font-size: 20px;
         font-weight: 800;
         letter-spacing: -.02em;
         color: #6d52ff;
       }
-      #${CONVERT_PROGRESS_ID} .zrm-convert-name {
+      .zrm-modal .zrm-convert-name {
         color: #6b6b74;
         font-size: 11px;
         word-break: break-all;
       }
-      #${COLLECTION_RESULT_ID} .zrm-result-copy { background: #6d52ff; color: #fff; }
-      #${COLLECTION_RESULT_ID} .zrm-result-close { background: #f0f0f3; color: #45454e; }
+      .zrm-modal .zrm-result-copy { background: #6d52ff; color: #fff; }
+      .zrm-modal .zrm-result-close { background: #f0f0f3; color: #45454e; }
       @media (max-width: 600px) {
-        #${COLLECTION_RESULT_ID} { padding: 14px; }
-        #${COLLECTION_RESULT_ID} .zrm-result-card {
+        .zrm-modal { padding: 14px; }
+        .zrm-modal .zrm-result-card {
           width: min(300px, 100%);
           padding: 17px 15px 14px;
           font-size: 11px;
         }
-        #${COLLECTION_RESULT_ID} .zrm-result-title { font-size: 12px; }
-        #${COLLECTION_RESULT_ID} .zrm-result-stat-value { font-size: 18px; }
-        #${COLLECTION_RESULT_ID} button { height: 36px; font-size: 11px; }
+        .zrm-modal .zrm-result-title { font-size: 12px; }
+        .zrm-modal .zrm-result-stat-value { font-size: 18px; }
+        .zrm-modal button { height: 36px; font-size: 11px; }
       }
     `;
     (document.head || document.documentElement).appendChild(style);
@@ -1683,6 +1674,7 @@
     const list = Array.isArray(failures) ? failures : [];
     const modal = document.createElement('div');
     modal.id = COLLECTION_RESULT_ID;
+    modal.className = 'zrm-modal';
 
     const card = document.createElement('div');
     card.className = 'zrm-result-card';
