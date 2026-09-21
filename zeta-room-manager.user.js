@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.8
+// @version      0.23.9
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -509,6 +509,7 @@
   }
 
   function inspectNativeResponsePayload(payload) {
+    if (suspendPassiveNativeCapture) return;
     const count = harvestPlotDataTree(payload, { maxDepth: 10, maxNodes: 12000 });
     if (count) saveState();
   }
@@ -525,7 +526,7 @@
         try {
           const first = arguments[0];
           const url = typeof first === 'string' ? first : first && first.url;
-          if (shouldInspectNativeResponse(url)) {
+          if (!suspendPassiveNativeCapture && shouldInspectNativeResponse(url)) {
             const clone = response.clone();
             clone.json().then(inspectNativeResponsePayload).catch(() => {});
           }
@@ -546,7 +547,7 @@
     XMLHttpRequest.prototype.send = function () {
       const xhr = this;
       const url = xhrUrl.get(xhr) || '';
-      if (shouldInspectNativeResponse(url)) {
+      if (!suspendPassiveNativeCapture && shouldInspectNativeResponse(url)) {
         xhr.addEventListener('load', () => {
           try {
             if (xhr.responseType === 'json' && xhr.response) {
@@ -837,6 +838,8 @@
   let collectionAborted = false;
   let wakeLock = null;
   let wakeStatus = '';
+  // 숨김 프로필을 연속으로 읽는 동안 fetch/XHR 응답까지 복제하면 메모리 사용량이 크게 늘어난다.
+  let suspendPassiveNativeCapture = false;
 
   function collectionRunning() {
     return Boolean(roomCollectionProgress.running || plotCollectionProgress.running);
@@ -1087,8 +1090,11 @@
 
   // 플롯마다 iframe을 새로 띄우면 제타 앱을 매번 처음부터 부팅한다.
   // 손으로 할 때처럼, 앱은 한 번만 띄우고 그 안에서 화면만 바꾼다.
-  const PROFILE_WORKERS = 4;
-  const MOBILE_FORCE_PROFILE_WORKERS = 3;
+  const PROFILE_WORKERS = 3;
+  const FORCE_PROFILE_WORKERS = 1;
+  const MOBILE_PROFILE_WORKERS = 2;
+  const PROFILE_BATCH_DESKTOP = 160;
+  const PROFILE_BATCH_MOBILE = 80;
   let lastProfileFailures = [];
 
   function isMobileProfileDevice() {
@@ -1209,90 +1215,51 @@
   }
 
   async function profileWorker(queue, onResult, options = {}) {
-    const slowMobileForce = Boolean(options.force && options.mobile);
-    let frame = null;
-    let used = 0;
+    const pauseMs = options.force
+      ? (options.mobile ? 550 : 350)
+      : (options.mobile ? 300 : 180);
 
-    const ensureFrame = () => {
-      if (!frame || !frame.isConnected) frame = hiddenFrame();
-      return frame;
-    };
-    const hardNavigateProfile = async (plotId, timeoutMs) => {
-      const active = ensureFrame();
-      active.src = profilePath(plotId);
-      return await readProfileIn(active, plotId, timeoutMs);
-    };
-    const hardNavigateRoomProfile = async roomId => {
-      const active = ensureFrame();
-      active.src = '/' + localeSegment() + '/rooms/' + roomId;
+    for (;;) {
+      const target = queue.next();
+      if (!target) return;
 
-      const button = await readInFrame(active, win => {
-        if (!win.location.pathname.includes(roomId)) return null;
-        return win.document.querySelector(PROFILE_BUTTON);
-      }, 10000);
-      button.click();
-
-      return await readInFrame(active, win => {
-        if (!PROFILE_PATH.test(win.location.pathname)) return null;
-        return readPlotProfile(win);
-      }, 10000);
-    };
-
-    try {
-      for (;;) {
-        const target = queue.next();
-        if (!target) return;
-
-        // 같은 browsing context에서 URL을 완전히 다시 로드한다.
-        // pushState처럼 이전 DOM을 재사용하지 않으므로 메타 오염은 막고,
-        // 매 항목마다 새 iframe을 생성/폐기하는 것보다 메모리 누적이 적다.
-        if (used >= 24) {
-          dropFrame(frame);
-          frame = null;
-          used = 0;
-          await sleep(250);
+      try {
+        if (!target.plotId) {
+          onResult(target, await visitRoomProfile(target.roomId), null);
+          await sleep(pauseMs);
+          continue;
         }
+
+        let result = null;
+        let directError = null;
 
         try {
-          if (!target.plotId) {
-            onResult(target, await hardNavigateRoomProfile(target.roomId), null);
-            used++;
-            continue;
-          }
-
-          let result = null;
-          let directError = null;
-
-          try {
-            result = await hardNavigateProfile(target.plotId, 18000);
-          } catch (error) {
-            directError = error;
-          }
-
-          if (!result && target.originatedId && target.originatedId !== target.plotId) {
-            try {
-              result = await hardNavigateProfile(target.originatedId, 15000);
-            } catch (_) {}
-          }
-
-          if (!result) {
-            try {
-              result = await hardNavigateRoomProfile(target.roomId);
-            } catch (roomError) {
-              throw roomError || directError || new Error('프로필을 열 수 없습니다');
-            }
-          }
-
-          onResult(target, result, null);
+          result = await visitPlotProfile(target.plotId, 18000);
         } catch (error) {
-          onResult(target, null, error);
+          directError = error;
         }
 
-        used++;
-        if (slowMobileForce) await sleep(300);
+        if (!result && target.originatedId && target.originatedId !== target.plotId) {
+          try {
+            result = await visitPlotProfile(target.originatedId, 15000);
+          } catch (_) {}
+        }
+
+        if (!result) {
+          try {
+            result = await visitRoomProfile(target.roomId);
+          } catch (roomError) {
+            throw roomError || directError || new Error('프로필을 열 수 없습니다');
+          }
+        }
+
+        onResult(target, result, null);
+      } catch (error) {
+        onResult(target, null, error);
       }
-    } finally {
-      dropFrame(frame);
+
+      // 매 항목마다 iframe을 완전히 폐기한 뒤 브라우저가 정리할 시간을 준다.
+      await sleep(pauseMs);
     }
   }
 
@@ -1305,12 +1272,16 @@
   }
 
   async function collectProfilesForEmptyPlots(force = false) {
-    // 다시 전체 수집은 앞 단계에서 index/plotMeta를 비우고 목록을 처음부터 새로 훑는다.
-    // 그 과정에서 캐릭터/제작자 정보까지 새로 들어온 플롯을 또 프로필로 열 필요는 없다.
-    // 프로필 단계는 새 수집 후에도 비어 있는 칸만 보충한다.
-    const targets = profileCollectionTargets(false);
-    if (!targets.length) return { targets: 0, done: 0, failed: 0 };
+    // 목록에서 이미 이름을 확보한 플롯은 다시 열지 않는다.
+    const allTargets = profileCollectionTargets(false);
+    if (!allTargets.length) {
+      return { targets: 0, attempted: 0, done: 0, failed: 0, remaining: 0, limited: false, failures: [] };
+    }
 
+    const mobile = isMobileProfileDevice();
+    const batchLimit = mobile ? PROFILE_BATCH_MOBILE : PROFILE_BATCH_DESKTOP;
+    const targets = allTargets.slice(0, batchLimit);
+    const remaining = Math.max(0, allTargets.length - targets.length);
     const startedAt = Date.now();
     const failures = [];
     let cursor = 0;
@@ -1322,6 +1293,12 @@
         if (collectionAborted || currentSection() !== 'room') return null;
         return cursor < targets.length ? targets[cursor++] : null;
       }
+    };
+
+    const progressNote = completed => {
+      const eta = remainingText(startedAt, completed, targets.length);
+      const guard = '메모리 보호 · 이번 실행 ' + targets.length + '개까지';
+      return eta ? eta + ' · ' + guard : guard;
     };
 
     const onResult = (target, result, error) => {
@@ -1344,12 +1321,12 @@
         roomTotal: roomCollectionCount(),
         phase: force ? '다시 이름 수집' : '이름 수집',
         current: completed,
-        total: targets.length,
-        note: remainingText(startedAt, completed, targets.length)
+        total: allTargets.length,
+        note: progressNote(completed)
       };
       renderCollectionTools();
 
-      if (completed % 10 === 0) saveStateNow();
+      if (completed % 5 === 0) saveStateNow();
     };
 
     roomCollectionProgress = {
@@ -1358,22 +1335,37 @@
       roomTotal: roomCollectionCount(),
       phase: force ? '다시 이름 수집' : '이름 수집',
       current: 0,
-      total: targets.length
+      total: allTargets.length,
+      note: progressNote(0)
     };
     renderCollectionTools();
 
-    const mobileForce = Boolean(force && isMobileProfileDevice());
-    const workerLimit = mobileForce ? MOBILE_FORCE_PROFILE_WORKERS : PROFILE_WORKERS;
-    const workers = [];
-    for (let i = 0; i < Math.min(workerLimit, targets.length); i++) {
-      workers.push(profileWorker(queue, onResult, { force, mobile: mobileForce }));
+    const workerLimit = force
+      ? FORCE_PROFILE_WORKERS
+      : (mobile ? MOBILE_PROFILE_WORKERS : PROFILE_WORKERS);
+    suspendPassiveNativeCapture = true;
+    try {
+      const workers = [];
+      for (let i = 0; i < Math.min(workerLimit, targets.length); i++) {
+        workers.push(profileWorker(queue, onResult, { force, mobile }));
+      }
+      await Promise.all(workers);
+    } finally {
+      suspendPassiveNativeCapture = false;
+      saveStateNow();
     }
-    await Promise.all(workers);
 
-    saveStateNow();
     scheduleRefresh();
     lastProfileFailures = failures;
-    return { targets: targets.length, done, failed, failures };
+    return {
+      targets: allTargets.length,
+      attempted: done + failed,
+      done,
+      failed,
+      remaining,
+      limited: remaining > 0 && !collectionAborted,
+      failures
+    };
   }
 
   async function collectAllRoomsByScrolling(options = {}) {
@@ -1517,19 +1509,31 @@
       const aliases = Object.values(state.index).filter(entry =>
         entry && entry.type === 'room' && normalizeText(entry.alias)
       ).length;
+      const resultTitle = collectionAborted
+        ? (force ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨')
+        : profiles.limited
+          ? '메모리 보호로 이름 수집 일시 정지'
+          : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료');
+      const shownFailures = profiles.failures.slice(0, 10);
       alert(
-        (collectionAborted
-          ? (force ? '다시 전체 수집 중지됨' : '대화방 수집 중지됨')
-          : (force ? '다시 전체 수집 완료' : '대화방 전체 수집 완료')) + ' · 저장된 방 ' + total + '개' +
+        resultTitle + ' · 저장된 방 ' + total + '개' +
         (skippedKnown ? ' (이미 수집된 구간은 건너뜀)' : '') +
         '\n별명 ' + aliases + '개 · 캐릭터명 ' + coverage.character + '개 · 제작자명 ' + coverage.creator + '개' +
-        '\n이름 수집: 플롯 ' + profiles.targets + '개 중 ' + profiles.done + '개 성공' +
-        (profiles.failed ? ' · ' + profiles.failed + '개 실패' : '') +
+        '\n이름 수집: 이번 ' + profiles.attempted + '개 처리 · 성공 ' + profiles.done + '개' +
+        (profiles.failed ? ' · 실패 ' + profiles.failed + '개' : '') +
+        (profiles.remaining ? '\n남은 플롯 약 ' + profiles.remaining + '개' : '') +
+        (profiles.limited
+          ? '\n\n브라우저 메모리 보호를 위해 여기서 저장하고 멈췄습니다.' +
+            '\n페이지를 새로고침한 뒤 일반 전체 수집을 누르면 남은 항목만 이어서 수집합니다.'
+          : '') +
         (profiles.failed
           ? '\n\n실패 사유\n' + failureSummary(profiles.failures).map(line => '· ' + line).join('\n') +
-            '\n\n실패한 대화방\n' + profiles.failures
+            '\n\n실패한 대화방 (최대 10개 표시)\n' + shownFailures
               .map(item => '· ' + item.name + '\n  ' + item.url)
-              .join('\n')
+              .join('\n') +
+            (profiles.failures.length > shownFailures.length
+              ? '\n· 외 ' + (profiles.failures.length - shownFailures.length) + '개'
+              : '')
           : '')
       );
       return true;
