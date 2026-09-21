@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.42
+// @version      0.23.43
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1301,6 +1301,85 @@
     } catch (_) {}
   }
 
+  // 숨긴 화면에서 제일 많이 먹는 건 그림이다. 캐릭터 프사 한 장이
+  // 펼쳐지면 수십 MB가 되고, 수백 번 띄우면 renderer가 Out of Memory로 죽는다.
+  // 이름은 img의 alt에서 읽으므로 그림 자체는 받지 않아도 된다.
+  const MEDIA_TAGS = /^(?:IMG|SOURCE|VIDEO|AUDIO)$/;
+  const MEDIA_ATTRS = /^(?:src|srcset|poster)$/;
+  let blockFrameMedia = true;
+
+  function stripMediaElement(el) {
+    try {
+      for (const name of ['src', 'srcset', 'poster']) {
+        const value = el.getAttribute && el.getAttribute(name);
+        if (value === null || value === undefined) continue;
+        el.removeAttribute(name);
+        el.setAttribute('data-zrm-' + name, value);
+      }
+    } catch (_) {}
+  }
+
+  function stripFrameMedia(win) {
+    if (!blockFrameMedia) return;
+    try {
+      const doc = win && win.document;
+      if (!doc || doc.__zrmNoMedia) return;
+      doc.__zrmNoMedia = true;
+
+      // 문서가 바뀌면 생성자도 새로 생긴다. 문서마다 다시 건다.
+      const setAttribute = win.Element.prototype.setAttribute;
+      win.Element.prototype.setAttribute = function (name, value) {
+        const lower = String(name).toLowerCase();
+        if (MEDIA_ATTRS.test(lower) && MEDIA_TAGS.test(this.tagName || '')) {
+          return setAttribute.call(this, 'data-zrm-' + lower, value);
+        }
+        return setAttribute.call(this, name, value);
+      };
+
+      const image = win.HTMLImageElement && win.HTMLImageElement.prototype;
+      for (const name of ['src', 'srcset']) {
+        const own = image && Object.getOwnPropertyDescriptor(image, name);
+        if (!own || !own.set) continue;
+        Object.defineProperty(image, name, {
+          configurable: true,
+          enumerable: own.enumerable,
+          get() { return this.getAttribute('data-zrm-' + name) || ''; },
+          set(value) { setAttribute.call(this, 'data-zrm-' + name, value); }
+        });
+      }
+
+      doc.querySelectorAll('img, source, video, audio').forEach(stripMediaElement);
+
+      const observer = new win.MutationObserver(records => {
+        for (const record of records) {
+          for (const node of record.addedNodes) {
+            if (!node || node.nodeType !== 1) continue;
+            if (MEDIA_TAGS.test(node.tagName || '')) stripMediaElement(node);
+            if (node.querySelectorAll) node.querySelectorAll('img, source, video, audio').forEach(stripMediaElement);
+          }
+        }
+      });
+      observer.observe(doc.documentElement, { childList: true, subtree: true });
+    } catch (_) {}
+  }
+
+  // 화면이 바뀌는 순간을 놓치면 그림이 이미 떠 버린다.
+  // 주소를 바꾼 직후 잠깐만 촘촘히 확인한다.
+  function armMediaGuard(frame) {
+    if (!blockFrameMedia || !frame) return;
+    let left = 80;
+    const timer = setInterval(() => {
+      if (--left <= 0 || !frame.isConnected) {
+        clearInterval(timer);
+        return;
+      }
+      try {
+        const win = frame.contentWindow;
+        if (win && win.document && !win.document.__zrmNoMedia) stripFrameMedia(win);
+      } catch (_) {}
+    }, 25);
+  }
+
   async function readInFrame(frame, read, timeoutMs) {
     const end = Date.now() + timeoutMs;
     while (Date.now() < end) {
@@ -1310,6 +1389,7 @@
         const win = frame.contentWindow;
         if (win && win.document) {
           muteFrameDialogs(win);
+          stripFrameMedia(win);
           const value = read(win);
           if (value) return value;
         }
@@ -1515,7 +1595,7 @@
   // 손으로 할 때처럼, 앱은 한 번만 띄우고 그 안에서 화면만 바꾼다.
   const PROFILE_WORKERS = 2;
   const MOBILE_PROFILE_WORKERS = 2;
-  const PROFILE_FRAME_RECYCLE = 12;
+  const PROFILE_FRAME_RECYCLE = 8;
   // 이 비율을 넘기면 화면을 모두 버리고 잠시 쉰다.
   // 다만 performance.memory는 JS 힙만 본다. 문서·이미지가 차지하는
   // renderer 메모리는 여기에 잡히지 않으므로, 이것만 믿으면 안 된다.
@@ -1543,6 +1623,35 @@
   // 없었으므로 PC도 그 선까지 내린다.
   const PROFILE_BATCH_DESKTOP = 80;
   const PROFILE_BATCH_MOBILE = 50;
+  const BATCH_KEY = 'zeta-room-manager:batch:v1';
+
+  function configuredBatch(mobile) {
+    let saved = 0;
+    try { saved = Number(localStorage.getItem(BATCH_KEY) || 0); } catch (_) {}
+    if (saved >= 10 && saved <= 200) return saved;
+    return mobile ? PROFILE_BATCH_MOBILE : PROFILE_BATCH_DESKTOP;
+  }
+
+  // 그래도 메모리가 터지면 한 번에 도는 개수를 줄인다.
+  window.zrmSetBatch = function (count) {
+    const value = Math.max(0, Math.min(200, Number(count) || 0));
+    try {
+      if (value) localStorage.setItem(BATCH_KEY, String(value));
+      else localStorage.removeItem(BATCH_KEY);
+    } catch (_) {}
+    return value
+      ? '한 번에 ' + value + '개씩 돌게 맞췄어요. 다음 수집부터 적용됩니다. (기본값으로 되돌리려면 zrmSetBatch(0))'
+      : '기본값으로 되돌렸어요.';
+  };
+
+  // 그림 차단이 수집을 망가뜨리면 이걸로 끈다.
+  window.zrmBlockImages = function (on) {
+    blockFrameMedia = on !== false;
+    return blockFrameMedia
+      ? '숨김 화면에서 그림을 받지 않습니다.'
+      : '숨김 화면에서 그림을 그대로 받습니다. (메모리를 더 씁니다)';
+  };
+
   let lastProfileFailures = [];
 
   function isMobileProfileDevice() {
@@ -1737,6 +1846,7 @@
       await blankFrame();
       const active = ensureFrame();
       active.src = '/' + localeSegment() + '/rooms/' + roomId;
+      armMediaGuard(active);
 
       const button = await readInFrame(active, win => {
         if (!win.location.pathname.includes(roomId)) return null;
@@ -1762,6 +1872,7 @@
       await blankFrame();
       const active = ensureFrame();
       active.src = '/' + localeSegment() + '/plots/' + plotId + '/profile';
+      armMediaGuard(active);
       // 직행은 빨리 뜨거나 안 뜨거나다. 오래 기다리면 느린 경로로 넘어가는 게 손해다.
       return await readProfileIn(active, plotId, timeLeft(deadline, options.mobile ? 4500 : 6000));
     };
@@ -1871,7 +1982,7 @@
     }
 
     const mobile = isMobileProfileDevice();
-    const batchLimit = mobile ? PROFILE_BATCH_MOBILE : PROFILE_BATCH_DESKTOP;
+    const batchLimit = configuredBatch(mobile);
     const targets = allTargets.slice(0, batchLimit);
     const queuedRemainingTargets = allTargets.slice(targets.length);
     const startedAt = Date.now();
@@ -1914,6 +2025,12 @@
         }
       } else {
         failed++;
+        // 그림 차단 때문에 화면이 안 그려지는 제타 화면일 수도 있다.
+        // 앞부분이 전부 실패하면 차단을 스스로 풀고 그대로 이어간다.
+        if (blockFrameMedia && done === 0 && failed >= 8) {
+          blockFrameMedia = false;
+          try { console.warn('[zrm] 그림 차단을 껐습니다 — 앞 ' + failed + '개가 모두 실패했습니다.'); } catch (_) {}
+        }
         const reason = normalizeText((error && error.message) || error) || '알 수 없는 오류';
         const record = describeFailure(target, reason);
         failures.push(record);
