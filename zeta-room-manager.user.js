@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.44
+// @version      0.23.45
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -2135,15 +2135,27 @@
     return Boolean(run && run.active && run.mode === 'navigate');
   }
 
-  function navTargetUrl(target) {
-    // 플롯 아이디를 알면 프로필로 바로 간다. 모르면 방을 거친다.
-    if (target.plotId) return '/' + localeSegment() + '/plots/' + target.plotId + '/profile';
+  // 팝업이 사라지지 않거나 화면이 계속 넘어갈 때 손으로 끄는 비상구.
+  window.zrmStopCollect = function () {
+    clearNavRun();
+    clearProfileResume();
+    navStopped = false;
+    document.getElementById(NAV_OVERLAY_ID)?.remove();
+    return '수집을 멈췄습니다. 화면을 새로고침해 주세요.';
+  };
+
+  // 프로필 주소로 바로 가는 게 빠르지만, 제작자는 방에서 프로필 버튼을 눌러야
+  // 안정적으로 나온다. 직행이 안 되면 방을 거치는 길로 한 번 더 간다.
+  function navTargetUrl(target, stage) {
+    if (stage !== 'room' && target.plotId) {
+      return '/' + localeSegment() + '/plots/' + target.plotId + '/profile';
+    }
     return '/' + localeSegment() + '/rooms/' + target.roomId;
   }
 
-  function atNavTarget(target) {
+  function atNavTarget(target, stage) {
     const path = location.pathname;
-    if (target.plotId) return path.includes('/plots/' + target.plotId + '/profile');
+    if (stage !== 'room' && target.plotId) return path.includes('/plots/' + target.plotId + '/profile');
     return path.includes('/rooms/' + target.roomId);
   }
 
@@ -2235,7 +2247,7 @@
     run.steps = Number(run.steps || 0) + 1;
     writeNavRun(run);
     // replace를 쓰면 뒤로 가기 기록이 수백 개 쌓이지 않는다.
-    location.replace(navTargetUrl(target));
+    location.replace(navTargetUrl(target, run.stage));
   }
 
   // 지금 화면에서 프로필이 다 그려질 때까지 기다렸다 읽는다.
@@ -2287,9 +2299,9 @@
     throw new Error('시간 초과 — 프로필이 열리지 않았습니다');
   }
 
-  async function readProfileOnThisPage(target) {
-    // 플롯 아이디를 모르면 방에서 프로필 버튼을 눌러 연다(같은 문서 안에서 열린다).
-    if (!target.plotId) {
+  async function readProfileOnThisPage(target, stage) {
+    // 방을 거치는 길에서는 프로필 버튼을 눌러 연다(같은 문서 안에서 열린다).
+    if (stage === 'room' || !target.plotId) {
       const end = Date.now() + NAV_READ_TIMEOUT;
       let button = null;
       while (Date.now() < end) {
@@ -2369,7 +2381,7 @@
     if (!run || !run.active || run.mode !== 'navigate') return;
 
     // 이동 횟수가 목표 수보다 훨씬 많아지면 뭔가 잘못 돌고 있는 것이다.
-    if (Number(run.steps || 0) > run.queue.length * 2 + 60) {
+    if (Number(run.steps || 0) > run.queue.length * 3 + 80) {
       finishNavRun(run, '이동이 너무 많아 멈췄습니다');
       return;
     }
@@ -2384,11 +2396,12 @@
       return;
     }
 
-    renderNavOverlay(run, '');
+    const stage = run.stage === 'room' ? 'room' : 'direct';
+    renderNavOverlay(run, stage === 'room' ? '대화방을 거쳐 다시 읽는 중…' : '');
     void holdScreenAwake();
 
     // 아직 목표 화면이 아니면 옮기기만 한다. 읽는 건 다음 로드에서.
-    if (!atNavTarget(target)) {
+    if (!atNavTarget(target, stage)) {
       goToNavTarget(run);
       return;
     }
@@ -2396,7 +2409,7 @@
     let result = null;
     let error = null;
     try {
-      result = await readProfileOnThisPage(target);
+      result = await readProfileOnThisPage(target, stage);
     } catch (caught) {
       error = caught;
     }
@@ -2406,6 +2419,28 @@
       finishNavRun(run, '이름 수집 중지됨');
       return;
     }
+
+    // 직행으로 제작자를 못 얻었으면 방을 거치는 길로 한 번 더 간다.
+    // 예전 숨김 화면 방식이 그렇게 해서 제작자를 얻었다.
+    const gotCreator = Boolean(result && (result.creators || []).length);
+    if (stage === 'direct' && target.plotId && !gotCreator) {
+      run.stage = 'room';
+      // 캐릭터명만 얻었으면 들고 간다. 방에서도 실패하면 그거라도 쓴다.
+      run.carry = result || null;
+      run.carryReason = normalizeText((error && error.message) || error) || '';
+      writeNavRun(run);
+      goToNavTarget(run);
+      return;
+    }
+
+    if (!result && run.carry) {
+      result = run.carry;
+      error = null;
+    }
+    run.stage = 'direct';
+    const carriedReason = run.carryReason || '';
+    run.carry = null;
+    run.carryReason = '';
 
     run.attempted = Number(run.attempted || 0) + 1;
     if (result) {
@@ -2417,7 +2452,9 @@
       }
     } else {
       run.failed = Number(run.failed || 0) + 1;
-      const reason = normalizeText((error && error.message) || error) || '알 수 없는 오류';
+      const raw = normalizeText((error && error.message) || error) || carriedReason || '알 수 없는 오류';
+      // 어디에서 실패했는지 남긴다. 원인을 찾을 때 이게 제일 중요하다.
+      const reason = raw + ' (' + location.pathname + ')';
       const record = describeFailure(target, reason);
       if ((run.failures || []).length < NAV_FAILURE_KEEP) run.failures.push(record);
       notePlotProfileFailure(target);
