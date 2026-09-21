@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.51
+// @version      0.20.52
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -14,6 +14,8 @@
   'use strict';
 
   if (window.top !== window.self) return;
+
+  window.__zrmRoomManagerIosVersion = '0.20.52';
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
   // 별명만 따로 둔다. 목록을 그리는 데는 이것만 있으면 된다.
