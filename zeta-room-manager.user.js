@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.36
+// @version      0.23.37
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -1342,8 +1342,11 @@
   const PROFILE_SETTLE_MS = 200;
   // 한 번에 너무 많이 돌면 renderer 메모리가 회복될 틈이 없다.
   // 끊어서 돌리고, 남은 개수는 완료 알림에 알려 다시 누르게 한다.
-  const PROFILE_BATCH_DESKTOP = 100;
-  const PROFILE_BATCH_MOBILE = 60;
+  // 한 배치를 마치면 새로고침으로 renderer 메모리를 비우는 구조인데,
+  // 한 배치가 크면 새로고침 전에 바닥난다. 도입 당시 모바일 80은 문제가
+  // 없었으므로 PC도 그 선까지 내린다.
+  const PROFILE_BATCH_DESKTOP = 80;
+  const PROFILE_BATCH_MOBILE = 50;
   let lastProfileFailures = [];
 
   function isMobileProfileDevice() {
