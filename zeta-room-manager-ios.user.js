@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.74
+// @version      0.20.75
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.74';
+  const SCRIPT_VERSION = '0.20.75';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -3830,9 +3830,12 @@
 
   // ── 대화창에서 별명 바꾸기 ───────────────────────────────────────────
   // 목록으로 돌아가지 않아도 지금 보고 있는 방의 별명을 고칠 수 있다.
-  // 제타 사이드바 메뉴의 '대화 캡처' 아래에 끼워 넣는다.
+  // 제타 사이드바 메뉴에 끼워 넣는다. 대화 검색 스크립트가 '대화 캡처'
+  // 아래를 쓰므로, 그쪽이 있으면 그 아래에 서서 자리를 다투지 않는다.
   function chatMenuAnchor() {
     const scope = document.querySelector('[data-sentry-component="ChatSidebar"]') || document.body;
+    const searchRow = scope.querySelector('#zeta-chat-search-menu');
+    if (searchRow) return searchRow;
     for (const button of scope.querySelectorAll('button')) {
       if (normalizeText(button.textContent) === '대화 캡처') return button;
     }
