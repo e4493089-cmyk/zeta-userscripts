@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.49
+// @version      0.20.50
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -1709,8 +1709,7 @@
   }
 
   async function collectAllPlotsByScrolling() {
-    const section = currentSection();
-    if (section !== 'plot' && section !== 'plot-search') {
+    if (!plotCollectionViewActive()) {
       alert('제작자센터의 플롯 목록에서 실행해 주세요.');
       return false;
     }
@@ -2001,7 +2000,7 @@
   }
 
   function collectionToolsAnchor() {
-    const section = currentSection();
+    const section = menuSection();
 
     if (section === 'room') {
       const search = roomSearchControl();
@@ -2030,7 +2029,7 @@
   function openCollectionPopup() {
     closeCollectionPopup();
 
-    const section = currentSection();
+    const section = menuSection();
     if (!['room', 'plot', 'plot-search', 'plot-profile'].includes(section)) return;
 
     const isRoom = section === 'room';
@@ -2080,13 +2079,19 @@
         abortCollection();
         return;
       }
-      if (isRoom) collectAllRoomsByScrolling({ force: false });
-      else collectAllPlotsByScrolling();
+      const task = isRoom
+        ? collectAllRoomsByScrolling({ force: false })
+        : collectAllPlotsByScrolling();
+      Promise.resolve(task).catch(error => {
+        alert('전체 수집 시작 실패: ' + normalizeText((error && error.message) || error || '알 수 없는 오류'));
+      });
     });
     forceCollect?.addEventListener('click', () => {
       closeCollectionPopup();
       if (progress.running) return;
-      collectAllRoomsByScrolling({ force: true });
+      Promise.resolve(collectAllRoomsByScrolling({ force: true })).catch(error => {
+        alert('다시 전체 수집 시작 실패: ' + normalizeText((error && error.message) || error || '알 수 없는 오류'));
+      });
     });
     modal.querySelector('[data-zrm-action="export"]').addEventListener('click', () => {
       closeCollectionPopup();
@@ -2106,7 +2111,7 @@
 
   // 수집은 이 화면에서 돈다. 닫으면 멈추므로 진행 중에는 화면 가운데에 띄운다.
   function renderCollectionBanner() {
-    const section = currentSection();
+    const section = menuSection();
     const progress = (section === 'plot' || section === 'plot-search' || section === 'plot-profile')
       ? plotCollectionProgress
       : roomCollectionProgress;
@@ -2174,7 +2179,7 @@
   }
 
   function renderCollectionTools() {
-    const section = currentSection();
+    const section = menuSection();
     let tools = document.getElementById(PLOT_TOOLS_ID);
     if (!['room', 'plot', 'plot-search', 'plot-profile'].includes(section)) {
       tools?.remove();
@@ -3142,19 +3147,38 @@
   }
 
   function currentSection() {
-    const path = location.pathname;
-    if (/^\/(?:[^/]+\/)?rooms\/?$/i.test(path)) return 'room';
-    if (/^\/(?:[^/]+\/)?creator-center\/search\/?$/i.test(path)) return 'plot-search';
-    if (/^\/(?:[^/]+\/)?creator-center(?:\/|$)/i.test(path)) return 'plot';
+    if (/^\/(?:[^/]+\/)?rooms\/?$/i.test(location.pathname)) return 'room';
+    if (/^\/(?:[^/]+\/)?creator-center\/search\/?$/i.test(location.pathname)) return 'plot-search';
+    if (/^\/(?:[^/]+\/)?creator-center(?:\/|$)/i.test(location.pathname)) return 'plot';
     if (currentRoomId()) return 'chat';
+    return null;
+  }
 
-    // 비공개/내 플롯 화면은 URL 구조가 달라져도 실제 렌더된 컴포넌트로 잡는다.
+  // 메뉴 표시용 판별은 수집기의 화면 판별과 분리한다.
+  // 비공개/내 플롯 UI가 별도 경로나 컴포넌트로 열려도 메뉴만 복구하고,
+  // currentSection()의 수집 동작에는 영향을 주지 않는다.
+  function menuSection() {
+    const section = currentSection();
+    if (section) return section;
+
     if (document.querySelector('[data-sentry-component="CreatorCenterSearchPage"]')) return 'plot-search';
-    if (document.querySelector('[data-sentry-component="CreatorCenterMyPlotListItem"]')) return 'plot';
-    if (/^\/(?:[^/]+\/)?plots\/[a-f\d-]{36}\/profile\/?$/i.test(path) ||
+    if (document.querySelector(
+      '[data-sentry-component="CreatorCenterMyPlotListHeader"], ' +
+      '[data-sentry-component="CreatorCenterMyPlotListItem"]'
+    )) return 'plot';
+    if (/^\/(?:[^/]+\/)?plots\/[a-f\d-]{36}\/profile\/?$/i.test(location.pathname) ||
         document.querySelector('[data-sentry-component="PlotProfile"]')) return 'plot-profile';
 
     return null;
+  }
+
+  function plotCollectionViewActive() {
+    const section = currentSection();
+    if (section === 'plot' || section === 'plot-search') return true;
+    return Boolean(document.querySelector(
+      '[data-sentry-component="CreatorCenterMyPlotListHeader"], ' +
+      '[data-sentry-component="CreatorCenterMyPlotListItem"]'
+    ));
   }
 
   function removeLegacyPanel() {
