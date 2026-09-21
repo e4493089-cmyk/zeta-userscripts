@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.17
+// @version      0.20.18
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -33,6 +33,24 @@
     window.__zetaRoomManagerBookmarklet ||
     window.__zetaRoomManagerIosBookmarklet
   );
+
+  function bookmarkletControllerReady() {
+    if (!BOOKMARKLET_MODE || !window.__zrmBookmarkletControllerReady) return false;
+    try {
+      return Boolean(window.__zrmBookmarkletController && !window.__zrmBookmarkletController.closed);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function closeBookmarkletController() {
+    if (!BOOKMARKLET_MODE) return;
+    try {
+      const controller = window.__zrmBookmarkletController;
+      window.__zrmBookmarkletControllerReady = false;
+      if (controller && !controller.closed) controller.close();
+    } catch (_) {}
+  }
 
   const state = loadState();
   let observer = null;
@@ -1384,7 +1402,7 @@
 
     const progressNote = completed => {
       const eta = remainingText(startedAt, completed, targets.length);
-      const guard = BOOKMARKLET_MODE
+      const guard = BOOKMARKLET_MODE && !bookmarkletControllerReady()
         ? '메모리 정리 · 이번 ' + targets.length + '개'
         : '메모리 정리 · ' + targets.length + '개마다 자동 새로고침';
       return eta ? eta + ' · ' + guard : guard;
@@ -1650,18 +1668,18 @@
           phase: '이름 수집',
           current: profiles.attempted,
           total: profiles.attempted + profiles.remaining,
-          note: BOOKMARKLET_MODE
+          note: BOOKMARKLET_MODE && !bookmarkletControllerReady()
             ? '저장 완료 · 새로고침 후 북마클릿을 다시 실행하세요'
             : '메모리 정리 후 자동으로 계속합니다'
         };
         renderCollectionTools();
 
-        if (BOOKMARKLET_MODE) {
+        if (BOOKMARKLET_MODE && !bookmarkletControllerReady()) {
           alert(
             '이름 수집을 ' + profiles.attempted + '개 저장했습니다.' +
             '\n남은 플롯 약 ' + profiles.remaining + '개' +
-            '\n\n메모리를 비우려면 페이지를 새로고침한 뒤 Room Manager 북마클릿을 다시 실행하세요.' +
-            '\n목록은 다시 수집하지 않고 남은 이름부터 이어집니다.'
+            '\n\n자동 재개용 보조 탭을 찾지 못했습니다.' +
+            '\n페이지를 새로고침한 뒤 Room Manager 북마클릿을 다시 실행하면 남은 이름부터 이어집니다.'
           );
           return true;
         }
@@ -1700,6 +1718,7 @@
               : '')
           : '')
       );
+      closeBookmarkletController();
       return true;
     })().finally(() => {
       roomCollectionPromise = null;
@@ -1742,17 +1761,18 @@
           phase: '이름 수집',
           current: next.attempted,
           total: next.attempted + profiles.remaining,
-          note: BOOKMARKLET_MODE
+          note: BOOKMARKLET_MODE && !bookmarkletControllerReady()
             ? '저장 완료 · 새로고침 후 북마클릿을 다시 실행하세요'
             : '메모리 정리 후 자동으로 계속합니다'
         };
         renderCollectionTools();
 
-        if (BOOKMARKLET_MODE) {
+        if (BOOKMARKLET_MODE && !bookmarkletControllerReady()) {
           alert(
             '이름 수집을 추가로 ' + profiles.attempted + '개 저장했습니다.' +
             '\n남은 플롯 약 ' + profiles.remaining + '개' +
-            '\n\n페이지를 새로고침한 뒤 Room Manager 북마클릿을 다시 실행하면 계속됩니다.'
+            '\n\n자동 재개용 보조 탭을 찾지 못했습니다.' +
+            '\n페이지를 새로고침한 뒤 Room Manager 북마클릿을 다시 실행하면 계속됩니다.'
           );
           return true;
         }
@@ -1778,6 +1798,7 @@
         '\n이름 수집: 총 ' + next.attempted + '개 처리 · 성공 ' + next.done + '개' +
         (next.failed ? ' · 실패 ' + next.failed + '개' : '')
       );
+      closeBookmarkletController();
       return true;
     })().finally(() => {
       roomCollectionPromise = null;
