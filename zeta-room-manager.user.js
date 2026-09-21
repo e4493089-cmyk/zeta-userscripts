@@ -1317,14 +1317,33 @@
 
   // 플롯마다 iframe을 새로 띄우면 제타 앱을 매번 처음부터 부팅한다.
   // 손으로 할 때처럼, 앱은 한 번만 띄우고 그 안에서 화면만 바꾼다.
-  const PROFILE_WORKERS = 3;
+  const PROFILE_WORKERS = 2;
   const MOBILE_PROFILE_WORKERS = 2;
-  const PROFILE_FRAME_RECYCLE = 6;
+  const PROFILE_FRAME_RECYCLE = 12;
   // 이 비율을 넘기면 화면을 모두 버리고 잠시 쉰다.
+  // 다만 performance.memory는 JS 힙만 본다. 문서·이미지가 차지하는
+  // renderer 메모리는 여기에 잡히지 않으므로, 이것만 믿으면 안 된다.
   const MEMORY_PAUSE_RATIO = 0.7;
+  const WORKERS_KEY = 'zeta-room-manager:workers:v1';
+
+  function configuredWorkers(mobile) {
+    let saved = 0;
+    try { saved = Number(localStorage.getItem(WORKERS_KEY) || 0); } catch (_) {}
+    if (saved >= 1 && saved <= 6) return saved;
+    return mobile ? MOBILE_PROFILE_WORKERS : PROFILE_WORKERS;
+  }
+
+  // 메모리가 빠듯하면 1~2, 빠르게 돌리고 싶으면 3~4.
+  window.zrmSetWorkers = function (count) {
+    const value = Math.max(1, Math.min(6, Number(count) || 0));
+    try { localStorage.setItem(WORKERS_KEY, String(value)); } catch (_) {}
+    return '동시 수집을 ' + value + '개로 맞췄어요. 다음 수집부터 적용됩니다. (기본값으로 되돌리려면 zrmSetWorkers(0))';
+  };
   const PROFILE_SETTLE_MS = 200;
-  const PROFILE_BATCH_DESKTOP = 200;
-  const PROFILE_BATCH_MOBILE = 100;
+  // 한 번에 너무 많이 돌면 renderer 메모리가 회복될 틈이 없다.
+  // 끊어서 돌리고, 남은 개수는 완료 알림에 알려 다시 누르게 한다.
+  const PROFILE_BATCH_DESKTOP = 100;
+  const PROFILE_BATCH_MOBILE = 60;
   let lastProfileFailures = [];
 
   function isMobileProfileDevice() {
@@ -1478,7 +1497,29 @@
       return frame;
     };
 
-    const resetFrame = async (delayMs = 80) => {
+    // iframe을 만들었다 지우기를 반복하면 떼어낸 문서가 회수되지 않고 쌓인다.
+    // 하나를 계속 쓰되, 다음 화면을 띄우기 전에 반드시 비워서
+    // 무거운 문서가 두 개 동시에 살아 있지 않게 한다.
+    const blankFrame = async (delayMs = 120) => {
+      if (frame && frame.isConnected) {
+        try {
+          const win = frame.contentWindow;
+          if (win) {
+            const highest = win.setTimeout(() => {}, 0);
+            for (let id = highest; id >= 0 && id > highest - 800; id--) {
+              win.clearTimeout(id);
+              win.clearInterval(id);
+            }
+          }
+        } catch (_) {}
+        try { frame.src = 'about:blank'; } catch (_) {}
+        if (delayMs) await sleep(delayMs);
+      }
+    };
+
+    const resetFrame = async (delayMs = 120) => {
+      // 완전히 버려야 할 때만 요소까지 새로 만든다.
+      await blankFrame(0);
       dropFrame(frame);
       frame = null;
       used = 0;
@@ -1494,6 +1535,7 @@
     // 제작자명은 대화방에서 플롯 프로필 버튼을 눌러 들어가야 안정적으로 보인다.
     // 직접 /plots/.../profile 주소를 여는 우회 경로는 쓰지 않는다.
     const navigateRoom = async (roomId, deadline) => {
+      await blankFrame();
       const active = ensureFrame();
       active.src = '/' + localeSegment() + '/rooms/' + roomId;
 
@@ -1518,6 +1560,7 @@
     // 프로필 주소로 바로 가면 화면을 한 번만 불러도 된다.
     // 제작자가 안 잡히는 경우에만 방을 거치는 느린 경로로 넘어간다.
     const navigateProfile = async (plotId, deadline) => {
+      await blankFrame();
       const active = ensureFrame();
       active.src = '/' + localeSegment() + '/plots/' + plotId + '/profile';
       // 직행은 빨리 뜨거나 안 뜨거나다. 오래 기다리면 느린 경로로 넘어가는 게 손해다.
@@ -1573,6 +1616,8 @@
           onResult(target, null, error);
         }
 
+        // 결과를 얻었으면 더 들고 있을 이유가 없다. 즉시 비운다.
+        await blankFrame(0);
         used++;
 
         // 메모리가 빠듯하면 화면을 버리고 회수될 틈을 준다.
@@ -1672,7 +1717,7 @@
     };
     renderCollectionTools();
 
-    const workerLimit = mobile ? MOBILE_PROFILE_WORKERS : PROFILE_WORKERS;
+    const workerLimit = configuredWorkers(mobile);
     let memoryPauses = 0;
     suspendPassiveNativeCapture = true;
     try {
