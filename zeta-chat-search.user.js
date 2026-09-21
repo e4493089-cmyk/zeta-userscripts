@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.1.14
+// @version      0.1.15
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.1.14';
+  const SCRIPT_VERSION = '0.1.15';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -571,6 +571,7 @@
       #${PANEL_ID} .zcs-grip { display: none; }
       #${PANEL_ID} .zcs-head {
         display: flex;
+        flex: 0 0 auto;
         align-items: center;
         justify-content: space-between;
         padding: 18px 18px 10px;
@@ -597,6 +598,7 @@
       #${PANEL_ID} .zcs-close:hover { background: transparent; }
       #${PANEL_ID} .zcs-field {
         display: flex;
+        flex: 0 0 44px;
         align-items: center;
         gap: 8px;
         margin: 0 18px;
@@ -626,6 +628,7 @@
       #${PANEL_ID} .zcs-input::placeholder { color: var(--kt-muted, rgba(255,255,255,.35)); font-weight: 500; }
       #${PANEL_ID} .zcs-input::-webkit-search-cancel-button { display: none; }
       #${PANEL_ID} .zcs-status {
+        flex: 0 0 auto;
         padding: 10px 20px 6px;
         color: var(--kt-sub, rgba(255,255,255,.45));
         font-size: 11px;
@@ -690,6 +693,7 @@
         font-size: 11.5px;
       }
       #${PANEL_ID} .zcs-foot {
+        flex: 0 0 auto;
         padding: 14px 16px;
         border-top: 1px solid var(--kt-line, rgba(255,255,255,.07));
       }
