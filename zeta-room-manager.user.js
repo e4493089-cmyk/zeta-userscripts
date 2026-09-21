@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.61
+// @version      0.23.62
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.61';
+  const SCRIPT_VERSION = '0.23.62';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1282,7 +1282,8 @@
     return false;
   }
 
-  async function waitFor(check, timeout = 12000, step = 180) {
+  // 화면이 바뀌는 순간을 놓치지 않게 촘촘히 확인한다.
+  async function waitFor(check, timeout = 12000, step = 60) {
     const until = Date.now() + timeout;
     while (Date.now() < until) {
       if (convertAborted) return null;
@@ -1455,6 +1456,8 @@
 
     convertRunning = true;
     convertAborted = false;
+    // 방을 빠르게 옮기는 동안 목록 갱신까지 돌면 폰에서 눈에 띄게 느려진다.
+    suspendObserverRefresh = true;
     document.getElementById(COLLECTION_RESULT_ID)?.remove();
 
     const startedAt = location.pathname + location.search;
@@ -1478,13 +1481,15 @@
         } else if (result.reason !== '중지됨') {
           failed.push({ name: item.name, url: item.url, reason: result.reason });
         }
-        // 연속 요청으로 보이지 않게 사이를 둔다.
-        await sleep(1200);
+        // 우리가 요청을 보내는 게 아니라 화면만 읽으므로 짧게만 쉰다.
+        await sleep(250);
       }
     } finally {
       document.getElementById(CONVERT_PROGRESS_ID)?.remove();
       convertRunning = false;
+      suspendObserverRefresh = false;
       routerNavigate(startedAt);
+      scheduleRefresh();
     }
 
     showCollectionResult({
