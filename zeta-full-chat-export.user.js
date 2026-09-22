@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.6
+// @version      0.3.7
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -70,15 +70,15 @@
       .trim();
   }
 
-  function pushPart(parts, type, text) {
+  function pushPart(parts, type, text, role, speaker) {
     const value = clean(text);
     if (!value) return;
 
     const previous = parts[parts.length - 1];
-    if (previous?.type === type) {
+    if (previous?.type === type && previous.role === role && previous.speaker === speaker) {
       previous.text = clean(previous.text + '\n\n' + value);
     } else {
-      parts.push({ type, text: value });
+      parts.push({ type, text: value, role, speaker });
     }
   }
 
@@ -92,6 +92,17 @@
 
     sections.forEach(section => {
       const forcedNarration = section.matches('[data-sentry-component="NarratorBubble"]');
+      const sectionRole = forcedNarration
+        ? 'narrator'
+        : section.matches('[data-sentry-component="RightTextContent"]')
+          ? 'user'
+          : 'assistant';
+      const sectionSpeaker = sectionRole === 'narrator'
+        ? ''
+        : clean(section.querySelector('.caption1')?.innerText || '')
+          .replace(/^@+/, '')
+          .replace(/:+$/, '')
+          .trim();
       const paragraphs = Array.from(section.querySelectorAll('.chat p'));
 
       if (paragraphs.length) {
@@ -108,7 +119,7 @@
               node.matches('em, i')
             )
           );
-          pushPart(parts, narration ? 'narration' : 'message', text);
+          pushPart(parts, narration ? 'narration' : 'message', text, sectionRole, sectionSpeaker);
         });
         return;
       }
@@ -120,12 +131,13 @@
 
       const label = clean(section.querySelector('.caption1')?.innerText || '');
       if (label && text.startsWith(label)) text = clean(text.slice(label.length));
-      pushPart(parts, forcedNarration ? 'narration' : 'message', text);
+      pushPart(parts, forcedNarration ? 'narration' : 'message', text, sectionRole, sectionSpeaker);
     });
 
     if (!parts.length) {
+      const role = roleOf(body);
       const text = clean(body.innerText || body.textContent || '');
-      pushPart(parts, 'message', text);
+      pushPart(parts, 'message', text, role, speakerNameOf(body, role));
     }
     return parts;
   }
@@ -472,25 +484,39 @@
     const messages = [];
 
     items.forEach(item => {
-      const fallback = item.role === 'user' ? userName : characterName;
-      const speaker = item.role === 'narrator'
-        ? ''
-        : cleanSpeakerName(item.speaker, fallback);
-      const blocks = ['@' + speaker + ':'];
+      let segment = null;
+
+      const flushSegment = () => {
+        if (segment?.blocks.length > 1) messages.push(segment.blocks.join('\n\n'));
+        segment = null;
+      };
 
       item.parts.forEach(part => {
+        const role = part.role || item.role;
+        const fallback = role === 'user' ? userName : characterName;
+        const itemSpeaker = role === item.role ? item.speaker : '';
+        const speaker = role === 'narrator'
+          ? '나레이터'
+          : cleanSpeakerName(part.speaker || itemSpeaker, fallback);
+        const label = '@' + speaker + ':';
+
+        if (!segment || segment.label !== label) {
+          flushSegment();
+          segment = { label, blocks: [label] };
+        }
+
         if (part.type === 'narration') {
           clean(part.text).split(/\n\s*\n/).forEach(paragraph => {
             const text = clean(paragraph);
-            if (text) blocks.push('*' + text + '*');
+            if (text) segment.blocks.push('*' + text + '*');
           });
         } else {
           const text = clean(part.text);
-          if (text) blocks.push(text);
+          if (text) segment.blocks.push(text);
         }
       });
 
-      if (blocks.length > 1) messages.push(blocks.join('\n\n'));
+      flushSegment();
     });
 
     return messages.join('\n\n\n').trim() + '\n';
