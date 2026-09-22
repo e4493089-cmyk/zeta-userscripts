@@ -1,17 +1,73 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.8
+// @version      0.3.9
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
-// @run-at       document-idle
+// @run-at       document-start
 // @grant        none
 // ==/UserScript==
 
 (() => {
   'use strict';
+
+  const API_FRAME_PREFIX = 'zfce-api-jump:';
+
+  function currentRoomId() {
+    const match = location.pathname.match(/\/rooms\/([^/?#]+)/i);
+    return match ? match[1] : '';
+  }
+
+  /*
+   * 대화 검색과 같은 방식으로 첫 메시지 XHR에 정확한 MESSAGE cursor를 넣는다.
+   * 숨은 iframe이 document-start에서 이 코드를 실행해야 앱의 초기 요청보다 빠르다.
+   */
+  function installFrameCursorInterceptor() {
+    if (window.top === window.self || !window.name.startsWith(API_FRAME_PREFIX)) return;
+
+    let pending = null;
+    try {
+      pending = JSON.parse(decodeURIComponent(window.name.slice(API_FRAME_PREFIX.length)));
+    } catch (_) {}
+    if (!pending?.roomId || !pending?.cursor || pending.roomId !== currentRoomId()) return;
+
+    const proto = window.XMLHttpRequest?.prototype;
+    if (!proto || proto.open.__zfceCursorPatched) return;
+    const originalOpen = proto.open;
+
+    function wrappedOpen(method, value, ...rest) {
+      let nextValue = value;
+      try {
+        const url = new URL(String(value), location.href);
+        const expectedPath = '/v1/rooms/' + pending.roomId + '/messages';
+        const initialRequest =
+          String(method || 'GET').toUpperCase() === 'GET' &&
+          url.pathname === expectedPath &&
+          !url.searchParams.has('cursor') &&
+          !url.searchParams.has('prevCursor');
+
+        if (initialRequest) {
+          url.searchParams.set('limit', '10');
+          url.searchParams.set('cursor', pending.roomId + ':' + pending.cursor);
+          nextValue = url.href;
+          window.__zfceCursorInjected = pending.cursor;
+          pending = null;
+          window.name = '';
+        }
+      } catch (_) {}
+      return originalOpen.call(this, method, nextValue, ...rest);
+    }
+
+    Object.defineProperty(wrappedOpen, '__zfceCursorPatched', { value: true });
+    proto.open = wrappedOpen;
+  }
+
+  if (window.top !== window.self) {
+    installFrameCursorInterceptor();
+    return;
+  }
 
   const APP = 'zeta-full-chat-export';
   const BUTTON_ID = APP + '-button';
@@ -186,6 +242,14 @@
     return location.pathname.replace(/\/bookmarks\/?$/, '').replace(/\/$/, '') + '/bookmarks';
   }
 
+  function roomUrl() {
+    const url = new URL(location.href);
+    url.pathname = url.pathname.replace(/\/bookmarks\/?$/, '').replace(/\/$/, '');
+    url.search = '';
+    url.hash = '';
+    return url.href;
+  }
+
   function readBookmarkButtons(root) {
     return Array.from(root.querySelectorAll('[data-testid^="bookmark-item-"]')).map(button => ({
       id: button.dataset.testid.replace('bookmark-item-', ''),
@@ -263,6 +327,53 @@
     }
     const match = text.match(/(?:^|[:?=&])(MESSAGE-\d+-[A-Za-z0-9_-]+)/);
     return match ? 'message-' + match[1] : '';
+  }
+
+  function messageCursor(messageId) {
+    const match = String(messageId || '').match(/^message-(MESSAGE-\d+-[A-Za-z0-9_-]+)/);
+    return match ? match[1] : '';
+  }
+
+  async function openMessageAtCursor(messageId) {
+    const roomId = currentRoomId();
+    const cursor = messageCursor(messageId);
+    if (!roomId || !cursor) throw new Error('책갈피 메시지의 API cursor를 만들지 못했어요.');
+
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.name = API_FRAME_PREFIX + encodeURIComponent(JSON.stringify({ roomId, cursor }));
+    frame.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
+    document.body.appendChild(frame);
+
+    try {
+      frame.src = roomUrl();
+
+      for (let attempt = 0; attempt < 150; attempt += 1) {
+        await wait(attempt ? 120 : 300);
+        let page = null;
+        let log = null;
+        let target = null;
+        let injected = false;
+        try {
+          page = frame.contentDocument;
+          log = page?.querySelector(CHAT_SELECTOR) || null;
+          target = page?.getElementById(messageId) || null;
+          injected = frame.contentWindow?.__zfceCursorInjected === cursor;
+        } catch (_) {}
+        if (target && log) {
+          target.scrollIntoView({ block: 'center', behavior: 'auto' });
+          await wait(80);
+          return { frame, id: messageId, log };
+        }
+        if (attempt >= 25 && log && !injected) {
+          throw new Error('이 화면에서는 API cursor 요청을 가로채지 못했어요.');
+        }
+      }
+      throw new Error('API cursor로 책갈피 메시지를 열지 못했어요.');
+    } catch (error) {
+      frame.remove();
+      throw error;
+    }
   }
 
   async function openBookmarkAtMessage(bookmark) {
@@ -630,8 +741,15 @@
         direction = 'newer';
       }
 
-      updatePanel('시작 지점으로 이동하는 중…', anchorPoint.entry.preview.slice(0, 42));
-      const opened = await openBookmarkAtMessage(anchorPoint.entry);
+      updatePanel('API로 시작 지점을 여는 중…', anchorPoint.entry.preview.slice(0, 42));
+      let opened;
+      try {
+        opened = await openMessageAtCursor(anchorPoint.id);
+      } catch (apiError) {
+        console.warn('[Zeta Full Chat Export] API cursor 이동 실패, 책갈피 이동으로 대체합니다.', apiError);
+        updatePanel('책갈피로 시작 지점을 여는 중…', anchorPoint.entry.preview.slice(0, 42));
+        opened = await openBookmarkAtMessage(anchorPoint.entry);
+      }
       activeFrame = opened.frame;
       const root = activeFrame.contentDocument;
       const log = opened.log;
@@ -1090,6 +1208,14 @@
     observer.timer = setTimeout(installUi, 250);
   });
 
-  installUi();
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  function start() {
+    installUi();
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  } else {
+    start();
+  }
 })();
