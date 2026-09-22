@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.7
+// @version      0.3.8
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -19,7 +19,8 @@
   const PANEL_ID = APP + '-panel';
   const RANGE_ID = APP + '-range';
   const STYLE_ID = APP + '-style';
-  const MESSAGE_SELECTOR = '[data-sentry-component="BodyView"][id^="message-"]';
+  const MESSAGE_BODY_SELECTOR = '[data-sentry-component="BodyView"]';
+  const MESSAGE_SELECTOR = MESSAGE_BODY_SELECTOR + '[id^="message-"]';
   const CHAT_SELECTOR = '[role="log"][aria-label="Chat messages"]';
 
   let running = false;
@@ -396,6 +397,74 @@
     return mergeOrder(order, ids);
   }
 
+  function messageDomSignature(root = document) {
+    return Array.from(root.querySelectorAll(MESSAGE_BODY_SELECTOR)).map(body => {
+      const text = clean(body.innerText || body.textContent || '');
+      const images = Array.from(body.querySelectorAll('img[src]'))
+        .map(image => image.currentSrc || image.src || '')
+        .join('\u001f');
+      return [body.id, text, images].join('\u001f');
+    }).join('\u001e');
+  }
+
+  function newestMessageId(messages, order = []) {
+    const numbered = Array.from(messages.keys())
+      .map(id => ({ id, number: messageNumber(id) }))
+      .filter(item => Number.isFinite(item.number) && item.number < Number.MAX_SAFE_INTEGER)
+      .sort((a, b) => a.number - b.number);
+    return numbered[0]?.id || order[order.length - 1] || '';
+  }
+
+  function newestVisibleMessageReady(root = document) {
+    const allBodies = Array.from(root.querySelectorAll(MESSAGE_BODY_SELECTOR));
+    const bodies = allBodies.filter(body => body.matches(MESSAGE_SELECTOR));
+    /* 마지막 메시지 placeholder가 아직 ID를 받지 못한 상태도 미완료로 본다. */
+    if (!bodies.length || bodies.length !== allBodies.length) return false;
+
+    const newest = bodies.sort((a, b) => messageNumber(a.id) - messageNumber(b.id))[0];
+    const message = readMessage(newest);
+    return message.parts.length > 0 || message.images.length > 0;
+  }
+
+  async function settleLatestEdge(messages, order, root = document, log = findChatLog()) {
+    if (!log) return order;
+
+    const reverse = (root.defaultView || window).getComputedStyle(log).flexDirection.includes('reverse');
+    const startedAt = Date.now();
+    const minimumWait = 1600;
+    const maximumWait = 12000;
+    const interval = 180;
+    const requiredStablePasses = 6;
+    let previousSignature = '';
+    let stablePasses = 0;
+
+    while (!cancelled && Date.now() - startedAt < maximumWait) {
+      /* 레이아웃 변화로 끝에서 밀려나지 않도록 매번 최신 경계를 다시 고정한다. */
+      log.scrollTo({
+        top: reverse ? 0 : log.scrollHeight,
+        behavior: 'auto'
+      });
+      await wait(interval);
+      order = capture(messages, order, root, log);
+
+      const signature = messageDomSignature(root);
+      const atBottom = reverse
+        ? Math.abs(log.scrollTop) < 3
+        : log.scrollTop + log.clientHeight >= log.scrollHeight - 3;
+      const ready = newestVisibleMessageReady(root);
+      stablePasses = atBottom && ready && signature === previousSignature
+        ? stablePasses + 1
+        : 0;
+      previousSignature = signature;
+
+      if (Date.now() - startedAt >= minimumWait && stablePasses >= requiredStablePasses) break;
+    }
+
+    /* 안정 판정과 파일 생성 사이에 들어온 마지막 DOM 변경까지 한 번 더 flush한다. */
+    await wait(0);
+    return capture(messages, order, root, log);
+  }
+
   function titleFromPage() {
     const candidates = [
       '[data-testid="chat-header-profile"]',
@@ -605,6 +674,13 @@
       }
 
       if (cancelled) throw new DOMException('Cancelled', 'AbortError');
+      if (targetPoint.special === 'chat-end') {
+        updatePanel('마지막 대화를 확인 중…', `${messages.size}개 수집`);
+        order = await settleLatestEdge(messages, order, root, log);
+      } else {
+        /* 반복문 종료 직후 붙은 경계 메시지까지 포함한다. */
+        order = capture(messages, order, root, log);
+      }
       let items = Array.from(messages.values()).sort((a, b) => messageNumber(b.id) - messageNumber(a.id));
       let firstId = anchorPoint.id;
       let secondId = targetPoint.id;
@@ -667,9 +743,9 @@
         top: reverse ? 0 : log.scrollHeight,
         behavior: 'auto'
       });
-      await wait(180);
-      order = capture(messages, order);
-      const latestAnchorId = order[order.length - 1] || '';
+      updatePanel('마지막 대화를 확인 중…', '최신 메시지 렌더링을 기다리는 중…');
+      order = await settleLatestEdge(messages, order, document, log);
+      let latestAnchorId = newestMessageId(messages, order);
       if (range?.end?.special === 'chat-end') {
         range.endMessageId = latestAnchorId;
       }
@@ -779,6 +855,10 @@
         await wait(90);
         chronologicalOrder = capture(messages, chronologicalOrder);
 
+        /* 처음 기준점을 잡은 뒤 더 최신 DOM이 나타나면 완료 기준도 함께 갱신한다. */
+        const newestCapturedId = newestMessageId(messages, chronologicalOrder);
+        if (newestCapturedId) latestAnchorId = newestCapturedId;
+
         const moved = Math.abs(log.scrollTop - beforeTop) > 2;
         const grew = messages.size > beforeCount;
         const atBottom = reverse
@@ -820,6 +900,12 @@
       }
 
       if (cancelled) throw new DOMException('Cancelled', 'AbortError');
+      if (!range) {
+        updatePanel('마지막 대화를 확인 중…', `${messages.size}개 수집 · DOM 안정화 대기`);
+        chronologicalOrder = await settleLatestEdge(messages, chronologicalOrder, document, log);
+      } else {
+        chronologicalOrder = capture(messages, chronologicalOrder);
+      }
       order = chronologicalOrder.length ? chronologicalOrder : capture(messages, order);
       /*
        * Zeta의 MESSAGE 번호는 오래된 메시지일수록 크다.
