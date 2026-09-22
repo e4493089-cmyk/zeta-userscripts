@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.4
+// @version      0.3.5
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -476,7 +476,7 @@
       const speaker = item.role === 'narrator'
         ? '나레이터'
         : cleanSpeakerName(item.speaker, fallback);
-      const blocks = ['@' + speaker + ':'];
+      const blocks = ['@' + (speaker || '나레이터') + ':'];
 
       item.parts.forEach(part => {
         if (part.type === 'narration') {
