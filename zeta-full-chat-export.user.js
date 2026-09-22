@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.9
+// @version      0.3.10
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -337,7 +337,7 @@
   async function openMessageAtCursor(messageId) {
     const roomId = currentRoomId();
     const cursor = messageCursor(messageId);
-    if (!roomId || !cursor) throw new Error('책갈피 메시지의 API cursor를 만들지 못했어요.');
+    if (!roomId || !cursor) throw new Error('책갈피 메시지 위치를 확인하지 못했어요.');
 
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
@@ -361,22 +361,24 @@
           injected = frame.contentWindow?.__zfceCursorInjected === cursor;
         } catch (_) {}
         if (target && log) {
+          /* scrollIntoView 뒤 가상 스크롤이 DOM을 교체하기 전에 경계 메시지를 보존한다. */
+          const message = readMessage(target);
           target.scrollIntoView({ block: 'center', behavior: 'auto' });
           await wait(80);
-          return { frame, id: messageId, log };
+          return { frame, id: messageId, log, message };
         }
         if (attempt >= 25 && log && !injected) {
-          throw new Error('이 화면에서는 API cursor 요청을 가로채지 못했어요.');
+          throw new Error('이 화면에서는 빠른 책갈피 이동을 시작하지 못했어요.');
         }
       }
-      throw new Error('API cursor로 책갈피 메시지를 열지 못했어요.');
+      throw new Error('책갈피 메시지로 바로 이동하지 못했어요.');
     } catch (error) {
       frame.remove();
       throw error;
     }
   }
 
-  async function openBookmarkAtMessage(bookmark) {
+  async function openBookmarkAtMessage(bookmark, requireRenderedMessage = false) {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
@@ -398,7 +400,34 @@
       if (!button) throw new Error('선택한 책갈피 항목을 다시 찾지 못했어요.');
 
       let navigatedUrl = '';
+      let requestedMessageId = '';
       const frameWindow = frame.contentWindow;
+      const rememberRequestedMessage = value => {
+        try {
+          const url = new URL(String(value?.url || value || ''), frameWindow.location.href);
+          if (!/\/v1\/rooms\/[^/]+\/messages$/i.test(url.pathname)) return;
+          const id = messageIdFromCursor(
+            url.searchParams.get('cursor') || url.searchParams.get('prevCursor') || ''
+          );
+          if (id) requestedMessageId = id;
+        } catch (_) {}
+      };
+
+      const frameXhr = frameWindow.XMLHttpRequest?.prototype;
+      if (frameXhr) {
+        const originalOpen = frameXhr.open;
+        frameXhr.open = function (method, value, ...rest) {
+          rememberRequestedMessage(value);
+          return originalOpen.call(this, method, value, ...rest);
+        };
+      }
+      if (frameWindow.fetch) {
+        const originalFetch = frameWindow.fetch.bind(frameWindow);
+        frameWindow.fetch = (input, ...rest) => {
+          rememberRequestedMessage(input);
+          return originalFetch(input, ...rest);
+        };
+      }
       ['pushState', 'replaceState'].forEach(name => {
         const original = frameWindow.history[name].bind(frameWindow.history);
         frameWindow.history[name] = (...args) => {
@@ -411,21 +440,23 @@
       for (let attempt = 0; attempt < 120; attempt += 1) {
         await wait(80);
         let currentUrl = '';
-        let html = '';
         try {
           currentUrl = frame.contentWindow.location.href;
-          html = frame.contentDocument?.documentElement?.innerHTML || '';
         } catch (_) {}
-        let id = messageIdFromCursor(navigatedUrl) ||
-          messageIdFromCursor(currentUrl) ||
-          messageIdFromCursor(html);
+        let id = requestedMessageId ||
+          messageIdFromCursor(navigatedUrl) ||
+          messageIdFromCursor(currentUrl);
         const log = frame.contentDocument?.querySelector(CHAT_SELECTOR);
-        if (!id && log) {
+        if (log) {
           const visible = Array.from(frame.contentDocument.querySelectorAll(MESSAGE_SELECTOR)).map(readMessage);
           const index = bookmarkIndex(visible, bookmark);
-          if (index >= 0) id = visible[index].id;
+          if (index >= 0 && !id) id = visible[index].id;
         }
-        if (id && log) return { frame, id, log };
+        if (id && log) {
+          const target = frame.contentDocument?.getElementById(id) || null;
+          if (target) return { frame, id, log, message: readMessage(target) };
+          if (!requireRenderedMessage) return { frame, id, log, message: null };
+        }
       }
       throw new Error('책갈피의 정확한 메시지 위치를 읽지 못했어요.');
     } catch (error) {
@@ -741,14 +772,14 @@
         direction = 'newer';
       }
 
-      updatePanel('API로 시작 지점을 여는 중…', anchorPoint.entry.preview.slice(0, 42));
+      updatePanel('시작 지점을 여는 중…', anchorPoint.entry.preview.slice(0, 42));
       let opened;
       try {
         opened = await openMessageAtCursor(anchorPoint.id);
-      } catch (apiError) {
-        console.warn('[Zeta Full Chat Export] API cursor 이동 실패, 책갈피 이동으로 대체합니다.', apiError);
+      } catch (jumpError) {
+        console.warn('[Zeta Full Chat Export] 빠른 책갈피 이동 실패, 일반 이동으로 대체합니다.', jumpError);
         updatePanel('책갈피로 시작 지점을 여는 중…', anchorPoint.entry.preview.slice(0, 42));
-        opened = await openBookmarkAtMessage(anchorPoint.entry);
+        opened = await openBookmarkAtMessage(anchorPoint.entry, true);
       }
       activeFrame = opened.frame;
       const root = activeFrame.contentDocument;
@@ -758,6 +789,10 @@
       let order = [];
       let stable = 0;
       let previousCount = -1;
+      if (opened.message?.id === anchorPoint.id) {
+        messages.set(opened.message.id, opened.message);
+        order.push(opened.message.id);
+      }
       order = capture(messages, order, root, log);
 
       while (!cancelled) {
@@ -806,7 +841,9 @@
       if (targetPoint.special === 'chat-end') secondId = items[items.length - 1]?.id || '';
       const first = items.findIndex(item => item.id === firstId);
       const second = items.findIndex(item => item.id === secondId);
-      if (first < 0 || second < 0) throw new Error('선택한 범위의 경계 메시지를 찾지 못했어요.');
+      if (first < 0 || second < 0) {
+        throw new Error('선택한 책갈피 메시지를 수집하지 못했어요. 잠시 후 다시 시도해줘.');
+      }
       items = items.slice(Math.min(first, second), Math.max(first, second) + 1);
 
       const meta = {
