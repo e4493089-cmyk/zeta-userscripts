@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.23
+// @version      3.50.24
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -270,12 +270,18 @@
     }
 
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"],
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat {
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [data-sentry-component="InfoBoxExpandedContent"] .caption1,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [data-sentry-component="InfoBoxCharacterSection"] .chat {
       color: var(--kt-chat-sub) !important;
+      opacity: 1 !important;
     }
 
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-semibold,
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] svg {
       color: var(--kt-chat-text) !important;
+      opacity: 1 !important;
     }
 
     /* 내레이션 마크다운 요소도 채팅 배경 대비를 그대로 사용 */
