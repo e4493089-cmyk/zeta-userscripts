@@ -10,3 +10,5 @@ Current public userscripts in this repository:
 
 Keep these filenames unchanged. Each userscript contains its own Tampermonkey update/download URL.
 Increase @version only when releasing an actual script update.
+
+Use at your own risk. I am not responsible for any penalties, account restrictions, suspensions, or other consequences resulting from the use of these scripts.
