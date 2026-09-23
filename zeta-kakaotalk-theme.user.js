@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.16
+// @version      3.50.17
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7955,6 +7955,56 @@
       text-shadow: 0 1px 3px rgba(0,0,0,.35);
     }
 
+
+
+    /* =========================================================
+       꿈 엿보기 확인 팝업
+       Zeta 플러그인 추가 UI를 카톡 테마의 밝은 팝업으로 통일
+    ========================================================= */
+    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"]) {
+      background: rgba(28,36,42,.46) !important;
+    }
+
+    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"])
+      > div {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      border: 1px solid var(--kt-line) !important;
+      box-shadow: 0 10px 30px rgba(35,48,56,.18) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] > span {
+      color: var(--kt-text) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] [role="checkbox"],
+    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] [role="checkbox"] span,
+    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] [role="checkbox"] svg {
+      color: var(--kt-sub) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] [role="checkbox"][aria-checked="true"] svg {
+      color: var(--kt-user-name) !important;
+    }
+
+    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"])
+      > div > div:last-child > button:first-child {
+      background: var(--kt-soft) !important;
+      color: var(--kt-text) !important;
+      border: 1px solid var(--kt-line) !important;
+    }
+
+    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"])
+      > div > div:last-child > button:last-child {
+      background: var(--kt-yellow) !important;
+      color: var(--kt-text) !important;
+      border: 1px solid rgba(0,0,0,.06) !important;
+    }
+
+    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"])
+      > div > div:last-child > button:last-child:hover {
+      background: var(--kt-yellow-hover) !important;
+    }
 
   `;
 
