@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.25
+// @version      3.50.26
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -1759,13 +1759,17 @@
     }
 
     html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] {
-      background: rgba(255,255,255,.96) !important;
-      border-bottom: 1px solid #E5EAED !important;
-      backdrop-filter: blur(10px) !important;
-      box-shadow: 0 1px 0 rgba(0,0,0,.02) !important;
+      background: var(--kt-chat) !important;
+      border-bottom: 0 !important;
+      backdrop-filter: none !important;
+      box-shadow: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] header,
+    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] > header {
+      background: var(--kt-white) !important;
+      border-bottom: 1px solid var(--kt-line) !important;
+    }
+
     html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] nav {
       background: transparent !important;
       border-color: transparent !important;
@@ -1788,10 +1792,7 @@
     }
 
     html.${ACTIVE} [data-sentry-component="DeleteStartNotice"] {
-      background: rgba(255,255,255,.82) !important;
-      color: #485860 !important;
-      border-bottom: 1px solid rgba(61,79,89,.08) !important;
-      backdrop-filter: blur(8px) !important;
+      display: none !important;
     }
 
     html.${ACTIVE} [data-sentry-component="ChatMessageDeleteSelector"]:hover {
@@ -1832,11 +1833,12 @@
       background: rgba(254,229,0,.16) !important;
     }
 
-    html.${ACTIVE} .kt-delete-mode-button-row {
-      background: rgba(255,255,255,.94) !important;
-      border-top: 1px solid #E5EAED !important;
-      box-shadow: 0 -8px 22px rgba(42,57,66,.10) !important;
-      backdrop-filter: blur(10px) !important;
+    html.${ACTIVE} .kt-delete-mode-button-row,
+    html.${ACTIVE} [data-sentry-component="DeleteModeBottom"] {
+      background: var(--kt-chat) !important;
+      border-top: 0 !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
       padding-top: 10px !important;
       padding-bottom: calc(10px + var(--safe-area-inset-bottom,0px)) !important;
     }
@@ -1844,7 +1846,7 @@
     html.${ACTIVE} .kt-delete-mode-button {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
-      border: 1px solid #E2CB00 !important;
+      border: 1px solid #DFC900 !important;
       box-shadow: none !important;
     }
 
@@ -1919,41 +1921,6 @@
     }
 
 
-    html.${ACTIVE} .kt-delete-mode-screen [class*="bg-black"],
-    html.${ACTIVE} .kt-delete-mode-screen [class*="bg-gray-main"] {
-      background: #FFFFFF !important;
-    }
-
-    html.${ACTIVE} .kt-delete-mode-screen [class*="text-white"],
-    html.${ACTIVE} .kt-delete-mode-screen [class*="text-gray-200"],
-    html.${ACTIVE} .kt-delete-mode-screen [class*="text-gray-300"],
-    html.${ACTIVE} .kt-delete-mode-screen [class*="text-gray-400"] {
-      color: #6A7880 !important;
-    }
-
-    html.${ACTIVE} .kt-delete-notice,
-    html.${ACTIVE} [data-sentry-component="DeleteStartNotice"] {
-      background: rgba(255,255,255,.88) !important;
-      color: #55636C !important;
-      border-bottom: 1px solid #E4EAEE !important;
-      backdrop-filter: blur(8px) !important;
-    }
-
-    html.${ACTIVE} .kt-delete-notice *,
-    html.${ACTIVE} [data-sentry-component="DeleteStartNotice"] * {
-      color: inherit !important;
-    }
-
-    /* 삭제 모드에서는 bg-gray-main 일괄 보정이 나레이터까지 흰 카드로
-       만들지 않도록, 원래의 투명한 나레이터 표현을 마지막에 복구한다. */
-    html.${ACTIVE}.kt-delete-mode-screen
-      [data-sentry-component="NarratorBubble"] > div,
-    html.${ACTIVE} .kt-delete-mode-screen
-      [data-sentry-component="NarratorBubble"] > div {
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-    }
 
     /* 커스텀 테마 배경색과 무관하게 보이는 무채색 이중 대비 표시. */
     html.${ACTIVE}.kt-delete-mode-screen
@@ -7451,47 +7418,7 @@
       box-shadow: none !important;
     }
 
-    /* 삭제 실행 하단바
-       삭제 모드에서도 채팅 배경이 그대로 이어지게 하고 흰 상태창을 만들지 않는다. */
-    html.${ACTIVE} .kt-delete-mode-button-row,
-    html.${ACTIVE} [data-sentry-component="DeleteModeBottom"] {
-      background: var(--kt-chat) !important;
-      border-top: 0 !important;
-      box-shadow: none !important;
-      backdrop-filter: none !important;
-    }
-
-    html.${ACTIVE} .kt-delete-mode-button {
-      background: var(--kt-yellow) !important;
-      color: #191919 !important;
-      border: 1px solid #DFC900 !important;
-      box-shadow: none !important;
-    }
-
-    html.${ACTIVE} .kt-delete-mode-button:hover {
-      background: var(--kt-yellow-hover) !important;
-    }
-
-    /* =========================================================
-       iPhone 삭제 모드 상태바 safe-area
-       바깥 여백은 채팅 배경, 실제 헤더만 흰색으로 유지
-    ========================================================= */
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] {
-      background: var(--kt-chat) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] > header {
-      background: var(--kt-white) !important;
-    }
-
-    /* =========================================================
-       삭제 시작 안내 문구 제거
-    ========================================================= */
-    html.${ACTIVE} [data-sentry-component="DeleteStartNotice"] {
-      display: none !important;
-    }
-
-    /* =========================================================
+     /* =========================================================
        마지막 메시지 컨트롤 4버튼 + 메시지 액션 바텀시트
        제타그램은 건드리지 않고 채팅 화면에만 적용
     ========================================================= */
