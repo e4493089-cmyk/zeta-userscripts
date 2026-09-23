@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.21
+// @version      3.50.22
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7992,7 +7992,7 @@
 
     html.${ACTIVE} [data-sentry-component*="Dream"] button span,
     html.${ACTIVE} [data-sentry-component*="Dream"] button svg {
-      color: #394A54 !important;
+      color: var(--kt-chat-text) !important;
       opacity: 1 !important;
     }
 
@@ -8041,6 +8041,51 @@
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"],
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat {
       color: var(--kt-chat-sub) !important;
+    }
+
+    /* =========================================================
+       커스텀 테마 대비 최종 가드
+       앞쪽의 고정색 규칙이 자동 대비를 다시 덮지 못하게 CSS 끝에서 확정
+    ========================================================= */
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] a,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] del,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] s {
+      color: var(--kt-chat-sub) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote p {
+      color: var(--kt-chat-sub) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote {
+      background: transparent !important;
+      border-color: var(--kt-chat-line) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote > div:first-child {
+      background: var(--kt-chat-muted) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"],
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .caption1,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"] {
+      color: var(--kt-chat-sub) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] {
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-semibold,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] svg {
+      color: var(--kt-chat-text) !important;
     }
 
     /* =========================================================
