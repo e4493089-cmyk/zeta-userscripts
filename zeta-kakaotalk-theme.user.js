@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.20
+// @version      3.50.21
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7996,10 +7996,10 @@
       opacity: 1 !important;
     }
 
-    /* 말풍선 옆 Zeta 워터마크 숨김 */
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] + span,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] ~ span[class*="text-white/"],
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] ~ span[class*="opacity-"] {
+    /* 말풍선 안쪽 Zeta 워터마크 숨김 — 실제 DOM 컴포넌트 */
+    html.${ACTIVE} [data-sentry-component="ZetaWatermarkRaw"],
+    html.${ACTIVE} [data-sentry-component="ZetaWatermarkRaw"] img,
+    html.${ACTIVE} img[src*="zeta_watermark"] {
       display: none !important;
     }
 
@@ -8026,9 +8026,10 @@
     }
 
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] {
-      background: var(--kt-chat-glass) !important;
+      background: transparent !important;
       color: var(--kt-chat-sub) !important;
-      border-color: var(--kt-chat-line) !important;
+      border: 0 !important;
+      box-shadow: none !important;
     }
 
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
