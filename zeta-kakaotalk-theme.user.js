@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.17
+// @version      3.50.18
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7955,6 +7955,41 @@
       text-shadow: 0 1px 3px rgba(0,0,0,.35);
     }
 
+
+
+    /* =========================================================
+       채팅 본문의 꿈 / 엿보기
+       밝은 채팅 배경에서도 제목과 버튼이 선명하게 보이도록 보정
+    ========================================================= */
+    html.${ACTIVE} [data-sentry-component*="Dream"] {
+      color: var(--kt-text) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component*="Dream"] span,
+    html.${ACTIVE} [data-sentry-component*="Dream"] p {
+      color: #46545E !important;
+      opacity: 1 !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component*="Dream"] button {
+      color: #394A54 !important;
+      background: rgba(255,255,255,.62) !important;
+      border: 1px solid rgba(70,84,94,.12) !important;
+      opacity: 1 !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component*="Dream"] button span,
+    html.${ACTIVE} [data-sentry-component*="Dream"] button svg {
+      color: #394A54 !important;
+      opacity: 1 !important;
+    }
+
+    /* 말풍선 옆 Zeta 워터마크 숨김 */
+    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] + span,
+    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] ~ span[class*="text-white/"],
+    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] ~ span[class*="opacity-"] {
+      display: none !important;
+    }
 
 
     /* =========================================================
