@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.22
+// @version      3.50.23
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -229,7 +229,7 @@
        긴 내레이터가 화면을 큰 박스로 덮지 않도록 배경/테두리 제거 */
     html.${ACTIVE} [data-sentry-component="NarratorBubble"] > div {
       background: transparent !important;
-      color: var(--kt-meta-text) !important;
+      color: var(--kt-chat-sub) !important;
       border: 0 !important;
       box-shadow: none !important;
       padding-top: 2px !important;
@@ -241,40 +241,61 @@
     html.${ACTIVE} [data-sentry-component="NarratorBubble"] em,
     html.${ACTIVE} [data-sentry-component="NarratorBubble"] li,
     html.${ACTIVE} [data-sentry-component="NarratorBubble"] strong {
-      color: var(--kt-meta-text) !important;
+      color: var(--kt-chat-sub) !important;
     }
 
     html.${ACTIVE} [data-sentry-component="NarratorBubble"] strong {
-      color: var(--kt-meta-title) !important;
+      color: var(--kt-chat-text) !important;
     }
 
     html.${ACTIVE} [data-sentry-component="NarratorBubble"] hr {
-      border-color: rgba(70,84,94,.28) !important;
+      border-color: var(--kt-chat-line) !important;
     }
 
     html.${ACTIVE} [data-sentry-component="NarratorBubble"] svg {
-      color: var(--kt-meta-title) !important;
+      color: var(--kt-chat-text) !important;
     }
 
     /* 정보박스 */
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] {
-      background: var(--kt-meta-bg) !important;
-      color: var(--kt-meta-text) !important;
-      border: 1px solid rgba(70,84,94,.08) !important;
+      background: transparent !important;
+      color: var(--kt-chat-sub) !important;
+      border: 0 !important;
+      box-shadow: none !important;
     }
 
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-semibold {
-      color: var(--kt-meta-title) !important;
+      color: var(--kt-chat-text) !important;
     }
 
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"],
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat {
-      color: var(--kt-meta-text) !important;
+      color: var(--kt-chat-sub) !important;
     }
 
     html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] svg {
-      color: var(--kt-meta-title) !important;
+      color: var(--kt-chat-text) !important;
+    }
+
+    /* 내레이션 마크다운 요소도 채팅 배경 대비를 그대로 사용 */
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] a,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] del,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] s,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote p {
+      color: var(--kt-chat-sub) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote {
+      background: transparent !important;
+      border-color: var(--kt-chat-line) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote > div:first-child {
+      background: var(--kt-chat-muted) !important;
     }
 
     /* =========================================================
@@ -1672,60 +1693,7 @@
     }
 
 
-    /* =========================================================
-       내레이터 글씨 한 톤 진하게
-    ========================================================= */
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] > div {
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] .chat,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] p,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] em,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] li {
-      color: #4E5C64 !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] strong {
-      color: #36464F !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] svg {
-      color: #52616A !important;
-    }
-
-
-    /* =========================================================
-       상태창(InfoBox) 배경 제거 + 글씨 진하게
-    ========================================================= */
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] {
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-      color: #4B5961 !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"],
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .caption1 {
-      color: #4B5961 !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-semibold {
-      color: #34434C !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"]
-      [data-sentry-component="InfoBoxCollapseToggle"] svg {
-      color: #52616A !important;
-    }
-
-
+    
     /* =========================================================
        이어하기 / 삭제 모드 / 확인 팝업 전체 정리
     ========================================================= */
@@ -8003,90 +7971,6 @@
       display: none !important;
     }
 
-
-    /* =========================================================
-       채팅 배경 직결 UI 대비 보정
-       커스텀 테마에서는 --kt-chat-* 변수가 실제 배경 밝기에 맞춰 바뀜
-    ========================================================= */
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] > div,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] .chat,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] p,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] em,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] li {
-      color: var(--kt-chat-sub) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] strong,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] svg {
-      color: var(--kt-chat-text) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] hr {
-      border-color: var(--kt-chat-line) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] {
-      background: transparent !important;
-      color: var(--kt-chat-sub) !important;
-      border: 0 !important;
-      box-shadow: none !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-semibold,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] svg {
-      color: var(--kt-chat-text) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"],
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat {
-      color: var(--kt-chat-sub) !important;
-    }
-
-    /* =========================================================
-       커스텀 테마 대비 최종 가드
-       앞쪽의 고정색 규칙이 자동 대비를 다시 덮지 못하게 CSS 끝에서 확정
-    ========================================================= */
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] a,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] del,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] s {
-      color: var(--kt-chat-sub) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote p {
-      color: var(--kt-chat-sub) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote {
-      background: transparent !important;
-      border-color: var(--kt-chat-line) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote > div:first-child {
-      background: var(--kt-chat-muted) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"],
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .caption1,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"] {
-      color: var(--kt-chat-sub) !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] {
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-    }
-
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-semibold,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] svg {
-      color: var(--kt-chat-text) !important;
-    }
 
     /* =========================================================
        꿈 엿보기 확인 팝업
