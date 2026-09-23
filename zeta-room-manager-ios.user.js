@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.75
+// @version      0.20.76
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -4501,14 +4501,23 @@
     bindSwipeOpenLock();
     refresh();
 
-    let lastUrl = location.href;
-    setInterval(() => {
-      if (location.href !== lastUrl) {
-        lastUrl = location.href;
-        scheduleRefresh();
-        const section = currentSection();
-      }
-    }, 500);
+    // Zeta SPA 이동 감지: 상시 500ms 폴링 대신 history/popstate 이벤트에서만 갱신한다.
+    const notifyRouteChange = () => scheduleRefresh();
+    const wrapHistory = method => {
+      const original = history[method];
+      if (typeof original !== 'function' || original.__zrmWrapped) return;
+      const wrapped = function (...args) {
+        const before = location.href;
+        const result = original.apply(this, args);
+        if (location.href !== before) notifyRouteChange();
+        return result;
+      };
+      wrapped.__zrmWrapped = true;
+      history[method] = wrapped;
+    };
+    wrapHistory('pushState');
+    wrapHistory('replaceState');
+    window.addEventListener('popstate', notifyRouteChange);
   }
 
   if (document.readyState === 'loading') {
