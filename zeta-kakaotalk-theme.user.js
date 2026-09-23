@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.18
+// @version      3.50.19
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -53,6 +53,12 @@
       --kt-yellow: #FEE500;
       --kt-yellow-hover: #F5DC00;
       --kt-chat: #B2C7D9;
+      /* 커스텀 테마에서 실제 채팅 배경 대비로 다시 계산됨 */
+      --kt-chat-text: #26343C;
+      --kt-chat-sub: #56636D;
+      --kt-chat-muted: #7B898F;
+      --kt-chat-glass: rgba(255,255,255,.62);
+      --kt-chat-line: rgba(70,84,94,.18);
 
       --kt-white: #FFFFFF;
       --kt-soft: #F5F5F5;
@@ -66,10 +72,14 @@
       --kt-ai-name: #52606B;
       --kt-ai-dialogue: #202124;
       --kt-ai-action: #67747D;
+      --kt-ai-soft: #EEF2F4;
+      --kt-ai-line: #D8E0E5;
 
       --kt-user-name: #645C38;
       --kt-user-dialogue: #191919;
       --kt-user-action: #756C38;
+      --kt-user-soft: rgba(255,255,255,.52);
+      --kt-user-line: rgba(73,61,8,.18);
 
       --kt-meta-bg: rgba(255,255,255,.62);
       --kt-meta-title: #46545E;
@@ -139,13 +149,13 @@
 
     /* 안내 문구 */
     html.${ACTIVE} [data-sentry-component="FirstGuide"] > div {
-      background: rgba(255,255,255,.76) !important;
-      color: #56636D !important;
-      border: 1px solid rgba(0,0,0,.04) !important;
+      background: var(--kt-chat-glass) !important;
+      color: var(--kt-chat-sub) !important;
+      border: 1px solid var(--kt-chat-line) !important;
     }
 
     html.${ACTIVE} [data-sentry-component="FirstGuide"] svg {
-      color: #56636D !important;
+      color: var(--kt-chat-sub) !important;
     }
 
     /* 상대 / 유저 이름 */
@@ -4323,7 +4333,7 @@
     html.${ACTIVE} #portal-container
       [data-testid="action-panel-grid"] > button > span:nth-child(2) {
       display: block !important;
-      color: #394A54 !important;
+      color: var(--kt-chat-text) !important;
       opacity: 1 !important;
     }
 
@@ -7967,14 +7977,14 @@
 
     html.${ACTIVE} [data-sentry-component*="Dream"] span,
     html.${ACTIVE} [data-sentry-component*="Dream"] p {
-      color: #46545E !important;
+      color: var(--kt-chat-text) !important;
       opacity: 1 !important;
     }
 
     html.${ACTIVE} [data-sentry-component*="Dream"] button {
-      color: #394A54 !important;
-      background: rgba(255,255,255,.62) !important;
-      border: 1px solid rgba(70,84,94,.12) !important;
+      color: var(--kt-chat-text) !important;
+      background: var(--kt-chat-glass) !important;
+      border: 1px solid var(--kt-chat-line) !important;
       opacity: 1 !important;
     }
 
@@ -7991,6 +8001,44 @@
       display: none !important;
     }
 
+
+    /* =========================================================
+       채팅 배경 직결 UI 대비 보정
+       커스텀 테마에서는 --kt-chat-* 변수가 실제 배경 밝기에 맞춰 바뀜
+    ========================================================= */
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] > div,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] .chat,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] p,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] em,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] li {
+      color: var(--kt-chat-sub) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] strong,
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] svg {
+      color: var(--kt-chat-text) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="NarratorBubble"] hr {
+      border-color: var(--kt-chat-line) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] {
+      background: var(--kt-chat-glass) !important;
+      color: var(--kt-chat-sub) !important;
+      border-color: var(--kt-chat-line) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-semibold,
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] svg {
+      color: var(--kt-chat-text) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"],
+    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat {
+      color: var(--kt-chat-sub) !important;
+    }
 
     /* =========================================================
        꿈 엿보기 확인 팝업
