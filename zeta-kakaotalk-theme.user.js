@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.19
+// @version      3.50.20
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7483,11 +7483,13 @@
       box-shadow: none !important;
     }
 
-    /* 삭제 실행 하단바 = 캡처 완료 하단바 */
-    html.${ACTIVE} .kt-delete-mode-button-row {
-      background: rgba(255,255,255,.97) !important;
-      border-top: 1px solid var(--kt-line) !important;
-      box-shadow: 0 -4px 12px rgba(45,61,71,.08) !important;
+    /* 삭제 실행 하단바
+       삭제 모드에서도 채팅 배경이 그대로 이어지게 하고 흰 상태창을 만들지 않는다. */
+    html.${ACTIVE} .kt-delete-mode-button-row,
+    html.${ACTIVE} [data-sentry-component="DeleteModeBottom"] {
+      background: var(--kt-chat) !important;
+      border-top: 0 !important;
+      box-shadow: none !important;
       backdrop-filter: none !important;
     }
 
