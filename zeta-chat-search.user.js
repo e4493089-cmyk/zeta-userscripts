@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.0
+// @version      0.2.1
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -122,22 +122,6 @@
     });
   }
 
-  async function clearRoom(roomId) {
-    const db = await openDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      const request = store.index('room').openKeyCursor(IDBKeyRange.only(roomId));
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (!cursor) return;
-        store.delete(cursor.primaryKey);
-        cursor.continue();
-      };
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-  }
 
   // ── 화면에 그려진 대화 읽기 ──────────────────────────────────────────
   // 요청은 보내지 않는다. 제타가 이미 그린 것만 읽는다.
