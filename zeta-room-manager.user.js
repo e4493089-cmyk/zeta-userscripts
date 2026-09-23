@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.72
+// @version      0.23.73
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -65,7 +65,6 @@
   });
 
   let observer = null;
-  let rafPending = false;
   let suspendObserverRefresh = false;
   let lastRoomContextRecord = null;
   let plotCollectionPromise = null;
@@ -1055,16 +1054,6 @@
     return Boolean(meta && meta.missing);
   }
 
-  function roomIndexStats() {
-    let rooms = 0;
-    let dead = 0;
-    for (const entry of Object.values(state.index)) {
-      if (!entry || entry.type !== 'room') continue;
-      rooms++;
-      if (isDeadEntry(entry)) dead++;
-    }
-    return { rooms, dead };
-  }
 
   // 전체 검색 범위는 사용자가 한 번 수동 수집한 로컬 인덱스 기준이다.
   function indexStatusText() {
@@ -2649,28 +2638,6 @@
       .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0] || null;
   }
 
-  function collectionToolsAnchor() {
-    const section = currentSection();
-
-    if (section === 'room') {
-      const search = roomSearchControl();
-      if (search && search.parentElement) {
-        return { host: search.parentElement, before: search };
-      }
-      const host = roomHeaderActionHost();
-      if (host) return { host, before: host.firstElementChild || null };
-    }
-
-    if (section === 'plot') {
-      const search = creatorCenterSearchLink();
-      if (search && search.parentElement) {
-        const host = search.parentElement;
-        return { host, before: host.firstElementChild || search };
-      }
-    }
-
-    return null;
-  }
 
   function isStandalonePlotProfileView() {
     return /^\/(?:[^/]+\/)?plots\/[a-f\d-]{36}\/profile\/?$/i.test(location.pathname)
