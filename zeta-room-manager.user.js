@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.80
+// @version      0.23.81
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.80';
+  const SCRIPT_VERSION = '0.23.81';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1777,6 +1777,7 @@
       .zrm-modal .zrm-result-item span { color: #6b6b74; }
       .zrm-modal .zrm-result-buttons {
         display: flex;
+        flex: 0 0 auto;
         gap: 8px;
         margin-top: 14px;
       }
@@ -1789,8 +1790,10 @@
         cursor: pointer;
       }
       .zrm-modal .zrm-result-action {
+        flex: 0 0 40px;
         width: 100%;
         height: 40px;
+        min-height: 40px;
         margin-top: 12px;
         border: 0;
         border-radius: 10px;
@@ -1823,6 +1826,7 @@
         .zrm-modal .zrm-result-title { font-size: 12px; }
         .zrm-modal .zrm-result-stat-value { font-size: 18px; }
         .zrm-modal button { height: 36px; font-size: 11px; }
+        .zrm-modal .zrm-result-action { flex-basis: 36px; min-height: 36px; }
       }
     `;
     (document.head || document.documentElement).appendChild(style);
