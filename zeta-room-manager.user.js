@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.73
+// @version      0.23.74
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.71';
+  const SCRIPT_VERSION = '0.23.74';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -71,6 +71,14 @@
   let plotCollectionProgress = { running: false, count: 0 };
   let roomCollectionPromise = null;
   let roomCollectionProgress = { running: false, count: 0 };
+
+  // 플롯 선택 삭제는 평소에는 아무 작업도 하지 않는다.
+  // Room Manager 메뉴에서 사용자가 직접 켰을 때만 현재 보이는 플롯에 체크박스를 붙인다.
+  const PLOT_DELETE_TOOLBAR_ID = 'zeta-room-manager-plot-delete-toolbar';
+  let plotDeleteMode = false;
+  let plotDeleting = false;
+  const plotDeleteSelectedIds = new Set();
+  const plotDeleteSelectedNames = new Map();
 
   // 별명 파일이 아직 없으면(업데이트 직후) 이번 한 번만 통째로 읽어 떼어낸다.
   function loadAliases() {
@@ -2717,6 +2725,242 @@
     if (tools.parentElement !== document.body) document.body.appendChild(tools);
   }
 
+  function plotDeleteId(item) {
+    const link = item?.querySelector('a[href*="/plots/"]');
+    const href = link?.href || '';
+    return href.match(/\/plots\/([0-9a-f-]{20,})/i)?.[1] || '';
+  }
+
+  function plotDeleteName(item) {
+    return normalizeText(
+      item?.querySelector('[data-zrm-original-title]')?.textContent
+      || item?.querySelector('.line-clamp-1')?.textContent
+      || item?.querySelector('img')?.alt
+    ) || plotDeleteId(item) || '플롯';
+  }
+
+  function updatePlotDeleteToolbar() {
+    const toolbar = document.getElementById(PLOT_DELETE_TOOLBAR_ID);
+    if (!toolbar) return;
+    const cancel = toolbar.querySelector('.zrm-plot-delete-cancel');
+    const submit = toolbar.querySelector('.zrm-plot-delete-submit');
+    const count = plotDeleteSelectedIds.size;
+    if (cancel) cancel.disabled = plotDeleting;
+    if (submit) {
+      submit.disabled = plotDeleting || count === 0;
+      if (!plotDeleting) submit.textContent = count ? count + '개 선택 삭제' : '선택 삭제';
+    }
+    document.querySelectorAll('.zrm-plot-delete-check').forEach(input => {
+      input.disabled = plotDeleting;
+    });
+  }
+
+  function ensurePlotDeleteToolbar() {
+    let toolbar = document.getElementById(PLOT_DELETE_TOOLBAR_ID);
+    if (toolbar) {
+      updatePlotDeleteToolbar();
+      return toolbar;
+    }
+
+    toolbar = document.createElement('div');
+    toolbar.id = PLOT_DELETE_TOOLBAR_ID;
+    toolbar.innerHTML =
+      '<button type="button" class="zrm-plot-delete-cancel">취소</button>' +
+      '<button type="button" class="zrm-plot-delete-submit">선택 삭제</button>';
+
+    toolbar.querySelector('.zrm-plot-delete-cancel').addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (plotDeleting) return;
+      stopPlotDeleteMode(true);
+    });
+    toolbar.querySelector('.zrm-plot-delete-submit').addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      void startSelectedPlotDelete();
+    });
+
+    document.body.appendChild(toolbar);
+    updatePlotDeleteToolbar();
+    return toolbar;
+  }
+
+  function injectPlotDeleteCheckbox(item) {
+    if (!plotDeleteMode || !item) return;
+    const id = plotDeleteId(item);
+    if (!id) return;
+
+    let wrap = item.querySelector('.zrm-plot-delete-check-wrap');
+    let input = wrap?.querySelector('.zrm-plot-delete-check');
+    const host = item.querySelector('a[href*="/plots/"]');
+    if (!host) return;
+
+    item.classList.add('zrm-plot-delete-item');
+    host.classList.add('zrm-plot-delete-host');
+
+    if (!wrap) {
+      wrap = document.createElement('label');
+      wrap.className = 'zrm-plot-delete-check-wrap';
+      wrap.title = '삭제할 플롯 선택';
+
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.className = 'zrm-plot-delete-check';
+      input.dataset.plotId = id;
+
+      for (const type of ['click', 'mousedown', 'pointerdown', 'touchstart']) {
+        wrap.addEventListener(type, event => event.stopPropagation(), { passive: type === 'touchstart' });
+      }
+      input.addEventListener('change', event => {
+        event.stopPropagation();
+        if (input.checked) {
+          plotDeleteSelectedIds.add(id);
+          plotDeleteSelectedNames.set(id, plotDeleteName(item));
+        } else {
+          plotDeleteSelectedIds.delete(id);
+          plotDeleteSelectedNames.delete(id);
+        }
+        updatePlotDeleteToolbar();
+      });
+
+      wrap.appendChild(input);
+      host.appendChild(wrap);
+    }
+
+    input.dataset.plotId = id;
+    input.checked = plotDeleteSelectedIds.has(id);
+    input.disabled = plotDeleting;
+  }
+
+  function refreshPlotDeleteMode() {
+    if (!plotDeleteMode || currentSection() !== 'plot') return;
+    ensurePlotDeleteToolbar();
+    document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]')
+      .forEach(injectPlotDeleteCheckbox);
+    updatePlotDeleteToolbar();
+  }
+
+  function stopPlotDeleteMode(clearSelection = true) {
+    plotDeleteMode = false;
+    plotDeleting = false;
+    document.getElementById(PLOT_DELETE_TOOLBAR_ID)?.remove();
+    document.querySelectorAll('.zrm-plot-delete-check-wrap').forEach(el => el.remove());
+    document.querySelectorAll('.zrm-plot-delete-item').forEach(el => el.classList.remove('zrm-plot-delete-item'));
+    document.querySelectorAll('.zrm-plot-delete-host').forEach(el => el.classList.remove('zrm-plot-delete-host'));
+    if (clearSelection) {
+      plotDeleteSelectedIds.clear();
+      plotDeleteSelectedNames.clear();
+    }
+  }
+
+  function startPlotDeleteMode() {
+    if (currentSection() !== 'plot' || collectionRunning()) return;
+    plotDeleteSelectedIds.clear();
+    plotDeleteSelectedNames.clear();
+    plotDeleteMode = true;
+    plotDeleting = false;
+    refreshPlotDeleteMode();
+  }
+
+  async function deletePlotById(id) {
+    try {
+      const headers = { ...roomApiHeaders(), 'Content-Type': 'application/json' };
+      const response = await fetch(API_BASE + '/v1/plots/' + encodeURIComponent(id) + '/status', {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        cache: 'no-store',
+        body: JSON.stringify({ status: 'DELETE' })
+      });
+      let data = null;
+      try { data = await response.json(); } catch (_) {}
+      if (!response.ok) {
+        const message = normalizeText(data?.message || data?.error) || ('HTTP ' + response.status);
+        return { ok: false, reason: message };
+      }
+      return { ok: true, data };
+    } catch (error) {
+      return { ok: false, reason: error?.message || '삭제 요청 실패' };
+    }
+  }
+
+  function removeDeletedPlotFromRoomManager(id) {
+    const key = keyOf('plot', id);
+    try {
+      ensureDataLoaded();
+      delete dataIndex[key];
+      delete dataPlotMeta[id];
+      delete state.aliases[key];
+      plotLookup = null;
+      plotLookupDirty = true;
+    } catch (_) {}
+
+    const visible = Array.from(document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]'))
+      .find(item => plotDeleteId(item) === id);
+    visible?.remove();
+  }
+
+  async function startSelectedPlotDelete() {
+    if (!plotDeleteMode || plotDeleting) return;
+    const targets = [...plotDeleteSelectedIds].map(id => ({
+      id,
+      name: plotDeleteSelectedNames.get(id) || id
+    }));
+    if (!targets.length) return;
+
+    const agreed = await askCollectionConfirm({
+      title: '선택한 플롯 ' + targets.length + '개를 삭제할까요?',
+      lines: [
+        '선택한 플롯을 순서대로 삭제합니다.',
+        '삭제한 플롯은 되돌릴 수 없습니다.'
+      ],
+      okLabel: '삭제'
+    });
+    if (!agreed || !plotDeleteMode) return;
+
+    plotDeleting = true;
+    updatePlotDeleteToolbar();
+
+    let success = 0;
+    const failures = [];
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        const submit = document.querySelector('#' + PLOT_DELETE_TOOLBAR_ID + ' .zrm-plot-delete-submit');
+        if (submit) submit.textContent = (i + 1) + ' / ' + targets.length + ' 삭제 중';
+
+        const result = await deletePlotById(target.id);
+        if (!result.ok) {
+          failures.push({
+            name: target.name,
+            url: '',
+            reason: result.reason || '삭제 실패'
+          });
+          break;
+        }
+
+        success++;
+        plotDeleteSelectedIds.delete(target.id);
+        plotDeleteSelectedNames.delete(target.id);
+        removeDeletedPlotFromRoomManager(target.id);
+        await sleep(350);
+      }
+    } finally {
+      saveStateNow();
+      stopPlotDeleteMode(true);
+      scheduleRefresh();
+    }
+
+    showCollectionResult({
+      title: failures.length ? '선택 삭제 중 일부 실패' : '선택 삭제 완료',
+      okLabel: '삭제 완료',
+      okCount: success,
+      failCount: failures.length,
+      failures,
+      failuresLabel: '삭제 실패'
+    });
+  }
+
   function closeCollectionPopup() {
     document.getElementById(COLLECTION_MODAL_ID)?.remove();
   }
@@ -2746,6 +2990,7 @@
           '<button type="button" data-zrm-action="export">내보내기</button>' +
           '<button type="button" data-zrm-action="import">불러오기</button>' +
           '<button type="button" data-zrm-action="delete">데이터 삭제</button>' +
+          (!isRoom ? '<button type="button" data-zrm-action="plot-delete">선택 삭제</button>' : '') +
         '</div>' +
       '</div>';
 
@@ -2756,10 +3001,12 @@
     const collect = modal.querySelector('[data-zrm-action="collect"]');
     const forceCollect = modal.querySelector('[data-zrm-action="force-collect"]');
     const deleteButton = modal.querySelector('[data-zrm-action="delete"]');
+    const plotDeleteButton = modal.querySelector('[data-zrm-action="plot-delete"]');
     collect.disabled = false;
     collect.textContent = progress.running ? '중지' : (isRoom ? '일반 전체 수집' : '전체 수집');
     if (forceCollect) forceCollect.disabled = progress.running;
     if (deleteButton) deleteButton.disabled = progress.running;
+    if (plotDeleteButton) plotDeleteButton.disabled = progress.running;
 
     modal.querySelector('.zrm-collection-close').addEventListener('click', closeCollectionPopup);
     modal.addEventListener('click', event => {
@@ -2790,6 +3037,10 @@
     deleteButton?.addEventListener('click', () => {
       closeCollectionPopup();
       deleteAllRoomManagerData();
+    });
+    plotDeleteButton?.addEventListener('click', () => {
+      closeCollectionPopup();
+      startPlotDeleteMode();
     });
 
     document.body.appendChild(modal);
@@ -3270,6 +3521,68 @@
       }
       #${COLLECTION_MODAL_ID} .zrm-collection-actions button:disabled {
         opacity: .45;
+      }
+      #${COLLECTION_MODAL_ID} .zrm-collection-actions [data-zrm-action="plot-delete"] {
+        color: #ff6b6b;
+      }
+
+      .zrm-plot-delete-item { position: relative !important; }
+      .zrm-plot-delete-host { position: relative !important; }
+      .zrm-plot-delete-check-wrap {
+        position: absolute;
+        left: 3px;
+        top: 3px;
+        z-index: 30;
+        display: block;
+        width: auto;
+        height: auto;
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+      }
+      .zrm-plot-delete-check {
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        accent-color: #fff;
+        cursor: pointer;
+      }
+      #${PLOT_DELETE_TOOLBAR_ID} {
+        position: fixed;
+        right: max(16px, env(safe-area-inset-right));
+        bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+        z-index: 2147483644;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 14px;
+        background: rgba(28,28,31,.94);
+        box-shadow: 0 8px 30px rgba(0,0,0,.38);
+        backdrop-filter: blur(10px);
+      }
+      #${PLOT_DELETE_TOOLBAR_ID} button {
+        border: 0;
+        border-radius: 9px;
+        padding: 9px 12px;
+        font: 600 12px/1.2 system-ui, sans-serif;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      #${PLOT_DELETE_TOOLBAR_ID} .zrm-plot-delete-cancel {
+        background: rgba(255,255,255,.08);
+        color: #fff;
+      }
+      #${PLOT_DELETE_TOOLBAR_ID} .zrm-plot-delete-submit {
+        background: #f05252;
+        color: #fff;
+      }
+      #${PLOT_DELETE_TOOLBAR_ID} button:disabled {
+        opacity: .45;
+        cursor: default;
       }
 
       #${MODAL_ID} {
@@ -4279,6 +4592,8 @@
     const section = currentSection();
     removeLegacyPanel();
 
+    if (plotDeleteMode && section !== 'plot') stopPlotDeleteMode(true);
+
     if (!section || section === 'chat') {
       if (section !== 'chat') document.getElementById(CHAT_RENAME_ID)?.remove();
       document.getElementById(NATIVE_RESULTS_ID)?.remove();
@@ -4311,6 +4626,8 @@
       applyAlias(record);
       makeRenameButton(record);
     }
+
+    if (section === 'plot' && plotDeleteMode) refreshPlotDeleteMode();
 
     injectRoomContextMenu();
     if (heavyParses !== savedHeavyParses) {
@@ -4352,6 +4669,8 @@
 
     // 같은 탭에 새 버전을 다시 주입하면 남은 UI의 이전 이벤트를 새 버전으로 다시 묶는다.
     document.getElementById(PLOT_TOOLS_ID)?.remove();
+    document.getElementById(PLOT_DELETE_TOOLBAR_ID)?.remove();
+    document.querySelectorAll('.zrm-plot-delete-check-wrap').forEach(el => el.remove());
     document.getElementById(COLLECTION_MODAL_ID)?.remove();
     document.getElementById(COLLECTION_BANNER_ID)?.remove();
     document.getElementById(CHAT_RENAME_ID)?.remove();
