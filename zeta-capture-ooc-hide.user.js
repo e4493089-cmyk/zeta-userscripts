@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture OOC Hide
 // @namespace    zeta-capture-ooc-hide
-// @version      0.1.7
+// @version      0.1.8
 // @description  Zeta 캡처 미리보기에서 내 말풍선과 내레이터의 OOC: 구문을 인식해 골라 제거합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-ooc-hide.user.js
@@ -68,10 +68,10 @@
         min-width: 38px !important;
         margin: 0 !important;
         padding: 0 8px !important;
-        border: 1px solid rgba(38,52,60,.10) !important;
+        border: 1px solid var(--kt-line, rgba(38,52,60,.10)) !important;
         border-radius: 9px !important;
-        background: #F1F3F4 !important;
-        color: #53636C !important;
+        background: var(--kt-soft, #F1F3F4) !important;
+        color: var(--kt-sub, #53636C) !important;
         box-shadow: none !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
         font-size: 11px !important;
@@ -83,20 +83,20 @@
         user-select: none !important;
         -webkit-user-select: none !important;
       }
-      #${CONTROL_ID}:hover { background: #E9EDF0 !important; }
+      #${CONTROL_ID}:hover { background: var(--kt-soft2, #E9EDF0) !important; }
       #${CONTROL_ID}[data-editing="1"] {
-        background: #26343C !important;
-        border-color: #26343C !important;
-        color: #FFFFFF !important;
+        background: var(--kt-yellow, #26343C) !important;
+        border-color: var(--kt-yellow, #26343C) !important;
+        color: var(--kt-user-dialogue, var(--kt-text, #FFFFFF)) !important;
       }
       #${CONTROL_ID}[data-applied="1"]:not([data-editing="1"]) {
-        background: #EEF1F3 !important;
-        color: #394A54 !important;
+        background: var(--kt-ai-soft, var(--kt-soft2, #EEF1F3)) !important;
+        color: var(--kt-text, #394A54) !important;
       }
 
       html.${EDITING_CLASS} .${CANDIDATE_CLASS} {
         position: relative !important;
-        outline: 2px dashed rgba(83,99,108,.72) !important;
+        outline: 2px dashed var(--kt-sub, rgba(83,99,108,.72)) !important;
         outline-offset: 3px !important;
         border-radius: 5px !important;
         cursor: pointer !important;
@@ -104,9 +104,9 @@
       }
       html.${EDITING_CLASS} .${CANDIDATE_CLASS}.${SELECTED_CLASS} {
         opacity: .78 !important;
-        outline: 2px solid #FF5D73 !important;
+        outline: 2px solid var(--kt-yellow, #FF5D73) !important;
         outline-offset: 3px !important;
-        background-color: rgba(255,93,115,.09) !important;
+        background-color: var(--kt-user-soft, rgba(255,93,115,.09)) !important;
       }
       .${COMPACT_CLASS} > p:last-child,
       .${COMPACT_CLASS} > div:last-child,
