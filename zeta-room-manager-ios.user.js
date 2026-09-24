@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.81
+// @version      0.20.82
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.81';
+  const SCRIPT_VERSION = '0.20.82';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -69,7 +69,9 @@
   let suspendObserverRefresh = false;
   let swipeGesture = null;
   let lastRoomContextRecord = null;
-  let pendingNativeRoomLeave = null;
+  // DELETE 성공 직후 제타의 이전 DOM/현재 대화 화면이 잠깐 남아 있어도
+  // 방이 다시 색인되지 않도록 짧게 재수집을 막는다.
+  const recentlyDeletedRoomIds = new Map();
   let plotCollectionPromise = null;
   let plotCollectionProgress = { running: false, count: 0 };
   let roomCollectionPromise = null;
@@ -125,7 +127,20 @@
     return (dataLoaded ? dataIndex[key] : pendingIndex[key]) || null;
   }
 
+  function isRecentlyDeletedRoomId(roomId) {
+    const id = normalizeText(roomId);
+    if (!id) return false;
+    const until = Number(recentlyDeletedRoomIds.get(id) || 0);
+    if (!until) return false;
+    if (until <= Date.now()) {
+      recentlyDeletedRoomIds.delete(id);
+      return false;
+    }
+    return true;
+  }
+
   function putEntry(key, value) {
+    if (value?.type === 'room' && isRecentlyDeletedRoomId(value.id)) return;
     if (dataLoaded) dataIndex[key] = value;
     else pendingIndex[key] = value;
   }
@@ -763,81 +778,35 @@
     } catch (_) {}
   }
 
-  function armNativeRoomLeave(record) {
-    const id = normalizeText(record && record.id);
-    if (!id || record?.type !== 'room') return;
-    pendingNativeRoomLeave = {
-      id,
-      key: record.key || keyOf('room', id),
-      startedAt: Date.now()
-    };
-    setTimeout(() => {
-      if (pendingNativeRoomLeave?.id === id && Date.now() - pendingNativeRoomLeave.startedAt >= 15000) {
-        pendingNativeRoomLeave = null;
-      }
-    }, 15100);
-  }
-
-  function clearPendingNativeRoomLeave() {
-    pendingNativeRoomLeave = null;
-  }
-
-  function isSuccessfulNativeMutation(method, url, ok) {
-    if (!ok) return false;
-    const verb = String(method || 'GET').toUpperCase();
-    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(verb)) return false;
-
+  function nativeDeletedRoomId(method, url) {
+    if (String(method || 'GET').toUpperCase() !== 'DELETE') return '';
     try {
       const parsed = new URL(String(url || ''), location.href);
-      const host = parsed.hostname.toLowerCase();
-      if (!(host === 'zeta-ai.io' || host.endsWith('.zeta-ai.io'))) return false;
-      // 분석/상태/상품 요청 같은 삭제와 무관한 성공 요청은 제외한다.
-      if (/emergency|sentry|analytics|open-stores|products/i.test(parsed.href)) return false;
+      if (parsed.hostname.toLowerCase() !== 'api.zeta-ai.io') return '';
+      const match = parsed.pathname.match(/^\/v1\/rooms\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i);
+      return match ? match[1] : '';
     } catch (_) {
-      return false;
+      return '';
     }
-    return true;
   }
 
-  function applyPendingNativeRoomLeave(method, url, ok) {
-    const pending = pendingNativeRoomLeave;
-    if (!pending) return false;
-    if (Date.now() - pending.startedAt > 15000) {
-      pendingNativeRoomLeave = null;
-      return false;
-    }
-    if (!isSuccessfulNativeMutation(method, url, ok)) return false;
+  function applyNativeRoomDeletion(method, url, ok) {
+    if (!ok) return false;
+    const roomId = nativeDeletedRoomId(method, url);
+    if (!roomId) return false;
 
-    pendingNativeRoomLeave = null;
-    const changed = removeRoomManagerRoom(pending.id);
-    if (changed) {
-      lastRoomContextRecord = null;
-      document.getElementById(NATIVE_RESULTS_ID)?.remove();
-      scheduleRefresh();
-    }
+    // 응답 직후 남아 있는 이전 DOM/대화 화면이 다시 putEntry() 하지 못하게 먼저 잠근다.
+    recentlyDeletedRoomIds.set(roomId, Date.now() + 60000);
+    const changed = removeRoomManagerRoom(roomId);
+
+    lastRoomContextRecord = null;
+    document.getElementById(NATIVE_RESULTS_ID)?.remove();
+
+    // 라우팅/DOM 정리가 뒤늦게 일어나도 저장본에서 한 번 더 확실히 제거한다.
+    setTimeout(() => removeRoomManagerRoom(roomId), 500);
+    setTimeout(() => removeRoomManagerRoom(roomId), 1800);
+    scheduleRefresh();
     return changed;
-  }
-
-  function installNativeRoomLeaveIntentCapture() {
-    const root = document.documentElement;
-    if (root.dataset.zrmLeaveIntentVersion === SCRIPT_VERSION) return;
-    root.dataset.zrmLeaveIntentVersion = SCRIPT_VERSION;
-
-    document.addEventListener('click', event => {
-      const button = event.target?.closest?.('button');
-      if (!button) return;
-      const label = normalizeText(button.textContent);
-
-      if (pendingNativeRoomLeave && /^(취소|닫기|아니오)$/i.test(label)) {
-        clearPendingNativeRoomLeave();
-        return;
-      }
-
-      if (label !== '나가기') return;
-      const record = lastRoomContextRecord;
-      if (!record || record.type !== 'room') return;
-      armNativeRoomLeave(record);
-    }, true);
   }
 
   function installPassiveNativeDataCapture() {
@@ -863,7 +832,7 @@
 
         const response = await originalFetch.apply(this, arguments);
         try {
-          applyPendingNativeRoomLeave(requestMethod, requestUrl, response.ok);
+          applyNativeRoomDeletion(requestMethod, requestUrl, response.ok);
           if (shouldInspectNativeResponse(requestUrl)) {
             const clone = response.clone();
             clone.json().then(inspectNativeResponsePayload).catch(() => {});
@@ -900,7 +869,7 @@
       xhr.addEventListener('load', () => {
         try {
           const ok = xhr.status >= 200 && xhr.status < 300;
-          applyPendingNativeRoomLeave(method, url, ok);
+          applyNativeRoomDeletion(method, url, ok);
 
           if (!shouldInspectNativeResponse(url)) return;
           if (xhr.responseType === 'json' && xhr.response) {
@@ -4204,13 +4173,6 @@
       }, true);
 
       const leaveButton = nativeButtons.find(btn => normalizeText(btn.textContent) === '나가기');
-      if (leaveButton && leaveButton.dataset.zrmLeaveIntent !== SCRIPT_VERSION) {
-        leaveButton.dataset.zrmLeaveIntent = SCRIPT_VERSION;
-        leaveButton.addEventListener('click', () => {
-          const record = lastRoomContextRecord;
-          if (record?.type === 'room') armNativeRoomLeave(record);
-        }, true);
-      }
       menu.insertBefore(button, leaveButton || null);
     }
   }
@@ -4921,7 +4883,6 @@
     document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
 
     installPassiveNativeDataCapture();
-    installNativeRoomLeaveIntentCapture();
     injectStyle();
 
     // 화면 크기나 방향이 바뀌면 헤더 위치도 바뀐다.
