@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.74
+// @version      0.23.75
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.74';
+  const SCRIPT_VERSION = '0.23.75';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1164,6 +1164,48 @@
   // 방 목록 자체는 API로 가져오지 않는다. 사용자가 버튼을 눌렀을 때 실제 목록을
   // 끝까지 스크롤해 저장하고, 그 뒤 수집된 방의 고유 plotId만 제한적으로 API 조회한다.
 
+  function removeRoomManagerRoom(roomId) {
+    const id = normalizeText(roomId);
+    if (!id) return false;
+    const key = keyOf('room', id);
+    let changed = false;
+
+    try {
+      ensureDataLoaded();
+      if (Object.prototype.hasOwnProperty.call(dataIndex, key)) {
+        delete dataIndex[key];
+        changed = true;
+      }
+    } catch (_) {}
+    if (Object.prototype.hasOwnProperty.call(pendingIndex, key)) {
+      delete pendingIndex[key];
+      changed = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(state.aliases, key)) {
+      delete state.aliases[key];
+      changed = true;
+    }
+
+    if (changed) saveStateNow();
+    return changed;
+  }
+
+  function reconcileStoredRooms(seenKeys) {
+    if (!(seenKeys instanceof Set)) return 0;
+    ensureDataLoaded();
+
+    let removed = 0;
+    for (const [key, entry] of Object.entries(dataIndex)) {
+      if (!entry || entry.type !== 'room') continue;
+      if (seenKeys.has(key)) continue;
+      delete dataIndex[key];
+      delete state.aliases[key];
+      removed++;
+    }
+    if (removed) saveStateNow();
+    return removed;
+  }
+
   function roomCollectionCount() {
     return Object.values(state.index).filter(entry => entry && entry.type === 'room' && entry.id).length;
   }
@@ -1983,9 +2025,9 @@
       harvestedItems.clear();
       void holdScreenAwake();
 
-      // 일반 수집은 새 방/연결 변경/이름 누락만 열고,
-      // 다시 전체 수집은 기존 데이터를 지우지 않은 채 모든 고유 플롯을 재검증한다.
-      forceReconcileSeenRoomKeys = force ? new Set() : null;
+      // 끝까지 정상 수집한 회차는 실제 방 목록을 기준으로 오래된 삭제 방도 정리한다.
+      // 다시 전체 수집에서는 같은 목록을 API 재검증 범위에도 사용한다.
+      forceReconcileSeenRoomKeys = new Set();
       // 수집 중 MutationObserver → refresh → renderedItems 중복 분석을 막는다.
       suspendObserverRefresh = true;
       observer?.disconnect();
@@ -2092,10 +2134,16 @@
       }
       setScrollTop(host, originalTop);
 
-      const seenRoomKeys = force && forceReconcileSeenRoomKeys
+      const seenRoomKeys = forceReconcileSeenRoomKeys
         ? new Set(forceReconcileSeenRoomKeys)
         : null;
       forceReconcileSeenRoomKeys = null;
+
+      // 목록 끝까지 실제로 확인한 경우에만 누적 인덱스를 현재 목록과 맞춘다.
+      // 중지/목록 끝 확인 실패 때는 오래된 데이터를 지우지 않는다.
+      if (!collectionAborted && listCompleted && seenRoomKeys) {
+        reconcileStoredRooms(seenRoomKeys);
+      }
 
       // 방 목록은 여기까지 스크롤로만 수집했다.
       // 이름/제작자 보충은 일반 수집 최초 1회 또는 '다시 전체 수집'을 누른 그 회차에만 API를 쓴다.
@@ -3994,6 +4042,42 @@
     }
   }
 
+  function roomLinkExistsInNativeList(roomId) {
+    const id = normalizeText(roomId);
+    if (!id) return false;
+    return Array.from(document.querySelectorAll('a[href*="/rooms/"]')).some(link => {
+      if (link.closest('#' + NATIVE_RESULTS_ID)) return false;
+      return extractId(link.href, 'room') === id;
+    });
+  }
+
+  function verifyNativeRoomRemoval(record) {
+    const roomId = normalizeText(record && record.id);
+    if (!roomId) return;
+
+    let tries = 0;
+    const check = () => {
+      tries++;
+      // 다른 화면으로 이동했으면 판단하지 않는다.
+      if (currentSection() !== 'room') return;
+
+      const itemGone = !record.item || !record.item.isConnected;
+      const nativeLinkGone = !roomLinkExistsInNativeList(roomId);
+      if (itemGone && nativeLinkGone) {
+        if (removeRoomManagerRoom(roomId)) {
+          lastRoomContextRecord = null;
+          document.getElementById(NATIVE_RESULTS_ID)?.remove();
+          scheduleRefresh();
+        }
+        return;
+      }
+
+      // 확인창에서 취소할 수 있으므로, 실제 카드가 사라지는지 최대 15초만 본다.
+      if (tries < 50) setTimeout(check, 300);
+    };
+    setTimeout(check, 300);
+  }
+
   function injectRoomContextMenu() {
     const menus = new Set(document.querySelectorAll('[data-sentry-source-file="RoomListItemContextMenu.tsx"]'));
     document.querySelectorAll('[role="dialog"], [role="menu"]').forEach(menu => {
@@ -4031,6 +4115,13 @@
       }, true);
 
       const leaveButton = nativeButtons.find(btn => normalizeText(btn.textContent) === '나가기');
+      if (leaveButton && leaveButton.dataset.zrmRemovalWatch !== SCRIPT_VERSION) {
+        leaveButton.dataset.zrmRemovalWatch = SCRIPT_VERSION;
+        leaveButton.addEventListener('click', () => {
+          const record = lastRoomContextRecord;
+          if (record && record.type === 'room') verifyNativeRoomRemoval(record);
+        }, true);
+      }
       menu.insertBefore(button, leaveButton || null);
     }
   }
