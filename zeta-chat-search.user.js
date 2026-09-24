@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.5
+// @version      0.2.6
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.2.5';
+  const SCRIPT_VERSION = '0.2.6';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -317,6 +317,82 @@
       .replace(/:+$/, '');
   }
 
+  function pushIndexedPart(parts, type, text, role, speaker) {
+    const value = clean(text);
+    if (!value) return;
+
+    const previous = parts[parts.length - 1];
+    if (previous?.type === type && previous.role === role && previous.speaker === speaker) {
+      previous.text = clean(previous.text + ' ' + value);
+    } else {
+      parts.push({ type, text: value, role, speaker });
+    }
+  }
+
+  // 대화 추출기와 같은 기준으로 렌더된 DOM에서 지문/대사를 나눈다.
+  // 검색용 text는 평탄화하되, TXT 내보내기용 parts는 구분 정보를 유지한다.
+  function extractIndexedParts(body) {
+    const parts = [];
+    const sections = body.querySelectorAll([
+      '[data-sentry-component="NarratorBubble"]',
+      '[data-sentry-component="LeftTextContent"]',
+      '[data-sentry-component="RightTextContent"]'
+    ].join(','));
+
+    sections.forEach(section => {
+      const forcedNarration = section.matches('[data-sentry-component="NarratorBubble"]');
+      const sectionRole = forcedNarration
+        ? 'narrator'
+        : section.matches('[data-sentry-component="RightTextContent"]')
+          ? 'user'
+          : 'assistant';
+      const sectionSpeaker = sectionRole === 'narrator'
+        ? ''
+        : clean(section.querySelector('.caption1')?.textContent || '')
+          .replace(/^@+/, '')
+          .replace(/:+$/, '');
+      const paragraphs = Array.from(section.querySelectorAll('.chat p'));
+
+      if (paragraphs.length) {
+        paragraphs.forEach(paragraph => {
+          const text = paragraph.innerText || paragraph.textContent || '';
+          const meaningfulNodes = Array.from(paragraph.childNodes).filter(node =>
+            node.nodeType === Node.ELEMENT_NODE ||
+            (node.nodeType === Node.TEXT_NODE && clean(node.textContent))
+          );
+          const narration = forcedNarration || (
+            meaningfulNodes.length > 0 &&
+            meaningfulNodes.every(node =>
+              node.nodeType === Node.ELEMENT_NODE &&
+              node.matches('em, i')
+            )
+          );
+          pushIndexedPart(parts, narration ? 'narration' : 'message', text, sectionRole, sectionSpeaker);
+        });
+        return;
+      }
+
+      const chats = Array.from(section.querySelectorAll('.chat'));
+      let text = clean(chats.length
+        ? chats.map(node => node.innerText || node.textContent || '').join(' ')
+        : section.innerText || section.textContent || '');
+
+      const label = clean(section.querySelector('.caption1')?.textContent || '');
+      if (label && text.startsWith(label)) text = clean(text.slice(label.length));
+      pushIndexedPart(parts, forcedNarration ? 'narration' : 'message', text, sectionRole, sectionSpeaker);
+    });
+
+    if (!parts.length) {
+      const role = roleOf(body);
+      const speaker = speakerOf(body, role);
+      let text = clean(body.innerText || body.textContent || '');
+      if (speaker && text.startsWith(speaker)) text = clean(text.slice(speaker.length));
+      pushIndexedPart(parts, 'message', text, role, speaker);
+    }
+
+    return parts;
+  }
+
   function messageNumber(id) {
     const match = String(id || '').match(/^(?:message-)?MESSAGE-(\d+)-/);
     return match ? Number(match[1]) : 0;
@@ -327,7 +403,9 @@
     for (const body of document.querySelectorAll(MESSAGE_SELECTOR)) {
       if (!body.id) continue;
       const role = roleOf(body);
-      const text = clean(body.textContent);
+      const speaker = speakerOf(body, role);
+      const parts = extractIndexedParts(body);
+      const text = clean(parts.map(part => part.text).join(' '));
       if (!text) continue;
       rows.push({
         key: roomId + '|' + body.id,
@@ -335,8 +413,9 @@
         id: body.id,
         num: messageNumber(body.id),
         role,
-        speaker: speakerOf(body, role),
-        text
+        speaker,
+        text,
+        parts
       });
     }
     return rows;
@@ -360,11 +439,12 @@
     }
 
     const fresh = rendered.filter(row => !knownKeys.has(row.key));
-    if (!fresh.length) return 0;
-    for (const row of fresh) knownKeys.add(row.key);
+    const rowsToSave = seenKeys instanceof Set ? rendered : fresh;
+    if (!rowsToSave.length) return 0;
+    for (const row of rendered) knownKeys.add(row.key);
 
     try {
-      await saveMessages(fresh);
+      await saveMessages(rowsToSave);
     } catch (_) {
       return 0;
     }
@@ -576,13 +656,66 @@
     return '메시지';
   }
 
+  function stripLegacySpeakerPrefix(text, speaker) {
+    let value = String(text || '').trim();
+    const label = clean(speaker);
+    if (label && value.startsWith(label)) value = value.slice(label.length).trim();
+    return value;
+  }
+
+  function indexedPartSpeakerLabel(part, row) {
+    const role = part?.role || row?.role;
+    if (role === 'narrator') return '나레이터';
+    const speaker = clean(part?.speaker || row?.speaker);
+    if (speaker) return speaker;
+    if (role === 'user') return '나';
+    if (role === 'assistant') return '캐릭터';
+    return '메시지';
+  }
+
   function buildIndexedTxt(rows) {
-    return (Array.isArray(rows) ? rows : [])
+    const output = [];
+
+    for (const row of (Array.isArray(rows) ? rows : [])
       .filter(row => row && row.text)
       .slice()
-      .sort((a, b) => Number(b?.num || 0) - Number(a?.num || 0))
-      .map(row => '[' + indexedSpeakerLabel(row) + ']\n' + String(row.text || '').trim())
-      .join('\n\n');
+      .sort((a, b) => Number(b?.num || 0) - Number(a?.num || 0))) {
+
+      const hasParts = Array.isArray(row.parts) && row.parts.some(part => clean(part?.text));
+      const parts = hasParts
+        ? row.parts
+        : [{
+            type: 'legacy',
+            role: row.role,
+            speaker: row.speaker,
+            text: stripLegacySpeakerPrefix(row.text, row.speaker)
+          }];
+
+      let currentSpeaker = '';
+      for (const part of parts) {
+        const text = clean(part?.text);
+        if (!text) continue;
+
+        const speaker = indexedPartSpeakerLabel(part, row);
+        if (speaker !== currentSpeaker) {
+          if (output.length && output[output.length - 1] !== '') output.push('');
+          output.push('[' + speaker + ']');
+          currentSpeaker = speaker;
+        }
+
+        const type = part.type === 'narration'
+          ? '[지문]'
+          : part.type === 'message'
+            ? '[대사]'
+            : '[본문]';
+        output.push(type);
+        output.push(text);
+        output.push('');
+      }
+    }
+
+    while (output[output.length - 1] === '') output.pop();
+    return output.join('\n');
   }
 
   function downloadIndexedTxt(rows, roomId) {
