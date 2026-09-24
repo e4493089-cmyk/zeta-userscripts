@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.79
+// @version      0.20.80
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.79';
+  const SCRIPT_VERSION = '0.20.80';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -762,6 +762,53 @@
     } catch (_) {}
   }
 
+  function parseJsonBody(value) {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      try { return JSON.parse(value); } catch (_) { return null; }
+    }
+    if (typeof value === 'object' && !(value instanceof FormData) && !(value instanceof Blob)) return value;
+    return null;
+  }
+
+  function deletedRoomIdsFromNativeRequest(method, url, body) {
+    const verb = String(method || 'GET').toUpperCase();
+    let parsedUrl = null;
+    try { parsedUrl = new URL(String(url || ''), location.href); } catch (_) { return []; }
+    if (!/\/v\d+\/rooms(?:\/|$)/i.test(parsedUrl.pathname)) return [];
+
+    // 단일 방 나가기/삭제: DELETE /vN/rooms/:roomId
+    if (verb === 'DELETE') {
+      const single = parsedUrl.pathname.match(/\/v\d+\/rooms\/([0-9a-f-]{20,})\/?$/i);
+      if (single) return [single[1]];
+    }
+
+    // 제타가 여러 방을 한 번에 정리하는 경로도 기존 요청 body만 읽어 처리한다.
+    if (/\/rooms\/purge\/?$/i.test(parsedUrl.pathname)) {
+      const data = parseJsonBody(body);
+      const roomIds = Array.isArray(data?.roomIds) ? data.roomIds : [];
+      return roomIds.map(normalizeText).filter(Boolean);
+    }
+
+    return [];
+  }
+
+  function applyNativeRoomDeletion(method, url, body, ok) {
+    if (!ok) return;
+    const ids = deletedRoomIdsFromNativeRequest(method, url, body);
+    if (!ids.length) return;
+
+    let changed = false;
+    for (const id of ids) {
+      if (removeRoomManagerRoom(id)) changed = true;
+    }
+    if (changed) {
+      lastRoomContextRecord = null;
+      document.getElementById(NATIVE_RESULTS_ID)?.remove();
+      scheduleRefresh();
+    }
+  }
+
   function installPassiveNativeDataCapture() {
     if (window.__zrmPassiveNativeCaptureInstalled) return;
     window.__zrmPassiveNativeCaptureInstalled = true;
@@ -770,16 +817,23 @@
     const originalFetch = window.fetch;
     if (typeof originalFetch === 'function') {
       window.fetch = async function () {
+        let requestMethod = 'GET';
+        let requestUrl = '';
+        let requestBody = null;
         try {
           const first = arguments[0];
+          const init = arguments[1] || {};
           if (first && typeof first !== 'string' && first.headers) captureClientVersionFromHeaders(first);
-          captureClientVersionFromHeaders(arguments[1]);
+          captureClientVersionFromHeaders(init);
+          requestMethod = String(init.method || (first && typeof first !== 'string' && first.method) || 'GET').toUpperCase();
+          requestUrl = typeof first === 'string' ? first : first && first.url;
+          requestBody = init.body ?? null;
         } catch (_) {}
+
         const response = await originalFetch.apply(this, arguments);
         try {
-          const first = arguments[0];
-          const url = typeof first === 'string' ? first : first && first.url;
-          if (shouldInspectNativeResponse(url)) {
+          applyNativeRoomDeletion(requestMethod, requestUrl, requestBody, response.ok);
+          if (shouldInspectNativeResponse(requestUrl)) {
             const clone = response.clone();
             clone.json().then(inspectNativeResponsePayload).catch(() => {});
           }
@@ -792,9 +846,13 @@
     const xhrSend = XMLHttpRequest.prototype.send;
     const xhrSetHeader = XMLHttpRequest.prototype.setRequestHeader;
     const xhrUrl = new WeakMap();
+    const xhrMethod = new WeakMap();
 
     XMLHttpRequest.prototype.open = function (method, url) {
-      try { xhrUrl.set(this, String(url || '')); } catch (_) {}
+      try {
+        xhrUrl.set(this, String(url || ''));
+        xhrMethod.set(this, String(method || 'GET').toUpperCase());
+      } catch (_) {}
       return xhrOpen.apply(this, arguments);
     };
 
@@ -803,23 +861,30 @@
       return xhrSetHeader.apply(this, arguments);
     };
 
-    XMLHttpRequest.prototype.send = function () {
+    XMLHttpRequest.prototype.send = function (body) {
       const xhr = this;
       const url = xhrUrl.get(xhr) || '';
-      if (shouldInspectNativeResponse(url)) {
-        xhr.addEventListener('load', () => {
-          try {
-            if (xhr.responseType === 'json' && xhr.response) {
-              inspectNativeResponsePayload(xhr.response);
-              return;
+      const method = xhrMethod.get(xhr) || 'GET';
+
+      xhr.addEventListener('load', () => {
+        try {
+          const ok = xhr.status >= 200 && xhr.status < 300;
+          applyNativeRoomDeletion(method, url, body, ok);
+
+          if (!shouldInspectNativeResponse(url)) return;
+          if (xhr.responseType === 'json' && xhr.response) {
+            inspectNativeResponsePayload(xhr.response);
+            return;
+          }
+          if (!xhr.responseType || xhr.responseType === 'text') {
+            const responseBody = xhr.responseText;
+            if (responseBody && /^[\s]*[\[{]/.test(responseBody)) {
+              inspectNativeResponsePayload(JSON.parse(responseBody));
             }
-            if (!xhr.responseType || xhr.responseType === 'text') {
-              const body = xhr.responseText;
-              if (body && /^[\s]*[\[{]/.test(body)) inspectNativeResponsePayload(JSON.parse(body));
-            }
-          } catch (_) {}
-        }, { once: true });
-      }
+          }
+        } catch (_) {}
+      }, { once: true });
+
       return xhrSend.apply(this, arguments);
     };
   }
@@ -4071,42 +4136,6 @@
     }
   }
 
-  function roomLinkExistsInNativeList(roomId) {
-    const id = normalizeText(roomId);
-    if (!id) return false;
-    return Array.from(document.querySelectorAll('a[href*="/rooms/"]')).some(link => {
-      if (link.closest('#' + NATIVE_RESULTS_ID)) return false;
-      return extractId(link.href, 'room') === id;
-    });
-  }
-
-  function verifyNativeRoomRemoval(record) {
-    const roomId = normalizeText(record && record.id);
-    if (!roomId) return;
-
-    let tries = 0;
-    const check = () => {
-      tries++;
-      // 다른 화면으로 이동했으면 판단하지 않는다.
-      if (currentSection() !== 'room') return;
-
-      const itemGone = !record.item || !record.item.isConnected;
-      const nativeLinkGone = !roomLinkExistsInNativeList(roomId);
-      if (itemGone && nativeLinkGone) {
-        if (removeRoomManagerRoom(roomId)) {
-          lastRoomContextRecord = null;
-          document.getElementById(NATIVE_RESULTS_ID)?.remove();
-          scheduleRefresh();
-        }
-        return;
-      }
-
-      // 확인창에서 취소할 수 있으므로, 실제 카드가 사라지는지 최대 15초만 본다.
-      if (tries < 50) setTimeout(check, 300);
-    };
-    setTimeout(check, 300);
-  }
-
   function injectRoomContextMenu() {
     const menus = new Set(document.querySelectorAll('[data-sentry-source-file="RoomListItemContextMenu.tsx"]'));
     document.querySelectorAll('[role="dialog"], [role="menu"]').forEach(menu => {
@@ -4144,13 +4173,6 @@
       }, true);
 
       const leaveButton = nativeButtons.find(btn => normalizeText(btn.textContent) === '나가기');
-      if (leaveButton && leaveButton.dataset.zrmRemovalWatch !== SCRIPT_VERSION) {
-        leaveButton.dataset.zrmRemovalWatch = SCRIPT_VERSION;
-        leaveButton.addEventListener('click', () => {
-          const record = lastRoomContextRecord;
-          if (record && record.type === 'room') verifyNativeRoomRemoval(record);
-        }, true);
-      }
       menu.insertBefore(button, leaveButton || null);
     }
   }
