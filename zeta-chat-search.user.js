@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.4
+// @version      0.2.5
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.2.4';
+  const SCRIPT_VERSION = '0.2.5';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -580,7 +580,7 @@
     return (Array.isArray(rows) ? rows : [])
       .filter(row => row && row.text)
       .slice()
-      .sort((a, b) => Number(a?.num || 0) - Number(b?.num || 0))
+      .sort((a, b) => Number(b?.num || 0) - Number(a?.num || 0))
       .map(row => '[' + indexedSpeakerLabel(row) + ']\n' + String(row.text || '').trim())
       .join('\n\n');
   }
