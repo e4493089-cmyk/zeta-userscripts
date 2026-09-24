@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.83
+// @version      0.20.84
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.83';
+  const SCRIPT_VERSION = '0.20.84';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -1320,6 +1320,29 @@
     return removed;
   }
 
+  function reconcileStoredPlots(seenKeys) {
+    if (!(seenKeys instanceof Set)) return 0;
+    ensureDataLoaded();
+
+    let removed = 0;
+    for (const [key, entry] of Object.entries(dataIndex)) {
+      if (!entry || entry.type !== 'plot') continue;
+      if (seenKeys.has(key)) continue;
+
+      delete dataIndex[key];
+      delete state.aliases[key];
+      if (entry.id) delete dataPlotMeta[entry.id];
+      removed++;
+    }
+
+    if (removed) {
+      plotLookup = null;
+      plotLookupDirty = true;
+      saveStateNow();
+    }
+    return removed;
+  }
+
   function roomCollectionCount() {
     return Object.values(state.index).filter(entry => entry && entry.type === 'room' && entry.id).length;
   }
@@ -2329,12 +2352,13 @@
     return Object.values(state.index).filter(entry => entry && entry.type === 'plot' && entry.id).length;
   }
 
-  function collectRenderedPlots() {
+  function collectRenderedPlots(seenKeys = null) {
     let seen = 0;
     const items = document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]');
     for (const item of items) {
       const record = parseItem(item, 'plot');
       if (!record) continue;
+      if (seenKeys instanceof Set) seenKeys.add(record.key);
       applyAlias(record);
       seen++;
     }
@@ -2521,6 +2545,7 @@
       };
       renderCollectionTools();
 
+      const seenPlotKeys = new Set();
       let host = plotCollectionScrollHost();
       const originalTop = scrollMetrics(host).top;
       let listCompleted = false;
@@ -2539,7 +2564,7 @@
         setScrollTop(host, 0);
         await sleep(PLOT_COLLECTION_SETTLE_MS);
       }
-      if (!collectionAborted) collectRenderedPlots();
+      if (!collectionAborted) collectRenderedPlots(seenPlotKeys);
       updateListCollectionProgress('plot', host);
       renderCollectionTools();
 
@@ -2554,7 +2579,7 @@
           setScrollTop(host, Math.min(live.height, Math.max(live.top, oldTop)));
         }
 
-        collectRenderedPlots();
+        collectRenderedPlots(seenPlotKeys);
         const before = collectionSnapshot('plot', host);
         const count = plotCollectionCount();
 
@@ -2578,7 +2603,7 @@
           if (collectionAborted) break;
           host = waited.host;
           if (waited.changed) await sleep(PLOT_COLLECTION_SETTLE_MS);
-          collectRenderedPlots();
+          collectRenderedPlots(seenPlotKeys);
 
           const after = collectionSnapshot('plot', host);
           const stillBottom = after.top + after.client >= after.height - Math.max(80, after.client * 0.15);
@@ -2603,14 +2628,17 @@
           if (collectionAborted) break;
           host = waited.host;
           if (waited.changed) await sleep(PLOT_COLLECTION_SETTLE_MS);
-          collectRenderedPlots();
+          collectRenderedPlots(seenPlotKeys);
         }
       }
 
-      if (!collectionAborted) collectRenderedPlots();
+      if (!collectionAborted) collectRenderedPlots(seenPlotKeys);
       saveStateNow();
       if (!collectionAborted && listCompleted) {
         localStorage.setItem(PLOT_COLLECTION_STAMP_KEY, String(Date.now()));
+        // 목록 끝까지 실제로 확인한 경우에만 누적 플롯 인덱스를 현재 목록과 맞춘다.
+        // 중지/목록 끝 확인 실패 때는 기존 플롯 데이터를 지우지 않는다.
+        reconcileStoredPlots(seenPlotKeys);
       }
 
       // 사용자가 보던 위치로 돌아간다.
