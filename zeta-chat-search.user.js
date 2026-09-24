@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.1
+// @version      0.2.2
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.2.0';
+  const SCRIPT_VERSION = '0.2.2';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -122,6 +122,29 @@
     });
   }
 
+  // 전체 색인이 끝까지 정상 완료된 경우에만, 이번 순회에서 실제로 확인하지 못한
+  // 예전 색인 행을 제거한다. 가상 스크롤로 DOM에서 잠깐 사라진 것만 보고 지우지는 않는다.
+  async function pruneMissingRoomMessages(roomId, seenKeys) {
+    if (!roomId || !(seenKeys instanceof Set)) return 0;
+    const stored = await loadRoomMessages(roomId);
+    const stale = stored.filter(row => row?.key && !seenKeys.has(row.key));
+    if (!stale.length) return 0;
+
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      for (const row of stale) store.delete(row.key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('색인 정리 중단'));
+    });
+
+    // 현재 방 메모리 캐시에도 남아 있으면 같이 비운다.
+    for (const row of stale) knownKeys.delete(row.key);
+    return stale.length;
+  }
+
 
   // ── 화면에 그려진 대화 읽기 ──────────────────────────────────────────
   // 요청은 보내지 않는다. 제타가 이미 그린 것만 읽는다.
@@ -178,7 +201,7 @@
   let knownRoomId = '';
   const knownKeys = new Set();
 
-  async function captureRendered() {
+  async function captureRendered(seenKeys = null) {
     const roomId = currentRoomId();
     if (!roomId) return 0;
     if (roomId !== knownRoomId) {
@@ -186,7 +209,12 @@
       knownKeys.clear();
     }
 
-    const fresh = readRenderedMessages(roomId).filter(row => !knownKeys.has(row.key));
+    const rendered = readRenderedMessages(roomId);
+    if (seenKeys instanceof Set) {
+      for (const row of rendered) seenKeys.add(row.key);
+    }
+
+    const fresh = rendered.filter(row => !knownKeys.has(row.key));
     if (!fresh.length) return 0;
     for (const row of fresh) knownKeys.add(row.key);
 
@@ -216,15 +244,20 @@
   // 든 것만 그리므로, 올라가며 읽는 것만으로는 중간이 빈다.
   async function deepIndex(onProgress) {
     const log = chatLog();
-    if (!log || deepLoadRunning) return 0;
+    const roomId = currentRoomId();
+    if (!log || !roomId || deepLoadRunning) return { added: 0, removed: 0, completed: false };
 
     deepLoadRunning = true;
     deepLoadAborted = false;
     const reverse = logIsReverse(log);
+    const seenKeys = new Set();
     let added = 0;
+    let removed = 0;
+    let reachedOldest = false;
+    let reachedNewest = false;
 
     try {
-      // 1단계 — 끝까지 올라가기. 높이가 더 늘지 않으면 다 붙은 것이다.
+      // 1단계 — 끝까지 올라가기. 높이가 더 늘지 않으면 과거 대화를 전부 붙였다고 본다.
       let stable = 0;
       while (!deepLoadAborted && stable < 4) {
         const beforeHeight = log.scrollHeight;
@@ -233,30 +266,46 @@
           behavior: 'auto'
         });
         await sleep(320);
-        added += await captureRendered();
+        added += await captureRendered(seenKeys);
         stable = Math.abs(log.scrollHeight - beforeHeight) > 2 ? 0 : stable + 1;
         onProgress?.(added, 'up');
       }
+      reachedOldest = !deepLoadAborted && stable >= 4;
 
-      // 2단계 — 내려오며 읽기. 한 화면보다 좁게 움직여 걸러지는 것을 줄인다.
+      // 2단계 — 내려오며 읽기. 한 화면보다 좁게 움직여 가상 스크롤 누락을 줄인다.
       let guard = 0;
       while (!deepLoadAborted && guard++ < 3000) {
         const beforeTop = log.scrollTop;
         log.scrollBy({ top: Math.max(240, log.clientHeight * 0.6), behavior: 'auto' });
         await sleep(110);
-        added += await captureRendered();
+        added += await captureRendered(seenKeys);
         onProgress?.(added, 'down');
 
         const moved = Math.abs(log.scrollTop - beforeTop) > 2;
         const atBottom = reverse
           ? Math.abs(log.scrollTop) < 3
           : log.scrollTop + log.clientHeight >= log.scrollHeight - 3;
-        if (atBottom || !moved) break;
+        if (atBottom) {
+          reachedNewest = true;
+          break;
+        }
+        if (!moved) {
+          // 더 움직이지 않는 지점이 실제 최신 끝인지 한 번 더 확인한다.
+          reachedNewest = reverse
+            ? Math.abs(log.scrollTop) < 3
+            : log.scrollTop + log.clientHeight >= log.scrollHeight - 3;
+          break;
+        }
       }
+
+      const completed = !deepLoadAborted && reachedOldest && reachedNewest;
+      if (completed) {
+        removed = await pruneMissingRoomMessages(roomId, seenKeys);
+      }
+      return { added, removed, completed };
     } finally {
       deepLoadRunning = false;
     }
-    return added;
   }
 
   // ── 검색 ─────────────────────────────────────────────────────────────
@@ -507,7 +556,7 @@
       }
       moreButton.textContent = '중지';
       render();
-      const added = await deepIndex((count, phase) => {
+      const result = await deepIndex((count, phase) => {
         status((phase === 'up' ? '옛 대화를 불러오는 중' : '내려오며 꼼꼼히 읽는 중') +
           ' · 새로 색인 ' + count.toLocaleString() + '개');
         // 색인 안내는 한 번만 그린다. 진행할 때마다 다시 그리면 화면이 떤다.
@@ -517,8 +566,12 @@
       await reload();
       // render가 상태줄을 다시 쓰므로 결과 요약은 그 뒤에 적는다.
       render();
-      status((deepLoadAborted ? '색인 중지됨 · ' : '색인 완료 · ') +
-        '새로 색인 ' + added.toLocaleString() + '개 · 전체 ' + rows.length.toLocaleString() + '개');
+      const cleanupText = result.removed
+        ? ' · 삭제된 대화 색인 정리 ' + result.removed.toLocaleString() + '개'
+        : '';
+      status((deepLoadAborted ? '색인 중지됨 · ' : (result.completed ? '색인 완료 · ' : '색인 일부 완료 · ')) +
+        '새로 색인 ' + result.added.toLocaleString() + '개' + cleanupText +
+        ' · 전체 ' + rows.length.toLocaleString() + '개');
     });
 
     status('색인을 읽는 중…');
