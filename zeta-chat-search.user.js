@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.2
+// @version      0.2.3
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.2.2';
+  const SCRIPT_VERSION = '0.2.3';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -36,45 +36,88 @@
   const clean = value => String(value || '').replace(/​/g, '').replace(/\s+/g, ' ').trim();
   const fold = value => clean(value).toLocaleLowerCase('ko-KR');
 
-  // 책갈피 이동과 동일하게 첫 메시지 요청에 roomId:MESSAGE-ID 커서를 넣는다.
-  // document-start에서 설치해야 제타의 초기 XHR보다 먼저 가로챌 수 있다.
-  function installJumpRequestInterceptor() {
+  // 책갈피 이동용 cursor 주입과 제타의 실제 메시지 삭제 요청 감지를 한 곳에서 처리한다.
+  // 새 요청은 만들지 않고 페이지가 원래 보내는 XHR/fetch만 관찰한다.
+  function installNativeRequestInterceptor() {
     let pending = null;
     try { pending = JSON.parse(sessionStorage.getItem(JUMP_REQUEST_KEY) || 'null'); } catch (_) {}
-    if (!pending?.roomId || !pending?.cursor || pending.roomId !== currentRoomId()) return;
+    if (!pending?.roomId || !pending?.cursor || pending.roomId !== currentRoomId()) pending = null;
 
     const proto = window.XMLHttpRequest?.prototype;
-    if (!proto || proto.open.__zcsJumpPatched) return;
-    const originalOpen = proto.open;
+    if (proto && proto.open && !proto.open.__zcsNativePatched) {
+      const originalOpen = proto.open;
+      const originalSend = proto.send;
+      const xhrMethod = new WeakMap();
+      const xhrUrl = new WeakMap();
 
-    function wrappedOpen(method, value, ...rest) {
-      let nextValue = value;
-      try {
-        const url = new URL(String(value), location.href);
-        const expectedPath = '/v1/rooms/' + pending.roomId + '/messages';
-        const isInitialMessagesRequest =
-          String(method || 'GET').toUpperCase() === 'GET' &&
-          url.pathname === expectedPath &&
-          !url.searchParams.has('cursor') &&
-          !url.searchParams.has('prevCursor');
+      function wrappedOpen(method, value, ...rest) {
+        let nextValue = value;
+        try {
+          const url = new URL(String(value), location.href);
+          const expectedPath = pending ? '/v1/rooms/' + pending.roomId + '/messages' : '';
+          const isInitialMessagesRequest =
+            pending &&
+            String(method || 'GET').toUpperCase() === 'GET' &&
+            url.pathname === expectedPath &&
+            !url.searchParams.has('cursor') &&
+            !url.searchParams.has('prevCursor');
 
-        if (isInitialMessagesRequest) {
-          url.searchParams.set('limit', '10');
-          url.searchParams.set('cursor', pending.roomId + ':' + pending.cursor);
-          nextValue = url.href;
-          sessionStorage.removeItem(JUMP_REQUEST_KEY);
-          sessionStorage.setItem(JUMP_HIGHLIGHT_KEY, 'message-' + pending.cursor);
-          pending = null;
-        }
-      } catch (_) {}
-      return originalOpen.call(this, method, nextValue, ...rest);
+          if (isInitialMessagesRequest) {
+            url.searchParams.set('limit', '10');
+            url.searchParams.set('cursor', pending.roomId + ':' + pending.cursor);
+            nextValue = url.href;
+            sessionStorage.removeItem(JUMP_REQUEST_KEY);
+            sessionStorage.setItem(JUMP_HIGHLIGHT_KEY, 'message-' + pending.cursor);
+            pending = null;
+          }
+
+          xhrMethod.set(this, String(method || 'GET').toUpperCase());
+          xhrUrl.set(this, String(nextValue || ''));
+        } catch (_) {}
+        return originalOpen.call(this, method, nextValue, ...rest);
+      }
+
+      function wrappedSend(body) {
+        const xhr = this;
+        const method = xhrMethod.get(xhr) || 'GET';
+        const url = xhrUrl.get(xhr) || '';
+        xhr.addEventListener('load', () => {
+          try {
+            applyNativeMessageDeletion(method, url, body, xhr.status >= 200 && xhr.status < 300);
+          } catch (_) {}
+        }, { once: true });
+        return originalSend.apply(this, arguments);
+      }
+
+      Object.defineProperty(wrappedOpen, '__zcsNativePatched', { value: true });
+      proto.open = wrappedOpen;
+      proto.send = wrappedSend;
     }
 
-    Object.defineProperty(wrappedOpen, '__zcsJumpPatched', { value: true });
-    proto.open = wrappedOpen;
+    const originalFetch = window.fetch;
+    if (typeof originalFetch === 'function' && !originalFetch.__zcsNativePatched) {
+      async function wrappedFetch() {
+        let method = 'GET';
+        let url = '';
+        let body = null;
+        try {
+          const first = arguments[0];
+          const init = arguments[1] || {};
+          method = String(init.method || (first && typeof first !== 'string' && first.method) || 'GET').toUpperCase();
+          url = typeof first === 'string' ? first : first && first.url;
+          body = init.body ?? null;
+        } catch (_) {}
+
+        const response = await originalFetch.apply(this, arguments);
+        try { applyNativeMessageDeletion(method, url, body, response.ok); } catch (_) {}
+        return response;
+      }
+      Object.defineProperty(wrappedFetch, '__zcsNativePatched', { value: true });
+      window.fetch = wrappedFetch;
+    }
   }
 
-  installJumpRequestInterceptor();
+  installNativeRequestInterceptor();
 
   // ── 색인 저장소 ──────────────────────────────────────────────────────
   // 대화 본문은 이름 몇 글자와 덩치가 다르다. localStorage로는 금방 넘친다.
@@ -120,6 +163,108 @@
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
     });
+  }
+
+  const recentlyDeletedMessageKeys = new Map();
+
+  function parseRequestJson(body) {
+    if (!body) return null;
+    if (typeof body === 'string') {
+      try { return JSON.parse(body); } catch (_) { return null; }
+    }
+    if (body instanceof URLSearchParams) {
+      try { return Object.fromEntries(body.entries()); } catch (_) { return null; }
+    }
+    return null;
+  }
+
+  function nativeMessageDeleteRange(method, value, body) {
+    if (String(method || 'GET').toUpperCase() !== 'DELETE') return null;
+
+    let url = null;
+    try { url = new URL(String(value || ''), location.href); } catch (_) { return null; }
+    if (url.hostname.toLowerCase() !== 'api.zeta-ai.io') return null;
+
+    const match = url.pathname.match(/^\/v1\/rooms\/([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\/room-messages\/?$/i);
+    if (!match) return null;
+
+    const data = parseRequestJson(body);
+    const pointer = data?.messagePointer;
+    const roomId = clean(pointer?.roomId);
+    const messageId = clean(pointer?.messageId);
+    const minNum = messageNumber(messageId);
+    if (!roomId || roomId !== match[1] || !messageId || !minNum) return null;
+
+    return { roomId, messageId, minNum };
+  }
+
+  function rememberDeletedKey(key) {
+    if (!key) return;
+    recentlyDeletedMessageKeys.set(key, Date.now() + 60000);
+  }
+
+  function isRecentlyDeletedKey(key) {
+    const until = Number(recentlyDeletedMessageKeys.get(key) || 0);
+    if (!until) return false;
+    if (until <= Date.now()) {
+      recentlyDeletedMessageKeys.delete(key);
+      return false;
+    }
+    return true;
+  }
+
+  function rememberRenderedDeletedRange(roomId, minNum) {
+    for (const row of readRenderedMessages(roomId)) {
+      if (row.num >= minNum) rememberDeletedKey(row.key);
+    }
+  }
+
+  async function deleteIndexedMessageRange(roomId, minNum) {
+    const db = await openDb();
+    let removed = 0;
+
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      const request = store.index('room').openCursor(IDBKeyRange.only(roomId));
+
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const row = cursor.value;
+        if (Number(row?.num || 0) >= minNum) {
+          rememberDeletedKey(row.key);
+          knownKeys.delete(row.key);
+          cursor.delete();
+          removed++;
+        }
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('삭제 색인 정리 중단'));
+    });
+
+    return removed;
+  }
+
+  function applyNativeMessageDeletion(method, url, body, ok) {
+    if (!ok) return false;
+    const range = nativeMessageDeleteRange(method, url, body);
+    if (!range) return false;
+
+    // 응답 직후 제타의 이전 DOM이 잠깐 남아 있어도 다시 색인되지 않게
+    // 현재 보이는 삭제 범위의 키를 먼저 막고, IndexedDB 정리는 이어서 처리한다.
+    rememberRenderedDeletedRange(range.roomId, range.minNum);
+    void deleteIndexedMessageRange(range.roomId, range.minNum)
+      .then(removed => {
+        window.dispatchEvent(new CustomEvent('zcs:index-pruned', {
+          detail: { roomId: range.roomId, minNum: range.minNum, removed }
+        }));
+      })
+      .catch(() => {});
+    return true;
   }
 
   // 전체 색인이 끝까지 정상 완료된 경우에만, 이번 순회에서 실제로 확인하지 못한
@@ -173,7 +318,7 @@
   }
 
   function messageNumber(id) {
-    const match = String(id || '').match(/^message-MESSAGE-(\d+)-/);
+    const match = String(id || '').match(/^(?:message-)?MESSAGE-(\d+)-/);
     return match ? Number(match[1]) : 0;
   }
 
@@ -209,7 +354,7 @@
       knownKeys.clear();
     }
 
-    const rendered = readRenderedMessages(roomId);
+    const rendered = readRenderedMessages(roomId).filter(row => !isRecentlyDeletedKey(row.key));
     if (seenKeys instanceof Set) {
       for (const row of rendered) seenKeys.add(row.key);
     }
@@ -424,7 +569,9 @@
 
   function closePanel() {
     deepLoadAborted = true;
-    document.getElementById(PANEL_ID)?.remove();
+    const panel = document.getElementById(PANEL_ID);
+    try { panel?.__zcsCleanup?.(); } catch (_) {}
+    panel?.remove();
   }
 
   async function openPanel() {
@@ -548,6 +695,14 @@
     panel.addEventListener('click', event => { if (event.target === panel) closePanel(); });
     input.addEventListener('input', render);
     input.addEventListener('keydown', event => { if (event.key === 'Escape') closePanel(); });
+
+    const onIndexPruned = async event => {
+      if (event?.detail?.roomId !== roomId || !panel.isConnected) return;
+      await reload();
+      render();
+    };
+    window.addEventListener('zcs:index-pruned', onIndexPruned);
+    panel.__zcsCleanup = () => window.removeEventListener('zcs:index-pruned', onIndexPruned);
 
     moreButton.addEventListener('click', async () => {
       if (deepLoadRunning) {
