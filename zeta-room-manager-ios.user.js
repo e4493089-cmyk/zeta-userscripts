@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.82
+// @version      0.20.83
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.82';
+  const SCRIPT_VERSION = '0.20.83';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -69,9 +69,9 @@
   let suspendObserverRefresh = false;
   let swipeGesture = null;
   let lastRoomContextRecord = null;
-  // DELETE 성공 직후 제타의 이전 DOM/현재 대화 화면이 잠깐 남아 있어도
-  // 방이 다시 색인되지 않도록 짧게 재수집을 막는다.
+  // 삭제 성공 직후 제타의 이전 DOM이 잠깐 남아 있어도 다시 색인되지 않도록 막는다.
   const recentlyDeletedRoomIds = new Map();
+  const recentlyDeletedPlotIds = new Map();
   let plotCollectionPromise = null;
   let plotCollectionProgress = { running: false, count: 0 };
   let roomCollectionPromise = null;
@@ -127,20 +127,29 @@
     return (dataLoaded ? dataIndex[key] : pendingIndex[key]) || null;
   }
 
-  function isRecentlyDeletedRoomId(roomId) {
-    const id = normalizeText(roomId);
+  function isRecentlyDeletedId(map, value) {
+    const id = normalizeText(value);
     if (!id) return false;
-    const until = Number(recentlyDeletedRoomIds.get(id) || 0);
+    const until = Number(map.get(id) || 0);
     if (!until) return false;
     if (until <= Date.now()) {
-      recentlyDeletedRoomIds.delete(id);
+      map.delete(id);
       return false;
     }
     return true;
   }
 
+  function isRecentlyDeletedRoomId(roomId) {
+    return isRecentlyDeletedId(recentlyDeletedRoomIds, roomId);
+  }
+
+  function isRecentlyDeletedPlotId(plotId) {
+    return isRecentlyDeletedId(recentlyDeletedPlotIds, plotId);
+  }
+
   function putEntry(key, value) {
     if (value?.type === 'room' && isRecentlyDeletedRoomId(value.id)) return;
+    if (value?.type === 'plot' && isRecentlyDeletedPlotId(value.id)) return;
     if (dataLoaded) dataIndex[key] = value;
     else pendingIndex[key] = value;
   }
@@ -809,6 +818,42 @@
     return changed;
   }
 
+  function requestJsonBody(body) {
+    if (!body) return null;
+    if (typeof body === 'string') {
+      try { return JSON.parse(body); } catch (_) { return null; }
+    }
+    if (body instanceof URLSearchParams) {
+      try { return Object.fromEntries(body.entries()); } catch (_) { return null; }
+    }
+    return null;
+  }
+
+  function nativeDeletedPlotId(method, url, body) {
+    if (String(method || 'GET').toUpperCase() !== 'PATCH') return '';
+    let parsed = null;
+    try { parsed = new URL(String(url || ''), location.href); } catch (_) { return ''; }
+    if (parsed.hostname.toLowerCase() !== 'api.zeta-ai.io') return '';
+    const match = parsed.pathname.match(/^\/v1\/plots\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/status\/?$/i);
+    if (!match) return '';
+    const data = requestJsonBody(body);
+    return normalizeText(data?.status).toUpperCase() === 'DELETE' ? match[1] : '';
+  }
+
+  function applyNativePlotDeletion(method, url, body, ok) {
+    if (!ok) return false;
+    const plotId = nativeDeletedPlotId(method, url, body);
+    if (!plotId) return false;
+    recentlyDeletedPlotIds.set(plotId, Date.now() + 60000);
+    removeDeletedPlotFromRoomManager(plotId);
+    if (!plotDeleting) saveStateNow();
+    document.getElementById(PLOT_NATIVE_RESULTS_ID)?.remove();
+    setTimeout(() => removeDeletedPlotFromRoomManager(plotId), 500);
+    setTimeout(() => removeDeletedPlotFromRoomManager(plotId), 1800);
+    scheduleRefresh();
+    return true;
+  }
+
   function installPassiveNativeDataCapture() {
     if (window.__zrmPassiveNativeCaptureVersion === SCRIPT_VERSION) return;
     window.__zrmPassiveNativeCaptureVersion = SCRIPT_VERSION;
@@ -833,6 +878,7 @@
         const response = await originalFetch.apply(this, arguments);
         try {
           applyNativeRoomDeletion(requestMethod, requestUrl, response.ok);
+          applyNativePlotDeletion(requestMethod, requestUrl, requestBody, response.ok);
           if (shouldInspectNativeResponse(requestUrl)) {
             const clone = response.clone();
             clone.json().then(inspectNativeResponsePayload).catch(() => {});
@@ -870,6 +916,7 @@
         try {
           const ok = xhr.status >= 200 && xhr.status < 300;
           applyNativeRoomDeletion(method, url, ok);
+          applyNativePlotDeletion(method, url, body, ok);
 
           if (!shouldInspectNativeResponse(url)) return;
           if (xhr.responseType === 'json' && xhr.response) {
