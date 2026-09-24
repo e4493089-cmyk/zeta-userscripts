@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.26
+// @version      3.50.27
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -4364,6 +4364,70 @@
     html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"]
       > button[data-sentry-component="Button"] span:last-child {
       color: #776B19 !important;
+    }
+
+    /* 새 일기 구매 확인 팝업 */
+    html.${DIARY_ACTIVE}
+      [data-sentry-component="Popup"]:has([data-sentry-component="DiaryPurchasePopupContent"]) {
+      background: rgba(38,52,60,.36) !important;
+    }
+
+    html.${DIARY_ACTIVE}
+      [data-sentry-component="Popup"]:has([data-sentry-component="DiaryPurchasePopupContent"])
+      > div {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      border: 1px solid var(--kt-line) !important;
+      box-shadow: 0 12px 32px rgba(38,52,60,.18) !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      > span:first-child {
+      color: var(--kt-text) !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      > p {
+      color: var(--kt-sub) !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      [role="checkbox"] {
+      color: var(--kt-sub) !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      [role="checkbox"] svg {
+      color: var(--kt-muted) !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      [role="checkbox"] span {
+      color: var(--kt-sub) !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      + div > button:first-child {
+      background: var(--kt-soft) !important;
+      color: var(--kt-text) !important;
+      border: 1px solid var(--kt-line) !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      + div > button:first-child:hover {
+      background: var(--kt-soft2) !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      + div > button:last-child {
+      background: var(--kt-yellow) !important;
+      color: #191919 !important;
+      border: 1px solid #E4CF00 !important;
+    }
+
+    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPurchasePopupContent"]
+      + div > button:last-child:hover {
+      background: var(--kt-yellow-hover) !important;
     }
 
     /* 보유 일기 카드 */
