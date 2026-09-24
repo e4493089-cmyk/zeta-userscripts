@@ -2921,6 +2921,9 @@
     if (!agreed || !plotDeleteMode) return;
 
     plotDeleting = true;
+    const previousObserverSuspend = suspendObserverRefresh;
+    suspendObserverRefresh = true;
+    observer?.disconnect();
     updatePlotDeleteToolbar();
 
     let success = 0;
@@ -2950,7 +2953,8 @@
     } finally {
       saveStateNow();
       stopPlotDeleteMode(true);
-      scheduleRefresh();
+      suspendObserverRefresh = previousObserverSuspend;
+      if (!previousObserverSuspend) scheduleRefresh();
     }
 
     showCollectionResult({
@@ -4756,6 +4760,8 @@
     document.getElementById(PLOT_TOOLS_ID)?.remove();
     document.getElementById(PLOT_DELETE_TOOLBAR_ID)?.remove();
     document.querySelectorAll('.zrm-plot-delete-check-wrap').forEach(el => el.remove());
+    document.querySelectorAll('.zrm-plot-delete-item').forEach(el => el.classList.remove('zrm-plot-delete-item'));
+    document.querySelectorAll('.zrm-plot-delete-host').forEach(el => el.classList.remove('zrm-plot-delete-host'));
     document.getElementById(COLLECTION_MODAL_ID)?.remove();
     document.getElementById(COLLECTION_BANNER_ID)?.remove();
     document.getElementById(CHAT_RENAME_ID)?.remove();
