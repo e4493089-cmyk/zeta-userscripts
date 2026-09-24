@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.3
+// @version      0.2.4
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.2.3';
+  const SCRIPT_VERSION = '0.2.4';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -567,6 +567,41 @@
   }
 
 
+  function indexedSpeakerLabel(row) {
+    if (row?.role === 'narrator') return '나레이터';
+    const speaker = clean(row?.speaker);
+    if (speaker) return speaker;
+    if (row?.role === 'user') return '나';
+    if (row?.role === 'assistant') return '캐릭터';
+    return '메시지';
+  }
+
+  function buildIndexedTxt(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .filter(row => row && row.text)
+      .slice()
+      .sort((a, b) => Number(a?.num || 0) - Number(b?.num || 0))
+      .map(row => '[' + indexedSpeakerLabel(row) + ']\n' + String(row.text || '').trim())
+      .join('\n\n');
+  }
+
+  function downloadIndexedTxt(rows, roomId) {
+    const text = buildIndexedTxt(rows);
+    if (!text) return false;
+
+    const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'zeta-chat-index-' + roomId + '.txt';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    return true;
+  }
+
   function closePanel() {
     deepLoadAborted = true;
     const panel = document.getElementById(PANEL_ID);
@@ -585,15 +620,22 @@
     panel.id = PANEL_ID;
     panel.innerHTML =
       '<div class="zcs-card" role="dialog" aria-modal="true" aria-label="대화 검색">' +
-        '<div class="zcs-grip"></div>' +
         '<div class="zcs-head">' +
           '<h2 class="zcs-title">대화 검색</h2>' +
-          '<button type="button" class="zcs-close" aria-label="닫기">' +
-            '<svg viewBox="0 0 20 20" aria-hidden="true">' +
-              '<path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" ' +
-                'stroke-linecap="round" fill="none"></path>' +
-            '</svg>' +
-          '</button>' +
+          '<div class="zcs-head-actions">' +
+            '<button type="button" class="zcs-head-button zcs-export" aria-label="색인 TXT 내보내기" title="색인 TXT 내보내기">' +
+              '<svg viewBox="0 0 20 20" aria-hidden="true">' +
+                '<path d="M10 3.5v8M6.8 8.7 10 11.9l3.2-3.2M4.5 15.2h11" stroke="currentColor" stroke-width="1.8" ' +
+                  'stroke-linecap="round" stroke-linejoin="round" fill="none"></path>' +
+              '</svg>' +
+            '</button>' +
+            '<button type="button" class="zcs-head-button zcs-close" aria-label="닫기" title="닫기">' +
+              '<svg viewBox="0 0 20 20" aria-hidden="true">' +
+                '<path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" ' +
+                  'stroke-linecap="round" fill="none"></path>' +
+              '</svg>' +
+            '</button>' +
+          '</div>' +
         '</div>' +
         '<div class="zcs-field">' +
           '<svg class="zcs-field-icon" viewBox="0 0 20 20" aria-hidden="true">' +
@@ -616,6 +658,7 @@
     const list = panel.querySelector('.zcs-list');
     const statusEl = panel.querySelector('.zcs-status');
     const moreButton = panel.querySelector('.zcs-more');
+    const exportButton = panel.querySelector('.zcs-export');
     const status = text => { statusEl.textContent = text; };
 
     let rows = [];
@@ -627,6 +670,7 @@
 
     const render = () => {
       const query = clean(input.value);
+      exportButton.disabled = !rows.length;
       list.textContent = '';
 
       if (!query) {
@@ -691,6 +735,10 @@
       }
     };
 
+    exportButton.addEventListener('click', () => {
+      if (!rows.length) return;
+      downloadIndexedTxt(rows, roomId);
+    });
     panel.querySelector('.zcs-close').addEventListener('click', closePanel);
     panel.addEventListener('click', event => { if (event.target === panel) closePanel(); });
     input.addEventListener('input', render);
@@ -806,13 +854,12 @@
         box-shadow: 0 24px 70px rgba(0,0,0,.45);
         overflow: hidden;
       }
-      #${PANEL_ID} .zcs-grip { display: none; }
       #${PANEL_ID} .zcs-head {
         display: flex;
         flex: 0 0 auto;
         align-items: center;
         justify-content: space-between;
-        padding: 18px 18px 10px;
+        padding: 14px 16px 9px;
       }
       #${PANEL_ID} .zcs-title {
         margin: 0;
@@ -820,20 +867,32 @@
         font-weight: 800;
         letter-spacing: -.01em;
       }
-      #${PANEL_ID} .zcs-close {
+      #${PANEL_ID} .zcs-head-actions {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      #${PANEL_ID} .zcs-head-button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 30px;
-        height: 30px;
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        padding: 0;
         border: 0;
-        border-radius: 9px;
-        background: transparent;
-        color: var(--kt-sub, rgba(255,255,255,.55));
+        border-radius: 11px;
+        background: var(--kt-soft, rgba(255,255,255,.07));
+        color: var(--kt-sub, rgba(255,255,255,.58));
         cursor: pointer;
       }
-      #${PANEL_ID} .zcs-close svg { width: 16px; height: 16px; }
-      #${PANEL_ID} .zcs-close:hover { background: transparent; }
+      #${PANEL_ID} .zcs-head-button svg { width: 18px; height: 18px; }
+      #${PANEL_ID} .zcs-head-button:hover,
+      #${PANEL_ID} .zcs-head-button:active { background: var(--kt-soft2, rgba(255,255,255,.11)); }
+      #${PANEL_ID} .zcs-head-button:disabled {
+        opacity: .36;
+        cursor: default;
+      }
       #${PANEL_ID} .zcs-field {
         display: flex;
         flex: 0 0 44px;
@@ -964,7 +1023,6 @@
         max-height: none;
         border-radius: 16px;
       }
-      #${PANEL_ID} .zcs-card.zcs-jumping .zcs-grip,
       #${PANEL_ID} .zcs-card.zcs-jumping .zcs-head,
       #${PANEL_ID} .zcs-card.zcs-jumping .zcs-field,
       #${PANEL_ID} .zcs-card.zcs-jumping .zcs-list,
@@ -1002,15 +1060,7 @@
           border-radius: 20px 20px 0 0;
           padding-bottom: env(safe-area-inset-bottom, 0px);
         }
-        #${PANEL_ID} .zcs-grip {
-          display: block;
-          width: 36px;
-          height: 4px;
-          margin: 9px auto 0;
-          border-radius: 2px;
-          background: var(--kt-line, rgba(255,255,255,.18));
-        }
-        #${PANEL_ID} .zcs-head { padding: 12px 16px 8px; }
+        #${PANEL_ID} .zcs-head { padding: 10px 16px 8px; }
         #${PANEL_ID} .zcs-field { margin: 0 16px; }
       }
 
