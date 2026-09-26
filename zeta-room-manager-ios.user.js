@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.85
+// @version      0.20.86
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.85';
+  const SCRIPT_VERSION = '0.20.86';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -4678,7 +4678,29 @@
     const input = nativeRoomSearchInput();
     if (!input || input.dataset.zrmAliasSearchBound === '1') return;
     input.dataset.zrmAliasSearchBound = '1';
-    const update = () => scheduleRefresh();
+
+    let lastQuery = input.value || '';
+
+    const resetNativeRoomScroll = () => {
+      const roomList = document.querySelector('[data-sentry-component="RoomList"]');
+      const scroller = input.closest('[data-sentry-component="WrappedDiv"]')
+        || roomList?.querySelector('[data-sentry-component="WrappedDiv"][data-sentry-source-file="index.tsx"]')
+        || roomList?.querySelector('.overflow-y-auto');
+      if (scroller && scroller.scrollTop !== 0) scroller.scrollTop = 0;
+    };
+
+    const update = () => {
+      const query = input.value || '';
+      if (query !== lastQuery) {
+        lastQuery = query;
+        // 제타 RoomList는 가상 스크롤을 써서 이전 scrollTop이 남으면
+        // 검색 결과 앞에 큰 상단 spacer가 생긴다. 검색어가 바뀔 때 맨 위로 되돌린다.
+        resetNativeRoomScroll();
+        requestAnimationFrame(resetNativeRoomScroll);
+      }
+      scheduleRefresh();
+    };
+
     // 검색을 시작하려는 순간 읽어 둔다. 첫 글자에서 멈칫하지 않게.
     input.addEventListener('focus', ensureDataLoaded);
     input.addEventListener('pointerdown', ensureDataLoaded);
