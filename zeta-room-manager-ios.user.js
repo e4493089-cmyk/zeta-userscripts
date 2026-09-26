@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.88
+// @version      0.20.89
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.88';
+  const SCRIPT_VERSION = '0.20.89';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -4566,16 +4566,9 @@
       || null;
   }
 
-  let nativeRoomSearchSettling = false;
-
   function renderNativeAliasResults(query) {
     const q = normalizeText(query).toLocaleLowerCase('ko-KR');
     let box = document.getElementById(NATIVE_RESULTS_ID);
-
-    if (nativeRoomSearchSettling) {
-      box?.remove();
-      return;
-    }
 
     if (!q || currentSection() !== 'room') {
       box?.remove();
@@ -4673,12 +4666,11 @@
     const searchRow = input?.closest('.p-4');
     const searchBlock = searchRow?.parentElement;
 
-    // 가상 목록 내부의 spacer/virtual item 위치는 건드리지 않는다.
-    // 검색창 바로 아래 한 곳에만 고정해 ZETA virtualizer와 재배치 경쟁이 생기지 않게 한다.
-    if (searchBlock?.parentElement === host) {
-      if (box.parentElement !== host || box.previousElementSibling !== searchBlock) {
-        searchBlock.after(box);
-      }
+    // ZETA의 virtualizer가 직접 관리하는 spacer / virtual item 형제 사이에는
+    // Room Manager 노드를 절대 끼워 넣지 않는다.
+    // 검색 영역 컨테이너 안에 붙이면 virtualizer의 형제 구조와 높이 계산을 건드리지 않는다.
+    if (searchBlock) {
+      if (box.parentElement !== searchBlock) searchBlock.appendChild(box);
     } else if (box.parentElement !== host) {
       host.prepend(box);
     }
@@ -4688,54 +4680,7 @@
     const input = nativeRoomSearchInput();
     if (!input || input.dataset.zrmAliasSearchBound === '1') return;
     input.dataset.zrmAliasSearchBound = '1';
-
-    let lastQuery = input.value || '';
-    let settleTimer = null;
-
-    const nativeScroller = () => (
-      input.closest('[data-sentry-component="WrappedDiv"]')
-      || document.querySelector('[data-sentry-component="RoomList"] .overflow-y-auto')
-    );
-
-    const resetScroll = () => {
-      const scroller = nativeScroller();
-      if (!scroller) return;
-      if (scroller.scrollTop !== 0) scroller.scrollTop = 0;
-      // 일부 브라우저에서는 programmatic scroll 직후 virtualizer 갱신이 늦다.
-      scroller.dispatchEvent(new Event('scroll'));
-    };
-
-    const finishSettle = () => {
-      nativeRoomSearchSettling = false;
-      settleTimer = null;
-      scheduleRefresh();
-    };
-
-    const update = () => {
-      const query = input.value || '';
-
-      if (query === lastQuery) {
-        scheduleRefresh();
-        return;
-      }
-
-      lastQuery = query;
-      nativeRoomSearchSettling = true;
-      document.getElementById(NATIVE_RESULTS_ID)?.remove();
-      clearTimeout(settleTimer);
-
-      // React가 검색 결과를 새로 그리기 전/후 모두 0으로 맞춘다.
-      // Room Manager 결과는 이 짧은 안정화 동안 숨겨서 레이아웃을 건드리지 않는다.
-      resetScroll();
-      requestAnimationFrame(() => requestAnimationFrame(resetScroll));
-      setTimeout(resetScroll, 60);
-      setTimeout(resetScroll, 140);
-      settleTimer = setTimeout(() => {
-        resetScroll();
-        finishSettle();
-      }, 260);
-    };
-
+    const update = () => scheduleRefresh();
     // 검색을 시작하려는 순간 읽어 둔다. 첫 글자에서 멈칫하지 않게.
     input.addEventListener('focus', ensureDataLoaded);
     input.addEventListener('pointerdown', ensureDataLoaded);
