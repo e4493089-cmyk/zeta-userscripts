@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.28
+// @version      3.50.29
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9011,6 +9011,7 @@
       return;
     }
 
+    clearAuxiliaryMarkers();
     markChatHeader();
     markTopSpacer();
     markBubbles();
@@ -9021,7 +9022,6 @@
     markSnapshotModals();
     markMessagePhone();
     markComposer();
-    clearAuxiliaryMarkers();
     markMessageActionSheet();
     markContinueScreen();
     markDeleteMode();
@@ -9099,7 +9099,20 @@
   }
 
   installStyle();
+
+  /* 기본 테마와 커스텀 테마가 함께 실행되면 마지막으로 실행된 테마만 유지한다. */
+  [
+    'zeta-kakaotalk-theme-style',
+    'zeta-custom-theme-style'
+  ].forEach(id => {
+    if (id !== STYLE_ID) document.getElementById(id)?.remove();
+  });
+
   setActiveState();
+
+  /* 스타일은 교체할 수 있지만 observer/history/listener 런타임은 한 번만 설치한다. */
+  if (document.documentElement.dataset.ktThemeRuntime === '1') return;
+  document.documentElement.dataset.ktThemeRuntime = '1';
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start, { once: true });
