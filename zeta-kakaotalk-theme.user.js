@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.32
+// @version      3.50.33
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -5981,8 +5981,8 @@
       [data-sentry-component="PluginDeleteNoticePopupContent"]
       + div > button:last-child {
       background: var(--kt-yellow) !important;
-      color: #16191C !important;
-      border: 1px solid #E4CE00 !important;
+      color: var(--kt-user-dialogue) !important;
+      border: 1px solid var(--kt-user-line) !important;
       box-shadow: none !important;
       font-weight: 600 !important;
     }
@@ -5991,7 +5991,7 @@
       [data-sentry-component="PluginDeleteNoticePopupContent"]
       + div > button:last-child:hover {
       background: var(--kt-yellow-hover) !important;
-      border-color: #D2BE00 !important;
+      border-color: var(--kt-user-line) !important;
     }
 
     /* Zetagram 토스트도 Instagram식 */
