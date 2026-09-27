@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.30
+// @version      3.50.31
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -5920,6 +5920,78 @@
       ) > div > div:last-child > button:last-child:hover {
       background: #1877F2 !important;
       border-color: #1877F2 !important;
+    }
+
+
+    /* 플러그인 대화 삭제 확인 팝업 */
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="Popup"]:has(
+        [data-sentry-component="PluginDeleteNoticePopupContent"]
+      ) {
+      background: rgba(0,0,0,.48) !important;
+      backdrop-filter: blur(1.5px) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="Popup"]:has(
+        [data-sentry-component="PluginDeleteNoticePopupContent"]
+      ) > div {
+      width: 343px !important;
+      background: #FFFFFF !important;
+      color: #262626 !important;
+      border: 1px solid #DBDBDB !important;
+      border-radius: 14px !important;
+      box-shadow: 0 16px 38px rgba(0,0,0,.22) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PluginDeleteNoticePopupContent"] h5 {
+      color: #262626 !important;
+      font-weight: 600 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PluginDeleteNoticePopupContent"]
+      li > span:first-child {
+      color: #8E8E8E !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PluginDeleteNoticePopupContent"]
+      li > span:last-child {
+      color: #525252 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PluginDeleteNoticePopupContent"]
+      + div > button:first-child {
+      background: #F2F3F5 !important;
+      color: #4E5963 !important;
+      border: 1px solid #E1E5E9 !important;
+      box-shadow: none !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PluginDeleteNoticePopupContent"]
+      + div > button:first-child:hover {
+      background: #ECEFF1 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PluginDeleteNoticePopupContent"]
+      + div > button:last-child {
+      background: #D94B4B !important;
+      color: #FFFFFF !important;
+      border: 1px solid #D94B4B !important;
+      box-shadow: none !important;
+      font-weight: 600 !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="PluginDeleteNoticePopupContent"]
+      + div > button:last-child:hover {
+      background: #C94343 !important;
+      border-color: #C94343 !important;
     }
 
     /* Zetagram 토스트도 Instagram식 */
