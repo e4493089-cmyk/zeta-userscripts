@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.34
+// @version      3.50.35
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -931,16 +931,16 @@
       background: #F7F9FA !important;
     }
 
-    /* 플러그인 아이콘 원 */
+    /* 플러그인 아이콘 원 - 기본/커스텀 테마 메인색 추종 */
     html.${ACTIVE} #portal-container
       [data-testid="action-panel-grid"] > button > span:first-child {
-      background: #EEF1F3 !important;
-      color: #53636C !important;
+      background: var(--kt-yellow) !important;
+      color: var(--kt-user-dialogue, var(--kt-text)) !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-testid="action-panel-grid"] > button > span:first-child svg {
-      color: #53636C !important;
+      color: var(--kt-user-dialogue, var(--kt-text)) !important;
     }
 
     /* 플러그인 이름 */
@@ -953,18 +953,6 @@
     html.${ACTIVE} #portal-container
       [data-testid="action-panel-grid"] > button > span:nth-child(n+3) {
       color: #87949E !important;
-    }
-
-    /* 메시지 버튼만 카카오 노랑 */
-    html.${ACTIVE} #portal-container
-      [data-testid="action-panel-grid"] > button[aria-label^="메시지"] > span:first-child {
-      background: var(--kt-yellow) !important;
-      color: var(--kt-text) !important;
-    }
-
-    html.${ACTIVE} #portal-container
-      [data-testid="action-panel-grid"] > button[aria-label^="메시지"] > span:first-child svg {
-      color: #2B2B2B !important;
     }
 
     /* 휴대폰 몰래 보기의 메시지 앱 아이콘은 액션 패널 버튼이 아니다. */
@@ -2407,6 +2395,64 @@
       background: #E8EAEB !important;
       border-color: #E0E3E5 !important;
       color: #A0A7AB !important;
+    }
+
+
+    /* =========================================================
+       대화 프로필 이미지 메뉴
+       프로필 사진 클릭 시: 이미지 가져오기 / 되돌리기
+       별도 dialog 라벨이 없어 JS로 현재 시트만 마킹
+    ========================================================= */
+
+    html.${PROFILE_EDIT_ACTIVE} #portal-container .kt-profile-image-backdrop {
+      background: rgba(43,57,66,.30) !important;
+    }
+
+    html.${PROFILE_EDIT_ACTIVE} #portal-container .kt-profile-image-sheet {
+      background: #FFFFFF !important;
+      color: var(--kt-text) !important;
+      border-top: 1px solid var(--kt-line) !important;
+      box-shadow: 0 -10px 28px rgba(38,52,61,.14) !important;
+    }
+
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet > div:first-child svg {
+      color: #C2C9CF !important;
+    }
+
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet .kt-profile-image-action {
+      background: var(--kt-yellow) !important;
+      color: var(--kt-user-dialogue, var(--kt-text)) !important;
+      border-color: var(--kt-user-line, rgba(0,0,0,.08)) !important;
+    }
+
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet .kt-profile-image-action:hover,
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet .kt-profile-image-action:active {
+      background: var(--kt-yellow-hover) !important;
+    }
+
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet .kt-profile-image-action span,
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet .kt-profile-image-action svg {
+      color: var(--kt-user-dialogue, var(--kt-text)) !important;
+      opacity: 1 !important;
+    }
+
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet .kt-profile-image-action:disabled {
+      background: var(--kt-soft2) !important;
+      color: var(--kt-muted) !important;
+    }
+
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet .kt-profile-image-action:disabled span,
+    html.${PROFILE_EDIT_ACTIVE} #portal-container
+      .kt-profile-image-sheet .kt-profile-image-action:disabled svg {
+      color: var(--kt-muted) !important;
     }
 
 
@@ -8491,6 +8537,55 @@
       });
   }
 
+  function markProfileImageMenu() {
+    /* 프로필 사진 클릭 메뉴는 role/aria-label이 없어 버튼 문구로 해당 시트만 식별 */
+    document.querySelectorAll(
+      '#portal-container [data-sentry-component="KeyboardAvoidingView"]'
+    ).forEach(root => {
+      const buttons = Array.from(
+        root.querySelectorAll('button[data-sentry-component="LogRawButton"]')
+      );
+
+      const labels = buttons.map(btn =>
+        (btn.textContent || '').replace(/\s+/g, ' ').trim()
+      );
+
+      if (
+        !labels.includes('이미지 가져오기') ||
+        !labels.includes('되돌리기')
+      ) return;
+
+      const imageButton = buttons.find(btn =>
+        (btn.textContent || '').replace(/\s+/g, ' ').trim() === '이미지 가져오기'
+      );
+      const resetButton = buttons.find(btn =>
+        (btn.textContent || '').replace(/\s+/g, ' ').trim() === '되돌리기'
+      );
+
+      imageButton?.classList.add('kt-profile-image-action');
+      resetButton?.classList.add('kt-profile-image-action');
+
+      let sheet = imageButton?.parentElement;
+      while (sheet && sheet !== root) {
+        const cls = String(sheet.className || '');
+        if (
+          cls.includes('rounded-t-[20px]') ||
+          cls.includes('bg-gray-sub1')
+        ) {
+          sheet.classList.add('kt-profile-image-sheet');
+          break;
+        }
+        sheet = sheet.parentElement;
+      }
+
+      const backdrop = Array.from(root.children).find(el =>
+        el.getAttribute?.('role') === 'presentation'
+      );
+      backdrop?.classList.add('kt-profile-image-backdrop');
+    });
+  }
+
+
   function markActionPanel() {
     /* 2026-09: 플러그인 시트에서 aria-label="Chat actions"가 제거됨.
        action-panel-grid를 기준으로 현재 dialog를 찾아 예전 구조도 함께 지원한다. */
@@ -9065,6 +9160,7 @@
       clearAuxiliaryMarkers();
       clearBookmarkMarkers();
       markProfileEditPage();
+      markProfileImageMenu();
       return;
     }
 
@@ -9119,6 +9215,7 @@
     markBubbles();
     markProfileSelect();
     markProfileHub();
+    markProfileImageMenu();
     markActionPanel();
     markSidebarMenu();
     markSnapshotModals();
