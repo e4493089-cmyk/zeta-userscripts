@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.35
+// @version      3.50.36
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -931,16 +931,16 @@
       background: #F7F9FA !important;
     }
 
-    /* 플러그인 아이콘 원 - 기본/커스텀 테마 메인색 추종 */
+    /* 플러그인 아이콘 원 */
     html.${ACTIVE} #portal-container
       [data-testid="action-panel-grid"] > button > span:first-child {
-      background: var(--kt-yellow) !important;
-      color: var(--kt-user-dialogue, var(--kt-text)) !important;
+      background: #EEF1F3 !important;
+      color: #53636C !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-testid="action-panel-grid"] > button > span:first-child svg {
-      color: var(--kt-user-dialogue, var(--kt-text)) !important;
+      color: #53636C !important;
     }
 
     /* 플러그인 이름 */
