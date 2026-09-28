@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.33
+// @version      3.50.34
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -875,8 +875,9 @@
 
 
     /* =========================================================
-       하단 액션 패널
-       스냅샷 / 메시지
+       플러그인 바텀시트
+       스냅샷 / 메시지 / 이벤트 컷 / 러브라인 / 제타그램 / 웹툰 /
+       휴대폰 몰래 보기 등 action-panel-grid 전체
     ========================================================= */
 
     html.${ACTIVE} #portal-container .kt-action-backdrop {
@@ -895,10 +896,20 @@
       color: #CBD3D8 !important;
     }
 
-    html.${ACTIVE} #portal-container
-      section[role="dialog"][aria-label="Chat actions"] {
+    /* 예전 Chat actions / 현재 플러그인 시트 공통 */
+    html.${ACTIVE} #portal-container .kt-action-sheet section[role="dialog"] {
       background: transparent !important;
       color: var(--kt-text) !important;
+    }
+
+    html.${ACTIVE} #portal-container .kt-action-sheet
+      section[role="dialog"] h2 {
+      color: #26343C !important;
+    }
+
+    html.${ACTIVE} #portal-container .kt-action-sheet
+      section[role="dialog"] a {
+      color: #75838D !important;
     }
 
     html.${ACTIVE} #portal-container
@@ -906,7 +917,7 @@
       background: transparent !important;
     }
 
-    /* 두 액션 버튼 공통 */
+    /* 모든 플러그인 버튼 공통 */
     html.${ACTIVE} #portal-container
       [data-testid="action-panel-grid"] > button {
       background: transparent !important;
@@ -920,33 +931,40 @@
       background: #F7F9FA !important;
     }
 
-    /* 스냅샷 아이콘 */
+    /* 플러그인 아이콘 원 */
     html.${ACTIVE} #portal-container
-      [data-testid="snapshot-action-button"] > span:first-child {
+      [data-testid="action-panel-grid"] > button > span:first-child {
       background: #EEF1F3 !important;
       color: #53636C !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-testid="snapshot-action-button"] > span:nth-child(2) {
+      [data-testid="action-panel-grid"] > button > span:first-child svg {
+      color: #53636C !important;
+    }
+
+    /* 플러그인 이름 */
+    html.${ACTIVE} #portal-container
+      [data-testid="action-panel-grid"] > button > span:nth-child(2) {
       color: #394A54 !important;
     }
 
-    /* 메시지 버튼 */
+    /* 피스/보조 문구 */
     html.${ACTIVE} #portal-container
-      button[aria-label^="메시지"] > span:first-child {
+      [data-testid="action-panel-grid"] > button > span:nth-child(n+3) {
+      color: #87949E !important;
+    }
+
+    /* 메시지 버튼만 카카오 노랑 */
+    html.${ACTIVE} #portal-container
+      [data-testid="action-panel-grid"] > button[aria-label^="메시지"] > span:first-child {
       background: var(--kt-yellow) !important;
       color: var(--kt-text) !important;
     }
 
     html.${ACTIVE} #portal-container
-      button[aria-label^="메시지"] > span:first-child svg {
+      [data-testid="action-panel-grid"] > button[aria-label^="메시지"] > span:first-child svg {
       color: #2B2B2B !important;
-    }
-
-    html.${ACTIVE} #portal-container
-      button[aria-label^="메시지"] > span:last-child {
-      color: #394A54 !important;
     }
 
     /* 휴대폰 몰래 보기의 메시지 앱 아이콘은 액션 패널 버튼이 아니다. */
@@ -8474,9 +8492,17 @@
   }
 
   function markActionPanel() {
-    const dialog = document.querySelector(
-      '#portal-container section[role="dialog"][aria-label="Chat actions"]'
+    /* 2026-09: 플러그인 시트에서 aria-label="Chat actions"가 제거됨.
+       action-panel-grid를 기준으로 현재 dialog를 찾아 예전 구조도 함께 지원한다. */
+    const grid = document.querySelector(
+      '#portal-container [data-testid="action-panel-grid"]'
     );
+
+    const dialog =
+      grid?.closest('section[role="dialog"]') ||
+      document.querySelector(
+        '#portal-container section[role="dialog"][aria-label="Chat actions"]'
+      );
 
     if (!dialog) return;
 
