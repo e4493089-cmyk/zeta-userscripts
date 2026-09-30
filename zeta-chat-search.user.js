@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.6
+// @version      0.2.7
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.2.6';
+  const SCRIPT_VERSION = '0.2.7';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -25,6 +25,12 @@
 
   const CHAT_SELECTOR = '[role="log"][aria-label="Chat messages"]';
   const MESSAGE_SELECTOR = '[data-sentry-component="BodyView"][id^="message-"]';
+  const TEXT_SECTION_SELECTOR = [
+    '[data-sentry-component="NarratorBubble"]',
+    '[data-sentry-component="LeftTextContent"]',
+    '[data-sentry-component="RightTextContent"]'
+  ].join(',');
+  const STATUS_BLOCK_SELECTOR = 'pre, table';
 
   const DB_NAME = 'zeta-chat-search';
   const DB_VERSION = 1;
@@ -317,12 +323,28 @@
       .replace(/:+$/, '');
   }
 
+  function cleanStatusText(value) {
+    return String(value || '').replace(/​/g, '').replace(/\r\n?/g, '\n')
+      .split('\n').map(line => line.trimEnd()).join('\n').trim();
+  }
+
+  function statusBlockText(block) {
+    if (block.matches('table')) {
+      return Array.from(block.rows).map(row =>
+        Array.from(row.cells).map(cell => clean(cell.innerText || cell.textContent)).join(' | ')
+      ).join('\n');
+    }
+    const content = (block.querySelector('code') || block).cloneNode(true);
+    content.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+    return content.textContent || '';
+  }
+
   function pushIndexedPart(parts, type, text, role, speaker) {
-    const value = clean(text);
+    const value = type === 'status' ? cleanStatusText(text) : clean(text);
     if (!value) return;
 
     const previous = parts[parts.length - 1];
-    if (previous?.type === type && previous.role === role && previous.speaker === speaker) {
+    if (type !== 'status' && previous?.type === type && previous.role === role && previous.speaker === speaker) {
       previous.text = clean(previous.text + ' ' + value);
     } else {
       parts.push({ type, text: value, role, speaker });
@@ -330,16 +352,19 @@
   }
 
   // 대화 추출기와 같은 기준으로 렌더된 DOM에서 지문/대사를 나눈다.
-  // 검색용 text는 평탄화하되, TXT 내보내기용 parts는 구분 정보를 유지한다.
+  // 검색용 text는 평탄화하되, TXT 내보내기용 parts는 상태창의 줄바꿈도 유지한다.
   function extractIndexedParts(body) {
     const parts = [];
-    const sections = body.querySelectorAll([
-      '[data-sentry-component="NarratorBubble"]',
-      '[data-sentry-component="LeftTextContent"]',
-      '[data-sentry-component="RightTextContent"]'
-    ].join(','));
+    const sections = body.querySelectorAll(TEXT_SECTION_SELECTOR + ',' + STATUS_BLOCK_SELECTOR);
 
     sections.forEach(section => {
+      if (section.matches(STATUS_BLOCK_SELECTOR)) {
+        // 말풍선 안의 상태창은 아래에서 본문 순서대로 읽는다.
+        if (section.parentElement?.closest(TEXT_SECTION_SELECTOR + ',' + STATUS_BLOCK_SELECTOR)) return;
+        const role = roleOf(body);
+        pushIndexedPart(parts, 'status', statusBlockText(section), role, speakerOf(body, role));
+        return;
+      }
       const forcedNarration = section.matches('[data-sentry-component="NarratorBubble"]');
       const sectionRole = forcedNarration
         ? 'narrator'
@@ -351,10 +376,15 @@
         : clean(section.querySelector('.caption1')?.textContent || '')
           .replace(/^@+/, '')
           .replace(/:+$/, '');
-      const paragraphs = Array.from(section.querySelectorAll('.chat p'));
+      const paragraphs = Array.from(section.querySelectorAll('.chat p,' + STATUS_BLOCK_SELECTOR))
+        .filter(node => !node.parentElement?.closest(STATUS_BLOCK_SELECTOR));
 
       if (paragraphs.length) {
         paragraphs.forEach(paragraph => {
+          if (paragraph.matches(STATUS_BLOCK_SELECTOR)) {
+            pushIndexedPart(parts, 'status', statusBlockText(paragraph), sectionRole, sectionSpeaker);
+            return;
+          }
           const text = paragraph.innerText || paragraph.textContent || '';
           const meaningfulNodes = Array.from(paragraph.childNodes).filter(node =>
             node.nodeType === Node.ELEMENT_NODE ||
@@ -421,9 +451,19 @@
     return rows;
   }
 
-  // 같은 메시지를 매번 다시 쓰면 저장소가 쉴 새 없이 돈다.
+  // 본문/상태창이 바뀐 메시지만 다시 쓴다. 스트리밍 도중 먼저 읽어도
+  // 나중에 붙은 상태창과 수정된 대화가 색인에서 빠지지 않게 한다.
   let knownRoomId = '';
-  const knownKeys = new Set();
+  const knownKeys = new Map();
+
+  function indexedSignature(row) {
+    const value = JSON.stringify([row.role, row.speaker, row.text, row.parts]);
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i++) {
+      hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+    }
+    return value.length + ':' + (hash >>> 0);
+  }
 
   async function captureRendered(seenKeys = null) {
     const roomId = currentRoomId();
@@ -439,14 +479,17 @@
     }
 
     const fresh = rendered.filter(row => !knownKeys.has(row.key));
-    const rowsToSave = seenKeys instanceof Set ? rendered : fresh;
+    const rowsToSave = seenKeys instanceof Set ? rendered
+      : rendered.filter(row => knownKeys.get(row.key) !== indexedSignature(row));
     if (!rowsToSave.length) return 0;
-    for (const row of rendered) knownKeys.add(row.key);
 
     try {
       await saveMessages(rowsToSave);
     } catch (_) {
       return 0;
+    }
+    if (knownRoomId === roomId) {
+      for (const row of rowsToSave) knownKeys.set(row.key, indexedSignature(row));
     }
     return fresh.length;
   }
@@ -693,7 +736,7 @@
 
       let currentSpeaker = '';
       for (const part of parts) {
-        const text = clean(part?.text);
+        const text = part?.type === 'status' ? cleanStatusText(part.text) : clean(part?.text);
         if (!text) continue;
 
         const speaker = indexedPartSpeakerLabel(part, row);
@@ -707,6 +750,8 @@
           ? '[지문]'
           : part.type === 'message'
             ? '[대사]'
+            : part.type === 'status'
+              ? '[상태창]'
             : '[본문]';
         output.push(type);
         output.push(text);
@@ -868,9 +913,15 @@
       }
     };
 
-    exportButton.addEventListener('click', () => {
-      if (!rows.length) return;
-      downloadIndexedTxt(rows, roomId);
+    exportButton.addEventListener('click', async () => {
+      exportButton.disabled = true;
+      try {
+        // 검색창을 연 뒤 추가된 상태창까지 내보내기 직전에 갱신한다.
+        await reload();
+        downloadIndexedTxt(rows, roomId);
+      } finally {
+        exportButton.disabled = !rows.length;
+      }
     });
     panel.querySelector('.zcs-close').addEventListener('click', closePanel);
     panel.addEventListener('click', event => { if (event.target === panel) closePanel(); });
@@ -1239,7 +1290,7 @@
       scheduleMenu();
       revealPendingJump();
       if (!deepLoadRunning) scheduleCapture();
-    }).observe(document.documentElement, { childList: true, subtree: true });
+    }).observe(document.documentElement, { childList: true, characterData: true, subtree: true });
 
     renderMenuRow();
     revealPendingJump();
