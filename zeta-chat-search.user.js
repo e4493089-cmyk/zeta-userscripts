@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.7
+// @version      0.2.8
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.2.7';
+  const SCRIPT_VERSION = '0.2.8';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -24,13 +24,14 @@
   const HIGHLIGHT_CLASS = 'zcs-hit';
 
   const CHAT_SELECTOR = '[role="log"][aria-label="Chat messages"]';
-  const MESSAGE_SELECTOR = '[data-sentry-component="BodyView"][id^="message-"]';
+  const MESSAGE_SELECTOR = '[data-sentry-component="BodyView"]';
   const TEXT_SECTION_SELECTOR = [
     '[data-sentry-component="NarratorBubble"]',
     '[data-sentry-component="LeftTextContent"]',
     '[data-sentry-component="RightTextContent"]'
   ].join(',');
-  const STATUS_BLOCK_SELECTOR = 'pre, table';
+  const NATIVE_STATUS_SELECTOR = '[data-sentry-component="InfoBoxContent"]';
+  const STATUS_BLOCK_SELECTOR = 'pre, table,' + NATIVE_STATUS_SELECTOR;
 
   const DB_NAME = 'zeta-chat-search';
   const DB_VERSION = 1;
@@ -329,6 +330,15 @@
   }
 
   function statusBlockText(block) {
+    if (block.matches(NATIVE_STATUS_SELECTOR)) {
+      // 제타 기본 상태창은 말풍선 옆의 별도 요소다. 날짜도 버튼 안에
+      // 있으므로 버튼 전체를 빼지 않고 실제 항목과 캐릭터 이름만 읽는다.
+      const content = block.querySelector('[data-sentry-component="InfoBoxExpandedContent"]') || block;
+      return Array.from(content.querySelectorAll(
+        '.chat,[data-sentry-component="InfoBoxCharacterSection"] .caption1'
+      )).filter(node => !node.parentElement?.closest('.chat'))
+        .map(node => clean(node.textContent)).filter(Boolean).join('\n');
+    }
     if (block.matches('table')) {
       return Array.from(block.rows).map(row =>
         Array.from(row.cells).map(cell => clean(cell.innerText || cell.textContent)).join(' | ')
@@ -428,27 +438,42 @@
     return match ? Number(match[1]) : 0;
   }
 
+  function renderedMessageId(body) {
+    // 최신 답변은 CandidatePanel 안에서 id 없이 렌더된다. 활성 후보만
+    // 가상 목록의 실제 메시지 키에 연결해 마지막 대화와 상태창도 읽는다.
+    const slide = body.closest('.swiper-slide');
+    if (slide && !slide.matches('.swiper-slide-active')) return '';
+    const id = body.id || body.closest('[data-key^="message-"]')?.getAttribute('data-key') || '';
+    return /^message-MESSAGE-\d+-[A-Za-z0-9_-]+$/.test(id) ? id : '';
+  }
+
+  function findRenderedMessage(id) {
+    return Array.from(document.querySelectorAll(MESSAGE_SELECTOR))
+      .find(body => renderedMessageId(body) === id) || null;
+  }
+
   function readRenderedMessages(roomId) {
-    const rows = [];
+    const rows = new Map();
     for (const body of document.querySelectorAll(MESSAGE_SELECTOR)) {
-      if (!body.id) continue;
+      const id = renderedMessageId(body);
+      if (!id) continue;
       const role = roleOf(body);
       const speaker = speakerOf(body, role);
       const parts = extractIndexedParts(body);
       const text = clean(parts.map(part => part.text).join(' '));
       if (!text) continue;
-      rows.push({
-        key: roomId + '|' + body.id,
+      rows.set(id, {
+        key: roomId + '|' + id,
         roomId,
-        id: body.id,
-        num: messageNumber(body.id),
+        id,
+        num: messageNumber(id),
         role,
         speaker,
         text,
         parts
       });
     }
-    return rows;
+    return Array.from(rows.values());
   }
 
   // 본문/상태창이 바뀐 메시지만 다시 쓴다. 스트리밍 도중 먼저 읽어도
@@ -630,7 +655,7 @@
     try { id = sessionStorage.getItem(JUMP_HIGHLIGHT_KEY) || ''; } catch (_) {}
     if (!id) return false;
 
-    const target = document.getElementById(id);
+    const target = findRenderedMessage(id);
     if (!target) return false;
     target.scrollIntoView({ block: 'center', behavior: 'auto' });
     target.classList.add(HIGHLIGHT_CLASS);
@@ -644,7 +669,7 @@
     // 새 결과를 누른 시점에는 이동 작업을 새로 시작해야 한다.
     deepLoadAborted = false;
 
-    const existing = document.getElementById(row.id);
+    const existing = findRenderedMessage(row.id);
     if (existing) {
       existing.scrollIntoView({ block: 'center', behavior: 'smooth' });
       existing.classList.add(HIGHLIGHT_CLASS);
@@ -662,17 +687,17 @@
     if (!log) return false;
 
     for (let round = 0; round < 400 && !deepLoadAborted; round++) {
-      if (document.getElementById(row.id)) return jumpToMessage(row, status);
+      if (findRenderedMessage(row.id)) return jumpToMessage(row, status);
       const beforeTop = log.scrollTop;
       log.scrollBy({ top: -Math.max(320, log.clientHeight * 0.82), behavior: 'auto' });
       await sleep(120);
       await captureRendered();
-      if (Math.abs(log.scrollTop - beforeTop) <= 2 && !document.getElementById(row.id)) {
+      if (Math.abs(log.scrollTop - beforeTop) <= 2 && !findRenderedMessage(row.id)) {
         await sleep(160);
         if (Math.abs(log.scrollTop - beforeTop) <= 2) break;
       }
     }
-    return Boolean(document.getElementById(row.id));
+    return Boolean(findRenderedMessage(row.id));
   }
 
   // ── 검색 패널 ────────────────────────────────────────────────────────
