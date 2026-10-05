@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.38
+// @version      3.50.39
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -8325,6 +8325,160 @@
     html.${ROOM_LIST_ACTIVE} [data-sentry-component="NavigationBar"]
       [title="대화"] svg {
       color: #3C454B !important;
+    }
+
+    /* =========================================================
+       대화방 목록 팝업 / 메뉴
+       목록과 동일하게 고정 white + light gray 팔레트 사용
+    ========================================================= */
+
+    /* 길게 누르기 메뉴: 고정/별명 변경/나가기 바텀시트 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="RoomListItemContextMenu.tsx"]
+      ) > [role="presentation"] {
+      background: rgba(25,29,32,.38) !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="RoomListItemContextMenu.tsx"]
+      ) > div:nth-child(2) {
+      background: #F4F5F6 !important;
+      color: #252A2E !important;
+      box-shadow: 0 -8px 28px rgba(30,38,44,.14) !important;
+    }
+
+    /* 상단 드래그 핸들 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        [data-sentry-source-file="RoomListItemContextMenu.tsx"]
+      ) > div:nth-child(2) > div:first-child svg {
+      color: #B4BBC0 !important;
+    }
+
+    /* 메뉴 카드 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="RoomListItemContextMenu.tsx"] > button {
+      background: #FFFFFF !important;
+      color: #2B3136 !important;
+      border: 1px solid #E6E9EB !important;
+      box-shadow: none !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="RoomListItemContextMenu.tsx"] > button:active,
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="RoomListItemContextMenu.tsx"] > button:hover {
+      background: #ECEFF1 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="RoomListItemContextMenu.tsx"] > button span,
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="RoomListItemContextMenu.tsx"] > button svg {
+      color: #4F5A62 !important;
+      opacity: 1 !important;
+    }
+
+    /* 나가기는 위험 동작만 빨강으로 구분 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="RoomListItemContextMenu.tsx"]
+      > button[data-sentry-element="ContextMenuItem"] span,
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="RoomListItemContextMenu.tsx"]
+      > button[data-sentry-element="ContextMenuItem"] svg {
+      color: #D95757 !important;
+    }
+
+    /* 우상단 설정 드롭다운 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-source-file="DropdownMenu.tsx"] {
+      color: #2B3136 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) > [data-sentry-source-file="DropdownMenu.tsx"] {
+      background: #FFFFFF !important;
+      border: 1px solid #E1E5E8 !important;
+      box-shadow: 0 10px 26px rgba(30,38,44,.16) !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-component="DropdownMenuItem"] {
+      background: #FFFFFF !important;
+      border-color: #E8EBED !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-component="DropdownMenuItem"]:hover {
+      background: #F3F5F6 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) button,
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) span,
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-source-file="UnlimitModeToggle.tsx"],
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-source-file="ChatCompleteHaptic.tsx"],
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-source-file="PlayerCharacterDisplayToggle.tsx"] {
+      color: #343B40 !important;
+    }
+
+    /* 도움말 아이콘 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-source-file="PlayerCharacterDisplayToggle.tsx"] svg {
+      color: #8E989F !important;
+    }
+
+    /* 토글: 제타 보라색 대신 고정 진회색 트랙 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-component="ReadOnlyToggle"] > div {
+      background: #4D565D !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-component="ReadOnlyToggle"] > div > div {
+      background: #FFFFFF !important;
+    }
+
+    /* 대화방 편집은 위험/편집 계열 액션으로 붉은색 유지 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) #delete-room,
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) #delete-room span {
+      color: #D95757 !important;
     }
 
 
