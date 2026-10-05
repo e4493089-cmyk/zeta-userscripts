@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.2.8
+// @version      0.2.9
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.2.8';
+  const SCRIPT_VERSION = '0.2.9';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -490,7 +490,7 @@
     return value.length + ':' + (hash >>> 0);
   }
 
-  async function captureRendered(seenKeys = null) {
+  async function captureRendered(seenKeys = null, indexedKeys = null) {
     const roomId = currentRoomId();
     if (!roomId) return 0;
     if (roomId !== knownRoomId) {
@@ -503,7 +503,12 @@
       for (const row of rendered) seenKeys.add(row.key);
     }
 
-    const fresh = rendered.filter(row => !knownKeys.has(row.key));
+    // knownKeys는 현재 탭에서 본 메시지만 기억한다. 페이지를 새로 연 뒤 전체 색인을
+    // 다시 돌리면 이미 IndexedDB에 있는 옛 메시지도 "새로 색인"으로 세던 문제가 있었다.
+    // 전체 색인에서는 시작 시점의 실제 DB 키 집합(indexedKeys)을 기준으로 새 항목만 센다.
+    const fresh = indexedKeys instanceof Set
+      ? rendered.filter(row => !indexedKeys.has(row.key))
+      : rendered.filter(row => !knownKeys.has(row.key));
     const rowsToSave = seenKeys instanceof Set ? rendered
       : rendered.filter(row => knownKeys.get(row.key) !== indexedSignature(row));
     if (!rowsToSave.length) return 0;
@@ -515,6 +520,9 @@
     }
     if (knownRoomId === roomId) {
       for (const row of rowsToSave) knownKeys.set(row.key, indexedSignature(row));
+    }
+    if (indexedKeys instanceof Set) {
+      for (const row of rendered) indexedKeys.add(row.key);
     }
     return fresh.length;
   }
@@ -544,6 +552,8 @@
     deepLoadAborted = false;
     const reverse = logIsReverse(log);
     const seenKeys = new Set();
+    // "새로 색인"은 현재 탭에서 처음 본 수가 아니라 실제 저장소에 없던 수여야 한다.
+    const indexedKeys = new Set((await loadRoomMessages(roomId)).map(row => row.key));
     let added = 0;
     let removed = 0;
     let reachedOldest = false;
@@ -559,7 +569,7 @@
           behavior: 'auto'
         });
         await sleep(320);
-        added += await captureRendered(seenKeys);
+        added += await captureRendered(seenKeys, indexedKeys);
         stable = Math.abs(log.scrollHeight - beforeHeight) > 2 ? 0 : stable + 1;
         onProgress?.(added, 'up');
       }
@@ -571,7 +581,7 @@
         const beforeTop = log.scrollTop;
         log.scrollBy({ top: Math.max(240, log.clientHeight * 0.6), behavior: 'auto' });
         await sleep(110);
-        added += await captureRendered(seenKeys);
+        added += await captureRendered(seenKeys, indexedKeys);
         onProgress?.(added, 'down');
 
         const moved = Math.abs(log.scrollTop - beforeTop) > 2;
