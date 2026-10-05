@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.36
+// @version      3.50.37
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -41,6 +41,7 @@
 
   const STYLE_ID = 'zeta-kakaotalk-theme-style';
   const ACTIVE = 'kt-chat-theme-active';
+  const ROOM_LIST_ACTIVE = 'kt-room-list-active';
   const PROFILE_EDIT_ACTIVE = 'kt-profile-edit-active';
   const BOOKMARK_ACTIVE = 'kt-bookmark-active';
   const SAVED_ROOMS_ACTIVE = 'kt-saved-rooms-active';
@@ -8155,6 +8156,199 @@
       background: var(--kt-yellow-hover) !important;
     }
 
+    /* =========================================================
+       대화방 목록 (/rooms)
+       채팅 배경/커스텀 테마 색과 분리된 고정 white + light gray UI
+    ========================================================= */
+
+    html.${ROOM_LIST_ACTIVE},
+    html.${ROOM_LIST_ACTIVE} body {
+      background: #F4F5F6 !important;
+      color: #191919 !important;
+      color-scheme: light !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} main#contents,
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="RoomList"],
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="RoomList"]
+      > [data-sentry-component="WrappedDiv"] {
+      background: #F4F5F6 !important;
+      color: #191919 !important;
+    }
+
+    /* 상단 '대화' 헤더 */
+    html.${ROOM_LIST_ACTIVE} body > header[data-sentry-component="Header"],
+    html.${ROOM_LIST_ACTIVE} main#contents ~ header[data-sentry-component="Header"],
+    html.${ROOM_LIST_ACTIVE} header[data-sentry-component="Header"] {
+      background: #FFFFFF !important;
+      color: #191919 !important;
+      border-bottom-color: #E7E9EB !important;
+      box-shadow: none !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} header[data-sentry-component="Header"] nav,
+    html.${ROOM_LIST_ACTIVE} header[data-sentry-component="Header"] span,
+    html.${ROOM_LIST_ACTIVE} header[data-sentry-component="Header"] button,
+    html.${ROOM_LIST_ACTIVE} header[data-sentry-component="Header"] a,
+    html.${ROOM_LIST_ACTIVE} header[data-sentry-component="Header"] svg {
+      color: #2B3136 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} header[data-sentry-component="Header"] button:hover,
+    html.${ROOM_LIST_ACTIVE} header[data-sentry-component="Header"] a:hover {
+      background: #F3F4F5 !important;
+    }
+
+    /* 스크랩 */
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="ScrappedPlotsPreview"] {
+      background: #FFFFFF !important;
+      color: #191919 !important;
+      border-bottom-color: #E7E9EB !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="ScrappedPlotsPreview"] h3 {
+      color: #2B3136 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="ScrappedPlotsPreview"]
+      a[href*="/scrapped-plots"],
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="ScrappedPlotsPreview"]
+      a[href*="/scrapped-plots"] svg {
+      color: #8A9298 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-sentry-source-file="ScrappedPlotsPreviewItem.tsx"] {
+      color: #555F66 !important;
+      opacity: 1 !important;
+    }
+
+    /* 이어보기 카드 */
+    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"] {
+      background: #FFFFFF !important;
+      color: #191919 !important;
+      border: 1px solid #E6E9EB !important;
+      box-shadow: 0 2px 8px rgba(32,43,50,.06) !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"]
+      [data-sentry-source-file="RoomHighlightCard.tsx"].text-primary-200,
+    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"]
+      span.text-primary-200 {
+      color: #7A858C !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"]
+      [data-sentry-source-file="RoomHighlightCard.tsx"].font-medium {
+      color: #24292D !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"]
+      [class*="text-white/"] {
+      color: #818B91 !important;
+      opacity: 1 !important;
+    }
+
+    /* 정렬 버튼 */
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="RoomList"]
+      button [data-sentry-source-file="Select.tsx"],
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="RoomList"]
+      button [data-sentry-source-file="Select.tsx"] svg {
+      color: #4E5961 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="RoomList"]
+      button:hover {
+      background: #EEF0F2 !important;
+    }
+
+    /* 대화방 목록 */
+    html.${ROOM_LIST_ACTIVE} [testid^="room-list-item-"] {
+      background: #FFFFFF !important;
+      color: #191919 !important;
+      border-bottom: 1px solid #EEF0F2 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [testid^="room-list-item-"]:hover {
+      background: #F8F9FA !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [testid^="room-list-item-"] .body1,
+    html.${ROOM_LIST_ACTIVE} [testid^="room-list-item-"] .font-medium {
+      color: #252A2E !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [testid^="room-list-item-"]
+      [class*="text-white/"] {
+      color: #7D878E !important;
+      opacity: 1 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [testid^="room-list-item-"]
+      [class*="text-gray-"] {
+      color: #9AA2A8 !important;
+    }
+
+    /* 스와이프 액션: 고정은 회색, 나가기는 위험 동작이라 빨강 유지 */
+    html.${ROOM_LIST_ACTIVE}
+      [data-sentry-element="RoomListItemRightActions"]
+      > button:first-child {
+      background: #E9ECEF !important;
+      color: #59636A !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE}
+      [data-sentry-element="RoomListItemRightActions"]
+      > button:first-child svg,
+    html.${ROOM_LIST_ACTIVE}
+      [data-sentry-element="RoomListItemRightActions"]
+      > button:first-child span {
+      color: #59636A !important;
+    }
+
+    /* 검색 화면도 같은 고정 팔레트 */
+    html.${ROOM_LIST_ACTIVE} input[name="room-list-search-input"] {
+      background: #F1F3F4 !important;
+      color: #202428 !important;
+      border-color: #E1E5E8 !important;
+      caret-color: #202428 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} input[name="room-list-search-input"]::placeholder {
+      color: #9AA2A8 !important;
+      opacity: 1 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} input[name="room-list-search-input"] ~ svg,
+    html.${ROOM_LIST_ACTIVE} input[name="room-list-search-input"] + svg {
+      color: #7D878E !important;
+    }
+
+    /* 하단 탭바 */
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="NavigationBar"] {
+      background: #FFFFFF !important;
+      border-top-color: #E4E7E9 !important;
+      box-shadow: 0 -1px 5px rgba(35,45,52,.04) !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="NavigationBar"]
+      > div:not(#navigation-item-Rooms),
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="NavigationBar"]
+      > div:not(#navigation-item-Rooms) span,
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="NavigationBar"]
+      > div:not(#navigation-item-Rooms) svg {
+      color: #A0A7AC !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="NavigationBar"]
+      [title="대화"],
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="NavigationBar"]
+      [title="대화"] span,
+    html.${ROOM_LIST_ACTIVE} [data-sentry-component="NavigationBar"]
+      [title="대화"] svg {
+      color: #3C454B !important;
+    }
+
+
   `;
 
   function isExactChatRoom() {
@@ -8163,6 +8357,14 @@
       /^\/[^/]+\/rooms\/[^/]+$/.test(path) ||
       !!document.querySelector('textarea[aria-label="내용 입력하기"]') ||
       !!document.querySelector('[data-testid="chat-header-model"]')
+    );
+  }
+
+  function isRoomListPage() {
+    const path = location.pathname.replace(/\/+$/, '');
+    return (
+      /^\/[^/]+\/rooms$/.test(path) ||
+      !!document.querySelector('[data-sentry-component="RoomList"]')
     );
   }
 
@@ -8232,6 +8434,10 @@
 
   function setActiveState() {
     document.documentElement.classList.toggle(ACTIVE, isExactChatRoom());
+    document.documentElement.classList.toggle(
+      ROOM_LIST_ACTIVE,
+      isRoomListPage()
+    );
     document.documentElement.classList.toggle(
       PROFILE_EDIT_ACTIVE,
       isProfileEditPage()
