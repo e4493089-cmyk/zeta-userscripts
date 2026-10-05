@@ -8400,9 +8400,9 @@
     }
 
     html.${ROOM_LIST_ACTIVE} #portal-container
-      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+      [data-sentry-source-file="DropdownMenu.tsx"][class*="bg-gray-sub1"][class*="shadow-400"]:has(
         [data-sentry-source-file="UnlimitModeToggle.tsx"]
-      ) > [data-sentry-source-file="DropdownMenu.tsx"] {
+      ) {
       background: #FFFFFF !important;
       border: 1px solid #E1E5E8 !important;
       box-shadow: 0 10px 26px rgba(30,38,44,.16) !important;
@@ -8454,12 +8454,19 @@
       color: #8E989F !important;
     }
 
-    /* 토글: 제타 보라색 대신 고정 진회색 트랙 */
+    /* 토글: ON은 진회색, OFF는 연회색으로 상태를 구분 */
     html.${ROOM_LIST_ACTIVE} #portal-container
       [data-sentry-source-file="DropdownMenu.tsx"]:has(
         [data-sentry-source-file="UnlimitModeToggle.tsx"]
-      ) [data-sentry-component="ReadOnlyToggle"] > div {
+      ) [data-sentry-component="ReadOnlyToggle"] > div.bg-primary-300 {
       background: #4D565D !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-source-file="DropdownMenu.tsx"]:has(
+        [data-sentry-source-file="UnlimitModeToggle.tsx"]
+      ) [data-sentry-component="ReadOnlyToggle"] > div[class*="bg-gray-"] {
+      background: #D8DDE0 !important;
     }
 
     html.${ROOM_LIST_ACTIVE} #portal-container
