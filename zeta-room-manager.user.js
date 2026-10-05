@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.86
+// @version      0.23.87
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.86';
+  const SCRIPT_VERSION = '0.23.87';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -4870,14 +4870,30 @@
   // 목록을 스크롤하면 제타가 매 프레임 DOM을 바꾼다. 그때마다 전체 갱신을
   // 돌리면 스크롤이 끊긴다. 최소 간격을 두고 마지막 요청만 처리한다.
   const REFRESH_MIN_GAP = 200;
+  const INPUT_FOCUS_GRACE_MS = 900;
   let refreshTimer = null;
   let lastRefreshAt = 0;
+  let inputFocusGraceUntil = 0;
+
+  function isTextEntryTarget(el) {
+    if (!el) return false;
+    if (el instanceof HTMLTextAreaElement) return true;
+    if (el instanceof HTMLInputElement) {
+      return !['hidden', 'checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'range', 'color'].includes(el.type);
+    }
+    return Boolean(el.isContentEditable);
+  }
 
   function scheduleRefresh() {
     if (suspendObserverRefresh) return;
     if (refreshTimer) return;
 
-    const wait = Math.max(0, REFRESH_MIN_GAP - (Date.now() - lastRefreshAt));
+    const now = Date.now();
+    // Samsung 폴더블/일부 Android WebView에서는 입력창 포커스 직후 큰 DOM 작업이
+    // 들어오면 IME가 열리자마자 포커스를 잃는 경우가 있다. 키보드가 자리잡는 짧은
+    // 구간만 전체 refresh를 미루고, 이후에는 평소처럼 동작한다.
+    const focusGrace = Math.max(0, inputFocusGraceUntil - now);
+    const wait = Math.max(0, REFRESH_MIN_GAP - (now - lastRefreshAt), focusGrace);
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
       lastRefreshAt = Date.now();
@@ -4917,6 +4933,10 @@
     document.addEventListener('visibilitychange', () => {
       if (collectionRunning() && document.visibilityState === 'visible') void holdScreenAwake();
     });
+
+    document.addEventListener('focusin', event => {
+      if (isTextEntryTarget(event.target)) inputFocusGraceUntil = Date.now() + INPUT_FOCUS_GRACE_MS;
+    }, true);
 
     document.addEventListener('pointerdown', rememberRoomContextTarget, true);
     document.addEventListener('contextmenu', rememberRoomContextTarget, true);
