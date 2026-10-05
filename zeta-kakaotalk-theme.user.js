@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.37
+// @version      3.50.38
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -8222,30 +8222,9 @@
       opacity: 1 !important;
     }
 
-    /* 이어보기 카드 */
+    /* '다시 한번 이야기를 이어가볼까요?' 하이라이트 카드 숨김 */
     html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"] {
-      background: #FFFFFF !important;
-      color: #191919 !important;
-      border: 1px solid #E6E9EB !important;
-      box-shadow: 0 2px 8px rgba(32,43,50,.06) !important;
-    }
-
-    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"]
-      [data-sentry-source-file="RoomHighlightCard.tsx"].text-primary-200,
-    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"]
-      span.text-primary-200 {
-      color: #7A858C !important;
-    }
-
-    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"]
-      [data-sentry-source-file="RoomHighlightCard.tsx"].font-medium {
-      color: #24292D !important;
-    }
-
-    html.${ROOM_LIST_ACTIVE} [testid="room-highlight-card"]
-      [class*="text-white/"] {
-      color: #818B91 !important;
-      opacity: 1 !important;
+      display: none !important;
     }
 
     /* 정렬 버튼 */
