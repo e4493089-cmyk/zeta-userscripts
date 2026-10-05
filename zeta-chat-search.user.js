@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.0
+// @version      0.3.1
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.3.0';
+  const SCRIPT_VERSION = '0.3.1';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -274,28 +274,12 @@
     return true;
   }
 
-  // 가상 스크롤은 끝까지 왕복해도 일부 메시지를 DOM에 한 번도 올리지 않을 수 있다.
-  // 따라서 "이번 순회에서 못 봤다"는 이유만으로 기존 색인을 지우면 정상 메시지가
-  // 통째로 사라져 전체 개수가 매번 달라질 수 있다.
-  //
-  // 대신 이번 순회에서 실제로 확인한 MESSAGE 번호에 한해서, 같은 번호의 예전
-  // 후보/재생성 메시지 ID만 정리한다. 보지 못한 번호는 절대로 삭제하지 않는다.
-  async function pruneSupersededRoomMessages(roomId, seenKeys) {
-    if (!roomId || !(seenKeys instanceof Set) || !seenKeys.size) return 0;
+  // 전체 색인이 끝까지 정상 완료된 경우에만, 이번 순회에서 실제로 확인하지 못한
+  // 예전 색인 행을 제거한다. 가상 스크롤로 DOM에서 잠깐 사라진 것만 보고 지우지는 않는다.
+  async function pruneMissingRoomMessages(roomId, seenKeys) {
+    if (!roomId || !(seenKeys instanceof Set)) return 0;
     const stored = await loadRoomMessages(roomId);
-    const seenNums = new Set(
-      stored
-        .filter(row => row?.key && seenKeys.has(row.key) && Number(row?.num || 0) > 0)
-        .map(row => Number(row.num))
-    );
-    if (!seenNums.size) return 0;
-
-    const stale = stored.filter(row =>
-      row?.key &&
-      Number(row?.num || 0) > 0 &&
-      seenNums.has(Number(row.num)) &&
-      !seenKeys.has(row.key)
-    );
+    const stale = stored.filter(row => row?.key && !seenKeys.has(row.key));
     if (!stale.length) return 0;
 
     const db = await openDb();
@@ -308,6 +292,7 @@
       tx.onabort = () => reject(tx.error || new Error('색인 정리 중단'));
     });
 
+    // 현재 방 메모리 캐시에도 남아 있으면 같이 비운다.
     for (const row of stale) knownKeys.delete(row.key);
     return stale.length;
   }
@@ -567,116 +552,58 @@
     deepLoadAborted = false;
     const reverse = logIsReverse(log);
     const seenKeys = new Set();
+    // "새로 색인"은 현재 탭에서 처음 본 수가 아니라 실제 저장소에 없던 수여야 한다.
     const indexedKeys = new Set((await loadRoomMessages(roomId)).map(row => row.key));
     let added = 0;
     let removed = 0;
     let reachedOldest = false;
     let reachedNewest = false;
-    let latestAnchorId = '';
 
     try {
-      // 먼저 실제 최신 끝을 기준점으로 잡는다. 가상 스크롤은 중간 이동 중에도
-      // scrollTop을 0으로 재설정할 수 있으므로, 나중에 이 메시지가 다시 보여야
-      // "최신 끝까지 돌아왔다"고 인정한다.
-      log.scrollTo({ top: reverse ? 0 : log.scrollHeight, behavior: 'auto' });
-      await sleep(300);
-      added += await captureRendered(seenKeys, indexedKeys);
-      await sleep(60);
-      added += await captureRendered(seenKeys, indexedKeys);
-
-      const latestRows = readRenderedMessages(roomId)
-        .filter(row => Number(row?.num || 0) > 0)
-        .sort((a, b) => Number(a.num) - Number(b.num));
-      latestAnchorId = latestRows[0]?.id || '';
-
-      // 1단계 — 과거 끝 찾기.
-      // scrollHeight 하나만 4번 같다고 끝으로 보던 기존 방식은 느린 네트워크나
-      // 폴더블/모바일 가상 스크롤에서 너무 빨리 종료될 수 있었다.
-      let stableOldest = 0;
-      let oldestGuard = 0;
-      while (!deepLoadAborted && stableOldest < 8 && oldestGuard++ < 120) {
-        const beforeTop = log.scrollTop;
+      // 1단계 — 끝까지 올라가기. 높이가 더 늘지 않으면 과거 대화를 전부 붙였다고 본다.
+      let stable = 0;
+      while (!deepLoadAborted && stable < 4) {
         const beforeHeight = log.scrollHeight;
-        const beforeSeen = seenKeys.size;
-
         log.scrollTo({
           top: reverse ? -(log.scrollHeight + log.clientHeight) : 0,
           behavior: 'auto'
         });
-
         await sleep(320);
         added += await captureRendered(seenKeys, indexedKeys);
-        await sleep(70);
-        added += await captureRendered(seenKeys, indexedKeys);
-
-        const moved = Math.abs(log.scrollTop - beforeTop) > 2;
-        const resized = Math.abs(log.scrollHeight - beforeHeight) > 2;
-        const grew = seenKeys.size > beforeSeen;
-        stableOldest = (!moved && !resized && !grew) ? stableOldest + 1 : 0;
+        stable = Math.abs(log.scrollHeight - beforeHeight) > 2 ? 0 : stable + 1;
         onProgress?.(added, 'up');
-
-        if (!moved && !resized && !grew && stableOldest < 8) await sleep(300);
       }
-      reachedOldest = !deepLoadAborted && stableOldest >= 8;
+      reachedOldest = !deepLoadAborted && stable >= 4;
 
-      // 2단계 — 과거→최신으로 촘촘히 다시 훑는다.
-      // "바닥 좌표"만 보고 끝내지 않고 시작 때 잡은 최신 메시지 기준점이 실제로
-      // 다시 렌더된 상태가 3번 안정될 때 완료한다.
+      // 2단계 — 내려오며 읽기. 한 화면보다 좁게 움직여 가상 스크롤 누락을 줄인다.
       let guard = 0;
-      let stableNewest = 0;
-      let stalledAwayFromLatest = 0;
-
-      while (!deepLoadAborted && guard++ < 5000) {
+      while (!deepLoadAborted && guard++ < 3000) {
         const beforeTop = log.scrollTop;
-        const beforeSeen = seenKeys.size;
-        const step = Math.max(240, log.clientHeight * 0.6);
-
-        log.scrollBy({ top: step, behavior: 'auto' });
+        log.scrollBy({ top: Math.max(240, log.clientHeight * 0.6), behavior: 'auto' });
         await sleep(110);
-        added += await captureRendered(seenKeys, indexedKeys);
-        await sleep(40);
         added += await captureRendered(seenKeys, indexedKeys);
         onProgress?.(added, 'down');
 
         const moved = Math.abs(log.scrollTop - beforeTop) > 2;
-        const grew = seenKeys.size > beforeSeen;
         const atBottom = reverse
           ? Math.abs(log.scrollTop) < 3
           : log.scrollTop + log.clientHeight >= log.scrollHeight - 3;
-        const latestVisible = !latestAnchorId || Boolean(findRenderedMessage(latestAnchorId));
-
-        stableNewest = atBottom && latestVisible && !moved && !grew
-          ? stableNewest + 1
-          : 0;
-
-        stalledAwayFromLatest = !moved && !grew && !latestVisible
-          ? stalledAwayFromLatest + 1
-          : 0;
-
-        if (stableNewest >= 3) {
+        if (atBottom) {
           reachedNewest = true;
           break;
         }
-
-        if (stalledAwayFromLatest >= 3) {
-          // 가상 스크롤이 중간 경계에서 멎는 경우 살짝 되짚었다가 다시 내려가
-          // 다음 묶음 렌더링을 재촉한다.
-          log.scrollBy({ top: -160, behavior: 'auto' });
-          await sleep(100);
-          log.scrollBy({ top: step + 160, behavior: 'auto' });
-          await sleep(420);
-          added += await captureRendered(seenKeys, indexedKeys);
-          stalledAwayFromLatest = 0;
-        } else if (!moved) {
-          await sleep(atBottom ? 360 : 220);
+        if (!moved) {
+          // 더 움직이지 않는 지점이 실제 최신 끝인지 한 번 더 확인한다.
+          reachedNewest = reverse
+            ? Math.abs(log.scrollTop) < 3
+            : log.scrollTop + log.clientHeight >= log.scrollHeight - 3;
+          break;
         }
       }
 
       const completed = !deepLoadAborted && reachedOldest && reachedNewest;
       if (completed) {
-        // 전체 왕복에서 못 본 번호는 건드리지 않는다. 실제로 본 번호의 예전
-        // 후보/재생성 ID만 정리해서 전체 개수의 뻥튀기만 제거한다.
-        removed = await pruneSupersededRoomMessages(roomId, seenKeys);
+        removed = await pruneMissingRoomMessages(roomId, seenKeys);
       }
       return { added, removed, completed };
     } finally {
@@ -1062,7 +989,7 @@
       // render가 상태줄을 다시 쓰므로 결과 요약은 그 뒤에 적는다.
       render();
       const cleanupText = result.removed
-        ? ' · 교체된 후보 색인 정리 ' + result.removed.toLocaleString() + '개'
+        ? ' · 삭제된 대화 색인 정리 ' + result.removed.toLocaleString() + '개'
         : '';
       status((deepLoadAborted ? '색인 중지됨 · ' : (result.completed ? '색인 완료 · ' : '색인 일부 완료 · ')) +
         '새로 색인 ' + result.added.toLocaleString() + '개' + cleanupText +
@@ -1382,7 +1309,7 @@
     };
 
     let captureTimer = null;
-    const scheduleCapture = () => {
+    const scheduleCapture = (delay = 700) => {
       if (deepLoadRunning || captureTimer) return;
       captureTimer = setTimeout(() => {
         captureTimer = null;
@@ -1391,18 +1318,34 @@
         // 경합이 생길 수 있으므로 자동 색인은 잠시 쉰다.
         if (deepLoadRunning) return;
         void captureRendered();
-      }, 700);
+      }, delay);
     };
 
+    // 새 메시지가 붙는 순간뿐 아니라, Zeta가 가상 목록의 기존 노드에
+    // id/data-key를 뒤늦게 연결하는 경우도 감지한다. 예전에는 childList와
+    // characterData만 봐서 이런 메시지는 실시간 색인에서 빠질 수 있었다.
     new MutationObserver(() => {
       scheduleMenu();
       revealPendingJump();
       if (!deepLoadRunning) scheduleCapture();
-    }).observe(document.documentElement, { childList: true, characterData: true, subtree: true });
+    }).observe(document.documentElement, {
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['id', 'data-key'],
+      subtree: true
+    });
+
+    // 일부 후보 전환/가상 스크롤 갱신은 class만 바뀌고 위 mutation이 없을 수 있다.
+    // 전체 색인을 강제로 돌리지 않아도 현재 화면의 최신 메시지는 결국 저장되도록
+    // 가벼운 안전 확인을 주기적으로 한 번씩 한다.
+    setInterval(() => {
+      if (currentRoomId() && !deepLoadRunning) scheduleCapture(0);
+    }, 2000);
 
     renderMenuRow();
     revealPendingJump();
-    scheduleCapture();
+    scheduleCapture(0);
   }
 
   if (document.readyState === 'loading') {
