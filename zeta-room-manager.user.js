@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.85
+// @version      0.23.86
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.85';
+  const SCRIPT_VERSION = '0.23.86';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -3628,11 +3628,15 @@
         top: 14px;
         left: auto;
         right: auto;
+        z-index: 2147483644;
+        pointer-events: auto;
       }
       #${PLOT_TOOLS_ID}.zrm-tools-fallback {
         position: fixed;
         top: 14px;
         right: 88px;
+        z-index: 2147483644;
+        pointer-events: auto;
       }
       #${PLOT_TOOLS_ID} .zrm-tools-trigger {
         display: inline-flex;
@@ -4659,10 +4663,22 @@
     const input = nativeRoomSearchInput();
     if (!input || input.dataset.zrmAliasSearchBound === '1') return;
     input.dataset.zrmAliasSearchBound = '1';
-    const update = () => scheduleRefresh();
-    // 검색을 시작하려는 순간 읽어 둔다. 첫 글자에서 멈칫하지 않게.
-    input.addEventListener('focus', ensureDataLoaded);
-    input.addEventListener('pointerdown', ensureDataLoaded);
+    let pendingSearchLoad = false;
+    const update = () => {
+      // 일부 Android/폴더블 + 유저스크립트 환경에서는 pointerdown/focus 중
+      // 큰 localStorage 인덱스를 동기 파싱하면 소프트키보드 포커스가 바로 풀린다.
+      // 실제 입력이 발생한 뒤 이벤트 스택을 빠져나온 다음 데이터를 읽는다.
+      if (!dataLoaded && !pendingSearchLoad) {
+        pendingSearchLoad = true;
+        setTimeout(() => {
+          pendingSearchLoad = false;
+          ensureDataLoaded();
+          scheduleRefresh();
+        }, 0);
+        return;
+      }
+      scheduleRefresh();
+    };
     input.addEventListener('input', update);
     input.addEventListener('search', update);
     input.addEventListener('change', update);
