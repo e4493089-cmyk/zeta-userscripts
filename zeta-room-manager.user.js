@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.87
+// @version      0.23.88
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.87';
+  const SCRIPT_VERSION = '0.23.88';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -3362,10 +3362,36 @@
     placeCollectionTools(tools);
   }
 
+  // Room Manager 아이콘은 옆의 ZETA 기본 헤더 아이콘 색을 그대로 따라간다.
+  // 어두운 기본 헤더에서는 흰색, 카톡 테마의 흰 헤더에서는 진회색이 되어 항상 대비를 유지한다.
+  function syncCollectionToolsContrast(tools, anchor) {
+    const source = anchor?.querySelector?.('svg') || anchor;
+    let color = '';
+    try { color = source ? getComputedStyle(source).color : ''; } catch (_) {}
+
+    if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') {
+      tools.style.removeProperty('--zrm-tools-icon-color');
+      tools.style.removeProperty('--zrm-tools-hover-bg');
+      return;
+    }
+
+    tools.style.setProperty('--zrm-tools-icon-color', color);
+
+    const rgb = color.match(/rgba?\(\s*(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)/i);
+    if (rgb) {
+      const luminance = 0.2126 * Number(rgb[1]) + 0.7152 * Number(rgb[2]) + 0.0722 * Number(rgb[3]);
+      tools.style.setProperty(
+        '--zrm-tools-hover-bg',
+        luminance < 150 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.08)'
+      );
+    }
+  }
+
   // 헤더의 검색 버튼 왼쪽에 나란히 세운다. 헤더가 없으면 화면 구석에 둔다.
   function placeCollectionTools(tools) {
     const section = currentSection();
     const anchor = roomSearchControl() || creatorCenterSearchLink() || null;
+    syncCollectionToolsContrast(tools, anchor);
     let rect = anchor ? anchor.getBoundingClientRect() : null;
 
     // 제작자 센터는 검색 버튼 바로 왼쪽에 알림 버튼이 하나 더 있다.
@@ -3648,7 +3674,7 @@
         border: 0;
         border-radius: 9px;
         background: transparent;
-        color: rgba(255,255,255,.92);
+        color: var(--zrm-tools-icon-color, rgba(255,255,255,.92));
         font-size: 23px;
         font-weight: 700;
         line-height: 1;
@@ -3662,7 +3688,7 @@
         flex: 0 0 24px;
       }
       #${PLOT_TOOLS_ID} .zrm-tools-trigger:hover {
-        background: rgba(255,255,255,.08);
+        background: var(--zrm-tools-hover-bg, rgba(255,255,255,.08));
       }
 
       #${COLLECTION_MODAL_ID} {
