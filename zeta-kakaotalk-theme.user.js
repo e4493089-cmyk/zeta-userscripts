@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.40
+// @version      3.50.41
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -8361,6 +8361,120 @@
     }
 
     /* =========================================================
+       대화방 편집 모드
+       편집 목록/하단 액션도 room-list 고정 팔레트에 맞춤
+    ========================================================= */
+
+    /* 편집 모드에서는 a가 아니라 button[data-testid]로 방 항목이 렌더됨 */
+    html.${ROOM_LIST_ACTIVE} [data-testid^="room-list-item-"] {
+      background: #FFFFFF !important;
+      color: #252A2E !important;
+      border-bottom: 1px solid #EEF0F2 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-testid^="room-list-item-"] .body1,
+    html.${ROOM_LIST_ACTIVE} [data-testid^="room-list-item-"] .font-medium {
+      color: #252A2E !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-testid^="room-list-item-"]
+      [class*="text-white/"] {
+      color: #7D878E !important;
+      opacity: 1 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-testid^="room-list-item-"]
+      [data-sentry-component="CheckBox"] svg {
+      color: #737E86 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} [data-testid^="room-list-item-"]
+      [data-sentry-component="CheckBox"][aria-checked="true"] svg {
+      color: #3F484E !important;
+    }
+
+    /* 편집 화면 하단 취소/나가기 영역 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="BottomActionArea"] {
+      background: #FFFFFF !important;
+      border-top: 1px solid #E1E5E8 !important;
+      box-shadow: 0 -4px 14px rgba(31,42,49,.07) !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="BottomActionArea"] > button:first-child {
+      background: #ECEFF1 !important;
+      color: #343B40 !important;
+      border: 1px solid #E0E4E7 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="BottomActionArea"] > button:first-child:hover,
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="BottomActionArea"] > button:first-child:active {
+      background: #E4E8EA !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="BottomActionArea"] > button:last-child:not(:disabled) {
+      background: #D95757 !important;
+      color: #FFFFFF !important;
+      border: 1px solid #CC4E4E !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="BottomActionArea"] > button:last-child:disabled {
+      background: #ECEFF1 !important;
+      color: #AEB5BA !important;
+      border: 1px solid #E3E6E8 !important;
+      opacity: 1 !important;
+    }
+
+    /* 대화방 나가기 확인 팝업 */
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="Popup"]:has(> div > h5):has(> div > div > button:last-child.bg-primary-400) {
+      background: rgba(28,34,38,.34) !important;
+      backdrop-filter: blur(8px) !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="Popup"]:has(> div > h5):has(> div > div > button:last-child.bg-primary-400)
+      > div {
+      background: #FFFFFF !important;
+      color: #252A2E !important;
+      border: 1px solid #E2E6E8 !important;
+      box-shadow: 0 12px 30px rgba(31,42,49,.16) !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="Popup"]:has(> div > h5):has(> div > div > button:last-child.bg-primary-400)
+      > div > h5 {
+      color: #252A2E !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="Popup"]:has(> div > h5):has(> div > div > button:last-child.bg-primary-400)
+      > div > p {
+      color: #717C84 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="Popup"]:has(> div > h5):has(> div > div > button:last-child.bg-primary-400)
+      > div > div:last-child > button:first-child {
+      background: #ECEFF1 !important;
+      color: #343B40 !important;
+      border: 1px solid #E0E4E7 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE} #portal-container
+      [data-sentry-component="Popup"]:has(> div > h5):has(> div > div > button:last-child.bg-primary-400)
+      > div > div:last-child > button:last-child {
+      background: #D95757 !important;
+      color: #FFFFFF !important;
+      border: 1px solid #CC4E4E !important;
+    }
+
+        /* =========================================================
        대화방 목록 팝업 / 메뉴
        목록과 동일하게 고정 white + light gray 팔레트 사용
     ========================================================= */
