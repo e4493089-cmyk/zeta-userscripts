@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.39
+// @version      3.50.40
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -8284,22 +8284,55 @@
       color: #59636A !important;
     }
 
-    /* 검색 화면도 같은 고정 팔레트 */
+    /* 검색 화면도 같은 고정 팔레트
+       실제 배경/테두리는 input이 아니라 부모 label(Input.tsx)에 들어간다. */
+    html.${ROOM_LIST_ACTIVE}
+      label[data-sentry-component="Input"]:has(input[name="room-list-search-input"]) {
+      background: #FFFFFF !important;
+      color: #1F2429 !important;
+      border: 1px solid #DDE2E5 !important;
+      box-shadow: none !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE}
+      label[data-sentry-component="Input"]:has(input[name="room-list-search-input"]):focus-within {
+      background: #FFFFFF !important;
+      border-color: #AEB8BE !important;
+      box-shadow: 0 0 0 1px rgba(77,88,98,.08) !important;
+    }
+
     html.${ROOM_LIST_ACTIVE} input[name="room-list-search-input"] {
-      background: #F1F3F4 !important;
-      color: #202428 !important;
-      border-color: #E1E5E8 !important;
-      caret-color: #202428 !important;
+      background: transparent !important;
+      color: #1F2429 !important;
+      border: 0 !important;
+      caret-color: #1F2429 !important;
+      -webkit-text-fill-color: #1F2429 !important;
     }
 
     html.${ROOM_LIST_ACTIVE} input[name="room-list-search-input"]::placeholder {
       color: #9AA2A8 !important;
+      -webkit-text-fill-color: #9AA2A8 !important;
       opacity: 1 !important;
     }
 
-    html.${ROOM_LIST_ACTIVE} input[name="room-list-search-input"] ~ svg,
-    html.${ROOM_LIST_ACTIVE} input[name="room-list-search-input"] + svg {
-      color: #7D878E !important;
+    html.${ROOM_LIST_ACTIVE}
+      label[data-sentry-component="Input"]:has(input[name="room-list-search-input"]) > button {
+      background: transparent !important;
+      color: #65717A !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE}
+      label[data-sentry-component="Input"]:has(input[name="room-list-search-input"]) > button:hover,
+    html.${ROOM_LIST_ACTIVE}
+      label[data-sentry-component="Input"]:has(input[name="room-list-search-input"]) > button:active {
+      background: #EEF1F3 !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE}
+      label[data-sentry-component="Input"]:has(input[name="room-list-search-input"]) > button svg {
+      color: #65717A !important;
     }
 
     /* 하단 탭바 */
