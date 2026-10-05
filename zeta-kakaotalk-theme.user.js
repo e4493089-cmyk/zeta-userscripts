@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.41
+// @version      3.50.42
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -3068,6 +3068,16 @@
       filter: invert(1) !important;
     }
 
+    /* 선택창에서도 zeta 원본 이미지만 캔버스 폭이 104px로,
+       koji/luca(약 47~48px)보다 두 배 이상 넓다. 투명 여백만 잘라 균형을 맞춘다. */
+    html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
+      [data-sentry-component="ModelItem"] img[alt="zeta"] {
+      width: 60px !important;
+      height: 24px !important;
+      object-fit: cover !important;
+      object-position: 30% center !important;
+    }
+
 
     /* =========================================================
        이어하기 목록
@@ -5391,6 +5401,18 @@
       button[data-testid="chat-header-model"][aria-label="Select AI model"] img {
       filter: brightness(0) saturate(100%) !important;
       opacity: .82 !important;
+    }
+
+    /* zeta 로고 PNG 자체에 좌우 투명 여백이 크게 들어 있어
+       같은 h-4여도 koji/luca보다 버튼 폭이 비정상적으로 넓어진다.
+       이미지는 찌그러뜨리지 않고 투명 캔버스만 crop해서 실제 로고 폭에 맞춘다. */
+    html.${ACTIVE} main#contents
+      button[data-testid="chat-header-model"][aria-label="Select AI model"]
+      img[alt="zeta"] {
+      width: 40px !important;
+      height: 16px !important;
+      object-fit: cover !important;
+      object-position: 30% center !important;
     }
 
     html.${ACTIVE} main#contents
