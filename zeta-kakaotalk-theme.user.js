@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.44
+// @version      3.50.45
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -2653,6 +2653,125 @@
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="엔딩 자동 제안"] > button:last-child span {
       color: var(--kt-user-dialogue) !important;
+    }
+
+
+    /* =========================================================
+       추천 대화 프로필 상세 바텀시트
+       현재 카카오톡 테마 변수에 연동
+    ========================================================= */
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        section[role="dialog"][aria-label="추천 대화 프로필"]
+      ) > [role="presentation"] {
+      background: rgba(31,43,50,.30) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        section[role="dialog"][aria-label="추천 대화 프로필"]
+      ) > div[class*="bg-gray-sub1"] {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      border-top: 1px solid var(--kt-line) !important;
+      box-shadow: 0 -10px 28px rgba(38,52,61,.14) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"] {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      > div:first-child {
+      background: var(--kt-white) !important;
+      border-bottom: 1px solid var(--kt-line) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"] h3 {
+      color: var(--kt-text) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      button[aria-label="Close"],
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      button[aria-label="Close"] svg {
+      color: var(--kt-text) !important;
+    }
+
+    /* 프로필 카드 */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      [data-sentry-component="PlotProfileCard"] {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      border-color: var(--kt-line) !important;
+      box-shadow: 0 4px 14px rgba(55,74,84,.10) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      [data-sentry-component="PlotProfileCard"] h4 {
+      color: var(--kt-text) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      [data-sentry-component="PlotProfileCard"] .body16 {
+      color: var(--kt-sub) !important;
+    }
+
+    /* 상세 펼치기 */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      button[aria-label="Show profile details"],
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      button[aria-label="Show profile details"] svg {
+      color: var(--kt-sub) !important;
+    }
+
+    /* 수정 버튼 */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      button[aria-label="Edit chat profile"] {
+      background: var(--kt-soft) !important;
+      color: var(--kt-sub) !important;
+      border: 1px solid var(--kt-line) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      button[aria-label="Edit chat profile"] svg {
+      color: var(--kt-sub) !important;
+    }
+
+    /* 마지막 선택 버튼은 현재 테마 메인색 */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      [data-sentry-component="PlotProfileCard"]
+      > div:last-child > div:last-child > button:last-child {
+      background: var(--kt-yellow) !important;
+      color: var(--kt-user-dialogue) !important;
+      border: 1px solid var(--kt-user-line) !important;
+      box-shadow: none !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      [data-sentry-component="PlotProfileCard"]
+      > div:last-child > div:last-child > button:last-child:hover,
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="추천 대화 프로필"]
+      [data-sentry-component="PlotProfileCard"]
+      > div:last-child > div:last-child > button:last-child:active {
+      background: var(--kt-yellow-hover) !important;
     }
 
 
