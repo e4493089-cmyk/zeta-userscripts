@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.42
+// @version      3.50.43
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -3068,14 +3068,16 @@
       filter: invert(1) !important;
     }
 
-    /* 선택창에서도 zeta 원본 이미지만 캔버스 폭이 104px로,
-       koji/luca(약 47~48px)보다 두 배 이상 넓다. 투명 여백만 잘라 균형을 맞춘다. */
+    /* 선택창도 로고 자체 크기는 건드리지 않고 좌우 빈 캔버스만 줄인다. */
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
       [data-sentry-component="ModelItem"] img[alt="zeta"] {
-      width: 60px !important;
+      width: 104px !important;
       height: 24px !important;
-      object-fit: cover !important;
-      object-position: 30% center !important;
+      object-fit: contain !important;
+      object-position: center !important;
+      clip-path: inset(0 20% 0 20%) !important;
+      margin-left: -21px !important;
+      margin-right: -21px !important;
     }
 
 
@@ -5403,16 +5405,19 @@
       opacity: .82 !important;
     }
 
-    /* zeta 로고 PNG 자체에 좌우 투명 여백이 크게 들어 있어
-       같은 h-4여도 koji/luca보다 버튼 폭이 비정상적으로 넓어진다.
-       이미지는 찌그러뜨리지 않고 투명 캔버스만 crop해서 실제 로고 폭에 맞춘다. */
+    /* zeta 이미지는 원본 캔버스 좌우 여백이 커서 버튼 폭만 넓어진다.
+       cover로 박스를 줄이면 로고가 확대되어 보이므로 원본 크기는 유지하고,
+       좌우 빈 영역만 clip + 음수 margin으로 레이아웃에서 덜 차지하게 한다. */
     html.${ACTIVE} main#contents
       button[data-testid="chat-header-model"][aria-label="Select AI model"]
       img[alt="zeta"] {
-      width: 40px !important;
+      width: 69.3333333333px !important;
       height: 16px !important;
-      object-fit: cover !important;
-      object-position: 30% center !important;
+      object-fit: contain !important;
+      object-position: center !important;
+      clip-path: inset(0 20% 0 20%) !important;
+      margin-left: -14px !important;
+      margin-right: -14px !important;
     }
 
     html.${ACTIVE} main#contents
