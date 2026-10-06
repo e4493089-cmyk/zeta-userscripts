@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.43
+// @version      3.50.44
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -2554,6 +2554,105 @@
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="상태창 보기"] > button:last-child span {
       color: #191919 !important;
+    }
+
+
+    /* =========================================================
+       엔딩 자동 제안 바텀시트
+       대화방 목록 고정색과 달리 현재 카카오톡 테마 변수에 연동
+    ========================================================= */
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        section[role="dialog"][aria-label="엔딩 자동 제안"]
+      ) > [role="presentation"] {
+      background: rgba(31,43,50,.30) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        section[role="dialog"][aria-label="엔딩 자동 제안"]
+      ) > div[class*="bg-gray-sub1"] {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      border-top: 1px solid var(--kt-line) !important;
+      box-shadow: 0 -10px 28px rgba(38,52,61,.14) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      [data-sentry-component="KeyboardAvoidingView"]:has(
+        section[role="dialog"][aria-label="엔딩 자동 제안"]
+      ) > div[class*="bg-gray-sub1"] > div:first-child svg {
+      color: var(--kt-muted) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"] {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+    }
+
+    /* 설정 카드 */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"] > div:first-child {
+      background: var(--kt-soft) !important;
+      border: 1px solid var(--kt-line) !important;
+      color: var(--kt-text) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"] > div:first-child
+      span.body2 {
+      color: var(--kt-text) !important;
+    }
+
+    /* 설명 */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"] > span.caption1 {
+      color: var(--kt-sub) !important;
+    }
+
+    /* 토글 OFF */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"]
+      button[aria-label="엔딩 자동 제안"] > div {
+      background: var(--kt-soft2) !important;
+      border: 1px solid var(--kt-line) !important;
+    }
+
+    /* 토글 ON: 사이트에서 설정한 카톡 테마 메인색 */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"]
+      button[aria-label="엔딩 자동 제안"] > div[class*="bg-primary-"] {
+      background: var(--kt-yellow) !important;
+      border-color: var(--kt-yellow) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"]
+      button[aria-label="엔딩 자동 제안"] > div > div {
+      background: var(--kt-white) !important;
+    }
+
+    /* 확인 버튼도 현재 테마의 사용자 말풍선 색을 사용 */
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"] > button:last-child {
+      background: var(--kt-yellow) !important;
+      color: var(--kt-user-dialogue) !important;
+      border: 1px solid var(--kt-user-line) !important;
+      box-shadow: 0 1px 3px rgba(45,61,71,.08) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"] > button:last-child:hover,
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"] > button:last-child:active {
+      background: var(--kt-yellow-hover) !important;
+    }
+
+    html.${ACTIVE} #portal-container
+      section[role="dialog"][aria-label="엔딩 자동 제안"] > button:last-child span {
+      color: var(--kt-user-dialogue) !important;
     }
 
 
