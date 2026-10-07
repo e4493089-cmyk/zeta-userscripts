@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.93
+// @version      0.20.94
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.93';
+  const SCRIPT_VERSION = '0.20.94';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -190,7 +190,6 @@
     // 한 번만 도는 정리 작업도 여기서 돈다. 시작할 때 돌리면 큰 덩어리를 읽게 된다.
     cleanupLegacyState();
     cleanupOldApiFlags();
-    saveState();
   }
 
   function loadStoredData() {
@@ -239,6 +238,7 @@
   }
 
   let saveTimer = null;
+  let stateDirty = false;
 
   let lastListScrollAt = 0;
   const LIST_SCROLL_QUIET_MS = 650;
@@ -248,7 +248,13 @@
   }
 
   function saveStateNow(force = false) {
-    if (force !== true && !collectionRunning() && listScrollWait()) {
+    if (force !== true) stateDirty = true;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (!stateDirty) return;
+    // Explicit collection accumulates changes in memory and commits once on exit.
+    if ((collectionRunning() || convertRunning) && force !== true) return;
+    if (force !== true && listScrollWait()) {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveStateNow, listScrollWait());
       return;
@@ -263,7 +269,10 @@
     } catch (_) {}
 
     // 아직 안 읽은 덩어리는 건드리지 않는다. 저장본이 그대로 남아 있어야 한다.
-    if (!dataLoaded) return;
+    if (!dataLoaded) {
+      stateDirty = false;
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         version: STATE_VERSION,
@@ -271,13 +280,15 @@
         index: dataIndex,
         plotMeta: dataPlotMeta
       }));
+      stateDirty = false;
     } catch (_) {}
   }
 
   // 인덱스가 커지면 JSON.stringify 비용이 커진다.
   // 렌더 루프에서 매번 저장하면 검색 입력이 눈에 띄게 끊기므로 묶어서 저장한다.
   function saveState() {
-    if (saveTimer) return;
+    stateDirty = true;
+    if (collectionRunning() || convertRunning || saveTimer) return;
     saveTimer = setTimeout(saveStateNow, 400);
   }
 
@@ -753,27 +764,10 @@
     return /(?:api\.zeta-ai\.io|zeta-ai\.io).*\/(?:v1\/plots|v2\/rooms)(?:[/?#]|$)/i.test(text);
   }
 
-  const pendingNativePayloads = [];
-  let nativePayloadTimer = null;
-
-  function scheduleNativePayload() {
-    if (nativePayloadTimer || !pendingNativePayloads.length) return;
-    nativePayloadTimer = setTimeout(() => {
-      nativePayloadTimer = null;
-      if (listScrollWait()) {
-        scheduleNativePayload();
-        return;
-      }
-      const payload = pendingNativePayloads.shift();
-      const count = harvestPlotDataTree(payload, { maxDepth: 10, maxNodes: 12000 });
-      if (count) saveState();
-      scheduleNativePayload();
-    }, Math.max(180, listScrollWait()));
-  }
-
   function inspectNativeResponsePayload(payload) {
-    pendingNativePayloads.push(payload);
-    scheduleNativePayload();
+    if (!collectionRunning()) return;
+    const count = harvestPlotDataTree(payload, { maxDepth: 10, maxNodes: 12000 });
+    if (count) saveState();
   }
 
   // 페이지가 보낸 요청 헤더에서 클라이언트 버전을 주워 담는다.
@@ -910,7 +904,7 @@
         try {
           applyNativeRoomDeletion(requestMethod, requestUrl, response.ok);
           applyNativePlotDeletion(requestMethod, requestUrl, requestBody, response.ok);
-          if (shouldInspectNativeResponse(requestUrl)) {
+          if (collectionRunning() && shouldInspectNativeResponse(requestUrl)) {
             const clone = response.clone();
             clone.json().then(inspectNativeResponsePayload).catch(() => {});
           }
@@ -949,7 +943,7 @@
           applyNativeRoomDeletion(method, url, ok);
           applyNativePlotDeletion(method, url, body, ok);
 
-          if (!shouldInspectNativeResponse(url)) return;
+          if (!collectionRunning() || !shouldInspectNativeResponse(url)) return;
           if (xhr.responseType === 'json' && xhr.response) {
             inspectNativeResponsePayload(xhr.response);
             return;
@@ -1696,6 +1690,7 @@
     } finally {
       document.getElementById(CONVERT_PROGRESS_ID)?.remove();
       convertRunning = false;
+      saveStateNow(true);
       suspendObserverRefresh = false;
       routerNavigate(startedAt);
       scheduleRefresh();
@@ -2369,6 +2364,7 @@
       forceReconcileSeenRoomKeys = null;
       roomCollectionPromise = null;
       roomCollectionProgress.running = false;
+      saveStateNow(true);
       suspendObserverRefresh = false;
       void releaseScreenAwake();
       renderCollectionTools();
@@ -2693,6 +2689,7 @@
     })().finally(() => {
       plotCollectionPromise = null;
       plotCollectionProgress.running = false;
+      saveStateNow(true);
       suspendObserverRefresh = false;
       void releaseScreenAwake();
       renderCollectionTools();
@@ -4021,48 +4018,8 @@
   const harvestedItems = new Map();
   // 무거운 분석이 실제로 돌았는지 세어, 바뀐 게 없으면 저장을 건너뛴다.
   let heavyParses = 0;
-  let savedHeavyParses = 0;
 
-  // Normal rendering reads DOM fields only. Metadata enrichment runs one item
-  // at a time after scrolling settles; explicit collection keeps its full scan.
-  const pendingItemEnrichment = new Map();
-  let enrichmentTimer = null;
-
-  function scheduleItemEnrichment() {
-    if (enrichmentTimer || !pendingItemEnrichment.size) return;
-    enrichmentTimer = setTimeout(() => {
-      enrichmentTimer = null;
-      if (collectionRunning()) return;
-      if (listScrollWait()) {
-        scheduleItemEnrichment();
-        return;
-      }
-      const section = currentSection();
-      const first = pendingItemEnrichment.entries().next().value;
-      if (!first) return;
-      const [key, job] = first;
-      pendingItemEnrichment.delete(key);
-      if (job.item.isConnected && (section === job.type || (job.type === 'plot' && section === 'plot-search'))) {
-        parseItem(job.item, job.type, true);
-        if (heavyParses !== savedHeavyParses) {
-          savedHeavyParses = heavyParses;
-          saveState();
-          if (section === 'room' && nativeRoomQuery()) scheduleRefresh();
-          if (section === 'plot-search' && nativePlotSearchInput()?.value) scheduleRefresh();
-        }
-      }
-      scheduleItemEnrichment();
-    }, Math.max(180, listScrollWait()));
-  }
-
-  function queueItemEnrichment(key, item, type, original) {
-    if (harvestedItems.get(key) === original) return;
-    pendingItemEnrichment.set(key, { item, type });
-    // Virtualized lists may replace nodes before enrichment; keep the queue bounded.
-    if (pendingItemEnrichment.size > 80) pendingItemEnrichment.delete(pendingItemEnrichment.keys().next().value);
-    scheduleItemEnrichment();
-  }
-
+  // Ordinary rendering applies saved aliases only. Deep parsing is explicit.
   function parseItem(item, type, enrich = false) {
     if (item.closest && item.closest('#' + NATIVE_RESULTS_ID + ', #' + PLOT_NATIVE_RESULTS_ID)) return null;
     const link = type === 'room'
@@ -4097,12 +4054,6 @@
     delete previous.missingSince;
 
     if (!enrich) {
-      putEntry(key, {
-        ...previous, type, id, original, alias,
-        href: link?.href || previous.href || '',
-        image: image || previous.image || ''
-      });
-      queueItemEnrichment(key, item, type, original);
       return { key, type, id, item, link, titleEl, original, alias };
     }
 
@@ -4260,7 +4211,7 @@
       alias,
       image: (record.link || record.item).querySelector('img')?.src || indexed.image || ''
     };
-    putEntry(record.key, next);
+    if (collectionRunning()) putEntry(record.key, next);
 
     // 삭제된 플롯의 방은 눌러도 열리지 않으므로 목록에서 미리 표시해 준다.
     if (record.type === 'room' && next.plotMissing) record.item.dataset.zrmDead = '1';
@@ -4419,6 +4370,13 @@
       const alias = normalizeText(value);
       if (alias) state.aliases[record.key] = alias;
       else delete state.aliases[record.key];
+      const previous = peekEntry(record.key) || {};
+      putEntry(record.key, {
+        ...previous, type: record.type, id: record.id,
+        original: record.original, alias,
+        href: record.link?.href || previous.href || (record.type === 'room' ? '/ko/rooms/' + record.id : ''),
+        image: (record.link || record.item)?.querySelector('img')?.src || previous.image || ''
+      });
       saveState();
       close();
       refresh();
@@ -4970,7 +4928,6 @@
 
       document.getElementById('zeta-room-manager-private-profile-tools')?.remove();
       if (section === 'chat') {
-        harvestChatRoom();
         renderChatAliasTools();
         observer?.observe(document.documentElement, { childList: true, subtree: true });
       }
@@ -4991,10 +4948,6 @@
     if (section === 'plot' && plotDeleteMode) refreshPlotDeleteMode();
 
     injectRoomContextMenu();
-    if (heavyParses !== savedHeavyParses) {
-      savedHeavyParses = heavyParses;
-      saveState();
-    }
 
     if (section === 'room') {
       bindNativeRoomSearch();
@@ -5110,13 +5063,7 @@
     return records.some(record => {
       if (isOwnMutation(record, '[id^="zeta-room-manager-"], [id^="zeta-chat-search-"], [id^="zsnai-"], [id^="zs-inline-"]')) return false;
       const target = record.target instanceof Element ? record.target : record.target.parentElement;
-      // Streaming message prose cannot change aliases or room metadata.
-      // New messages and speaker labels still trigger the passive metadata harvest.
-      if (inChat && target?.closest('[data-sentry-component="BodyView"]') && !target.closest('.caption1')) {
-        return [...record.addedNodes, ...record.removedNodes].some(node =>
-          node instanceof Element && (node.matches('.caption1') || node.querySelector('.caption1'))
-        );
-      }
+      if (inChat && target?.closest('[data-sentry-component="BodyView"], [role="log"][aria-label="Chat messages"]')) return false;
       return true;
     });
   }
@@ -5173,12 +5120,7 @@
     refresh();
 
     // Zeta SPA 이동 감지: 상시 500ms 폴링 대신 history/popstate 이벤트에서만 갱신한다.
-    const notifyRouteChange = () => {
-      clearTimeout(enrichmentTimer);
-      enrichmentTimer = null;
-      pendingItemEnrichment.clear();
-      scheduleRefresh(true);
-    };
+    const notifyRouteChange = () => scheduleRefresh(true);
     const wrapHistory = method => {
       const original = history[method];
       if (typeof original !== 'function' || original.__zrmWrapped) return;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.4
+// @version      0.3.5
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.3.4';
+  const SCRIPT_VERSION = '0.3.5';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -1357,11 +1357,8 @@
       subtree: true
     });
 
-    // 후보 전환은 사용자 입력으로 시작되므로 2초 상시 폴링 대신
-    // 실제 클릭/화면 복귀 시에만 안전 색인을 한 번 더 한다.
-    document.addEventListener('click', () => {
-      if (currentRoomId() && !deepLoadRunning) scheduleCapture(250);
-    }, true);
+    // Message/candidate changes are already observed in the chat DOM.
+    // Unrelated clicks must not start another full message scan.
     window.addEventListener('pageshow', () => {
       if (currentRoomId() && !deepLoadRunning) scheduleCapture(0);
     }, true);
