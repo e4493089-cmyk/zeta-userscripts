@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.6
+// @version      0.2.7
 // @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분을 글자 수만큼 ■로 가립니다. 네모 색은 원래 글자색을 따릅니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
@@ -242,14 +242,17 @@
     apply();
 
     const observer = new MutationObserver(scheduleApply);
+    // 이름 마스킹은 캡처 UI가 생기거나 사라질 때만 다시 적용하면 된다.
+    // 평소 채팅 답변의 글자 스트리밍은 감시하지 않는다.
     observer.observe(document.documentElement, {
       childList: true,
-      subtree: true,
-      characterData: true
+      subtree: true
     });
 
     window.addEventListener('pageshow', scheduleApply, true);
-    document.addEventListener('visibilitychange', scheduleApply, true);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) scheduleApply();
+    }, true);
 
     document.addEventListener(
       'click',
