@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture OOC Hide
 // @namespace    zeta-capture-ooc-hide
-// @version      0.1.9
+// @version      0.1.10
 // @description  Zeta 캡처 미리보기에서 내 말풍선과 내레이터의 OOC: 구문을 인식해 골라 제거합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-ooc-hide.user.js
@@ -607,14 +607,36 @@
     requestAnimationFrame(reconcile);
   }
 
+  function mutationTouchesPreview(records) {
+    const selector = '[data-sentry-component="CapturePreview"]';
+
+    if (previewRoot) {
+      return records.some(record => {
+        if (record.target === previewRoot || previewRoot.contains(record.target)) return true;
+        return [...record.addedNodes, ...record.removedNodes].some(node => {
+          if (!(node instanceof Element)) return node === previewRoot;
+          return node === previewRoot || node.contains(previewRoot) || previewRoot.contains(node);
+        });
+      });
+    }
+
+    return records.some(record =>
+      [...record.addedNodes].some(node =>
+        node instanceof Element &&
+        (node.matches(selector) || node.querySelector(selector))
+      )
+    );
+  }
+
   function start() {
     installStyle();
     document.addEventListener('click', onCandidateClick, true);
     reconcile();
 
-    const observer = new MutationObserver(schedule);
-    // 캡처 미리보기는 요소 추가/삭제로 열리고 닫힌다.
-    // 일반 채팅의 글자 스트리밍(characterData)까지 감시할 필요는 없다.
+    const observer = new MutationObserver(records => {
+      if (mutationTouchesPreview(records)) schedule();
+    });
+    // 캡처 미리보기가 닫혀 있을 때는 일반 채팅 DOM 변화는 무시한다.
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true
