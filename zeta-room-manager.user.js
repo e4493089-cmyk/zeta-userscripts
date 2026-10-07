@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.90
+// @version      0.23.91
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.90';
+  const SCRIPT_VERSION = '0.23.91';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -238,7 +238,20 @@
 
   let saveTimer = null;
 
-  function saveStateNow() {
+  let lastListScrollAt = 0;
+  const LIST_SCROLL_QUIET_MS = 650;
+
+  function listScrollWait() {
+    return Math.max(0, LIST_SCROLL_QUIET_MS - (Date.now() - lastListScrollAt));
+  }
+
+  function saveStateNow(force = false) {
+    if (force !== true && !collectionRunning() && listScrollWait()) {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveStateNow, listScrollWait());
+      return;
+    }
+    clearTimeout(saveTimer);
     saveTimer = null;
     try {
       localStorage.setItem(ALIAS_KEY, JSON.stringify({
@@ -738,9 +751,27 @@
     return /(?:api\.zeta-ai\.io|zeta-ai\.io).*\/(?:v1\/plots|v2\/rooms)(?:[/?#]|$)/i.test(text);
   }
 
+  const pendingNativePayloads = [];
+  let nativePayloadTimer = null;
+
+  function scheduleNativePayload() {
+    if (nativePayloadTimer || !pendingNativePayloads.length) return;
+    nativePayloadTimer = setTimeout(() => {
+      nativePayloadTimer = null;
+      if (listScrollWait()) {
+        scheduleNativePayload();
+        return;
+      }
+      const payload = pendingNativePayloads.shift();
+      const count = harvestPlotDataTree(payload, { maxDepth: 10, maxNodes: 12000 });
+      if (count) saveState();
+      scheduleNativePayload();
+    }, Math.max(180, listScrollWait()));
+  }
+
   function inspectNativeResponsePayload(payload) {
-    const count = harvestPlotDataTree(payload, { maxDepth: 10, maxNodes: 12000 });
-    if (count) saveState();
+    pendingNativePayloads.push(payload);
+    scheduleNativePayload();
   }
 
   // 페이지가 보낸 요청 헤더에서 클라이언트 버전을 주워 담는다.
@@ -1229,7 +1260,7 @@
   function harvestRoomDocument(doc) {
     let harvested = 0;
     for (const item of roomItemsFromDocument(doc)) {
-      const record = parseItem(item, 'room');
+      const record = parseItem(item, 'room', true);
       if (!record) continue;
       if (forceReconcileSeenRoomKeys) forceReconcileSeenRoomKeys.add(record.key);
       applyAlias(record);
@@ -2364,7 +2395,7 @@
     let seen = 0;
     const items = document.querySelectorAll('[data-sentry-component="CreatorCenterMyPlotListItem"]');
     for (const item of items) {
-      const record = parseItem(item, 'plot');
+      const record = parseItem(item, 'plot', true);
       if (!record) continue;
       if (seenKeys instanceof Set) seenKeys.add(record.key);
       applyAlias(record);
@@ -3998,7 +4029,47 @@
   let heavyParses = 0;
   let savedHeavyParses = 0;
 
-  function parseItem(item, type) {
+  // Normal rendering reads DOM fields only. Metadata enrichment runs one item
+  // at a time after scrolling settles; explicit collection keeps its full scan.
+  const pendingItemEnrichment = new Map();
+  let enrichmentTimer = null;
+
+  function scheduleItemEnrichment() {
+    if (enrichmentTimer || !pendingItemEnrichment.size) return;
+    enrichmentTimer = setTimeout(() => {
+      enrichmentTimer = null;
+      if (collectionRunning()) return;
+      if (listScrollWait()) {
+        scheduleItemEnrichment();
+        return;
+      }
+      const section = currentSection();
+      const first = pendingItemEnrichment.entries().next().value;
+      if (!first) return;
+      const [key, job] = first;
+      pendingItemEnrichment.delete(key);
+      if (job.item.isConnected && (section === job.type || (job.type === 'plot' && section === 'plot-search'))) {
+        parseItem(job.item, job.type, true);
+        if (heavyParses !== savedHeavyParses) {
+          savedHeavyParses = heavyParses;
+          saveState();
+          if (section === 'room' && nativeRoomQuery()) scheduleRefresh();
+          if (section === 'plot-search' && nativePlotSearchInput()?.value) scheduleRefresh();
+        }
+      }
+      scheduleItemEnrichment();
+    }, Math.max(180, listScrollWait()));
+  }
+
+  function queueItemEnrichment(key, item, type, original) {
+    if (harvestedItems.get(key) === original) return;
+    pendingItemEnrichment.set(key, { item, type });
+    // Virtualized lists may replace nodes before enrichment; keep the queue bounded.
+    if (pendingItemEnrichment.size > 80) pendingItemEnrichment.delete(pendingItemEnrichment.keys().next().value);
+    scheduleItemEnrichment();
+  }
+
+  function parseItem(item, type, enrich = false) {
     if (item.closest && item.closest('#' + NATIVE_RESULTS_ID + ', #' + PLOT_NATIVE_RESULTS_ID)) return null;
     const link = type === 'room'
       ? item.querySelector('a[href*="/rooms/"]')
@@ -4010,9 +4081,7 @@
       : titleElementForPlot(item, link || item);
     if (!titleEl) return null;
 
-    if (!titleEl.dataset.zrmOriginalTitle) titleEl.dataset.zrmOriginalTitle = normalizeText(titleEl.textContent);
-
-    const original = titleEl.dataset.zrmOriginalTitle;
+    let original = titleEl.dataset.zrmOriginalTitle || normalizeText(titleEl.textContent);
     const image = (link || item).querySelector('img')?.src || '';
     const id = extractId(link && link.href, type)
       || item.getAttribute('data-plot-id')
@@ -4020,12 +4089,28 @@
       || localFallbackId(original, image);
     if (!id) return null;
 
+    if (titleEl.dataset.zrmOriginalKey !== keyOf(type, id)) {
+      if (titleEl.dataset.zrmOriginalKey) original = normalizeText(titleEl.textContent);
+      titleEl.dataset.zrmOriginalTitle = original;
+      titleEl.dataset.zrmOriginalKey = keyOf(type, id);
+    }
+
     const key = keyOf(type, id);
     const previous = { ...(peekEntry(key) || {}) };
     const alias = normalizeText(state.aliases[key] || previous.alias);
     if (alias && state.aliases[key] !== alias) state.aliases[key] = alias;
     // 제타가 실제로 그려준 방이면 사라진 방이 아니다.
     delete previous.missingSince;
+
+    if (!enrich) {
+      putEntry(key, {
+        ...previous, type, id, original, alias,
+        href: link?.href || previous.href || '',
+        image: image || previous.image || ''
+      });
+      queueItemEnrichment(key, item, type, original);
+      return { key, type, id, item, link, titleEl, original, alias };
+    }
 
     // 각 수집 세션에서 방 하나당 한 번만 plot 연결을 얕게 확인한다.
     // 일반 전체 수집도 기존 방의 plot 연결이 바뀌었으면 정밀 분석/이름 재검증 대상으로 올린다.
@@ -4073,7 +4158,7 @@
 
     // 카드에 텍스트로 안 보여도 React props 안의 plot 데이터에서 이름을 보강한다.
     heavyParses++;
-    harvestReactPlotData(item);
+    if (collectionRunning()) harvestReactPlotData(item);
     harvestedItems.set(key, original);
     const searchMeta = collectSearchMeta(item, titleEl);
     // 플롯 목록 항목은 API 보강 대상이 아니라 화면 데이터가 유일한 출처다.
@@ -4954,10 +5039,14 @@
     const focusGrace = Math.max(0, inputFocusGraceUntil - now);
     const cadenceGap = Math.max(0, REFRESH_MIN_GAP - (now - lastRefreshAt));
     const quietGap = !force && isVirtualList ? LIST_REFRESH_DEBOUNCE : 0;
-    const wait = Math.max(cadenceGap, focusGrace, quietGap);
+    const wait = Math.max(cadenceGap, focusGrace, quietGap, isVirtualList ? listScrollWait() : 0);
 
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
+      if (isVirtualList && listScrollWait()) {
+        scheduleRefresh();
+        return;
+      }
       lastRefreshAt = Date.now();
       refresh();
     }, wait);
@@ -5013,12 +5102,20 @@
       if (tools) placeCollectionTools(tools);
     });
 
-    window.addEventListener('pagehide', saveStateNow);
-    window.addEventListener('beforeunload', saveStateNow);
+    window.addEventListener('pagehide', () => saveStateNow(true));
+    window.addEventListener('beforeunload', () => saveStateNow(true));
 
     document.addEventListener('visibilitychange', () => {
       if (collectionRunning() && document.visibilityState === 'visible') void holdScreenAwake();
     });
+
+    document.addEventListener('scroll', event => {
+      const section = currentSection();
+      if (!['room', 'plot', 'plot-search'].includes(section) || collectionRunning()) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('[id^="zeta-room-manager-"]')) return;
+      lastListScrollAt = Date.now();
+    }, { capture: true, passive: true });
 
     document.addEventListener('focusin', event => {
       if (isTextEntryTarget(event.target)) inputFocusGraceUntil = Date.now() + INPUT_FOCUS_GRACE_MS;
@@ -5034,7 +5131,12 @@
     refresh();
 
     // Zeta SPA 이동 감지: 상시 500ms 폴링 대신 history/popstate 이벤트에서만 갱신한다.
-    const notifyRouteChange = () => scheduleRefresh(true);
+    const notifyRouteChange = () => {
+      clearTimeout(enrichmentTimer);
+      enrichmentTimer = null;
+      pendingItemEnrichment.clear();
+      scheduleRefresh(true);
+    };
     const wrapHistory = method => {
       const original = history[method];
       if (typeof original !== 'function' || original.__zrmWrapped) return;
