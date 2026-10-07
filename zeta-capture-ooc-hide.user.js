@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture OOC Hide
 // @namespace    zeta-capture-ooc-hide
-// @version      0.1.8
+// @version      0.1.9
 // @description  Zeta 캡처 미리보기에서 내 말풍선과 내레이터의 OOC: 구문을 인식해 골라 제거합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-ooc-hide.user.js
@@ -613,10 +613,11 @@
     reconcile();
 
     const observer = new MutationObserver(schedule);
+    // 캡처 미리보기는 요소 추가/삭제로 열리고 닫힌다.
+    // 일반 채팅의 글자 스트리밍(characterData)까지 감시할 필요는 없다.
     observer.observe(document.documentElement, {
       childList: true,
-      subtree: true,
-      characterData: true
+      subtree: true
     });
 
     window.addEventListener('pageshow', schedule, true);
