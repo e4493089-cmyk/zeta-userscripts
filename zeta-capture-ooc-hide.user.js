@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture OOC Hide
 // @namespace    zeta-capture-ooc-hide
-// @version      0.1.10
+// @version      0.1.11
 // @description  Zeta 캡처 미리보기에서 내 말풍선과 내레이터의 OOC: 구문을 인식해 골라 제거합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-ooc-hide.user.js
@@ -188,10 +188,12 @@
     control.dataset.editing = editing ? '1' : '0';
     control.dataset.applied = !editing && count ? '1' : '0';
     if (editing) {
-      control.textContent = count ? `완료 ${count}` : '완료';
+      const label = count ? `완료 ${count}` : '완료';
+      if (control.textContent !== label) control.textContent = label;
       control.title = '선택한 OOC를 캡처에서 제거';
     } else {
-      control.textContent = count ? `OOC ${count}` : 'OOC';
+      const label = count ? `OOC ${count}` : 'OOC';
+      if (control.textContent !== label) control.textContent = label;
       control.title = count ? `OOC ${count}개 제거됨 · 눌러서 수정` : '캡처에서 지울 OOC 고르기';
     }
   }
@@ -597,7 +599,6 @@
         scanCandidates();
         syncSelectedClasses();
       }
-      updateControl();
     }
   }
 
@@ -608,6 +609,12 @@
   }
 
   function mutationTouchesPreview(records) {
+    records = records.filter(record => {
+      const target = record.target instanceof Element ? record.target : record.target.parentElement;
+      if (target?.closest('#' + CONTROL_ID)) return false;
+      const nodes = [...record.addedNodes, ...record.removedNodes];
+      return !nodes.length || !nodes.every(node => node instanceof Element && node.id === CONTROL_ID);
+    });
     const selector = '[data-sentry-component="CapturePreview"]';
 
     if (previewRoot) {

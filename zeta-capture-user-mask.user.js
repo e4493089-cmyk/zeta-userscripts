@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.8
+// @version      0.2.9
 // @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분을 글자 수만큼 ■로 가립니다. 네모 색은 원래 글자색을 따릅니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
@@ -20,6 +20,9 @@
   let applying = false;
   let scheduled = false;
   let captureActive = false;
+  let observer = null;
+  let fullScanPending = true;
+  const dirtyRoots = new Set();
 
   function installStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -214,11 +217,17 @@
     if (applying) return;
 
     installStyle();
+    const previousNameCount = userNames.size;
     collectUserNames();
+    if (userNames.size !== previousNameCount) fullScanPending = true;
 
+    const wasActive = captureActive;
     captureActive = isCaptureActive();
     if (!captureActive) {
       restoreMasks();
+      dirtyRoots.clear();
+      fullScanPending = false;
+      observer?.takeRecords();
       return;
     }
 
@@ -226,13 +235,19 @@
 
     applying = true;
     try {
-      getCaptureRoots().forEach(wrapMatchesInRoot);
+      const roots = fullScanPending || !wasActive ? getCaptureRoots() : [...dirtyRoots];
+      dirtyRoots.clear();
+      fullScanPending = false;
+      roots.filter(root => !roots.some(other => other !== root && other.contains(root))).forEach(wrapMatchesInRoot);
     } finally {
       applying = false;
+      observer?.takeRecords();
     }
   }
 
-  function scheduleApply() {
+  function scheduleApply(root = null) {
+    if (root instanceof Element) dirtyRoots.add(root);
+    else fullScanPending = true;
     if (applying || scheduled) return;
     scheduled = true;
     requestAnimationFrame(apply);
@@ -250,9 +265,15 @@
       '[data-sentry-component="ChatMessageCaptureSelector"]'
     ].join(',');
 
-    const observer = new MutationObserver(records => {
+    observer = new MutationObserver(records => {
       if (captureActive) {
-        scheduleApply();
+        const contentSelector = '[data-sentry-component="CapturePreview"], [data-sentry-component="ChatMessageCaptureSelector"], [role="log"][aria-label="Chat messages"]';
+        for (const record of records) {
+          const target = record.target instanceof Element ? record.target : record.target.parentElement;
+          if (!target || target.closest('.' + MASK_CLASS)) continue;
+          if (target.closest(contentSelector)) scheduleApply(target);
+          else if ([...record.addedNodes, ...record.removedNodes].some(node => node instanceof Element && (node.matches(captureSelector) || node.querySelector(captureSelector)))) scheduleApply();
+        }
         return;
       }
 
@@ -270,7 +291,7 @@
       subtree: true
     });
 
-    window.addEventListener('pageshow', scheduleApply, true);
+    window.addEventListener('pageshow', () => scheduleApply(), true);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) scheduleApply();
     }, true);
@@ -288,7 +309,12 @@
           '[data-sentry-component="ChatMessageCaptureSelector"]'
         );
 
-        if (captureUi || isCaptureActive()) apply();
+        // Mask synchronously immediately before saving/sharing the image.
+        // Selection changes are handled once by the scoped DOM observer.
+        if (captureUi && target.closest('button[aria-label="Save captured image"], button[aria-label="Share captured image"]')) {
+          fullScanPending = true;
+          apply();
+        }
       },
       true
     );

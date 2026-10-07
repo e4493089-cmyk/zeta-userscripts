@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.5
+// @version      0.3.6
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.3.5';
+  const SCRIPT_VERSION = '0.3.6';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -452,9 +452,10 @@
       .find(body => renderedMessageId(body) === id) || null;
   }
 
-  function readRenderedMessages(roomId) {
+  function readRenderedMessages(roomId, bodies = null) {
     const rows = new Map();
-    for (const body of document.querySelectorAll(MESSAGE_SELECTOR)) {
+    for (const body of bodies || chatLog()?.querySelectorAll(MESSAGE_SELECTOR) || []) {
+      if (!body.isConnected || body.querySelector('.zeta-capture-user-mask')) continue;
       const id = renderedMessageId(body);
       if (!id) continue;
       const role = roleOf(body);
@@ -490,7 +491,7 @@
     return value.length + ':' + (hash >>> 0);
   }
 
-  async function captureRendered(seenKeys = null, indexedKeys = null) {
+  async function captureRendered(seenKeys = null, indexedKeys = null, bodies = null) {
     const roomId = currentRoomId();
     if (!roomId) return 0;
     if (roomId !== knownRoomId) {
@@ -498,7 +499,7 @@
       knownKeys.clear();
     }
 
-    const rendered = readRenderedMessages(roomId).filter(row => !isRecentlyDeletedKey(row.key));
+    const rendered = readRenderedMessages(roomId, bodies).filter(row => !isRecentlyDeletedKey(row.key));
     if (seenKeys instanceof Set) {
       for (const row of rendered) seenKeys.add(row.key);
     }
@@ -509,8 +510,7 @@
     const fresh = indexedKeys instanceof Set
       ? rendered.filter(row => !indexedKeys.has(row.key))
       : rendered.filter(row => !knownKeys.has(row.key));
-    const rowsToSave = seenKeys instanceof Set ? rendered
-      : rendered.filter(row => knownKeys.get(row.key) !== indexedSignature(row));
+    const rowsToSave = rendered.filter(row => knownKeys.get(row.key) !== indexedSignature(row));
     if (!rowsToSave.length) return 0;
 
     try {
@@ -553,7 +553,11 @@
     const reverse = logIsReverse(log);
     const seenKeys = new Set();
     // "새로 색인"은 현재 탭에서 처음 본 수가 아니라 실제 저장소에 없던 수여야 한다.
-    const indexedKeys = new Set((await loadRoomMessages(roomId)).map(row => row.key));
+    const storedRows = await loadRoomMessages(roomId);
+    const indexedKeys = new Set(storedRows.map(row => row.key));
+    knownRoomId = roomId;
+    knownKeys.clear();
+    for (const row of storedRows) knownKeys.set(row.key, indexedSignature(row));
     let added = 0;
     let removed = 0;
     let reachedOldest = false;
@@ -1310,14 +1314,17 @@
     let menuTimer = null;
     const scheduleMenu = () => {
       if (menuTimer) return;
-      menuTimer = setTimeout(() => {
+      menuTimer = requestAnimationFrame(() => {
         menuTimer = null;
         renderMenuRow();
-      }, 120);
+      });
     };
 
     let captureTimer = null;
-    const scheduleCapture = (delay = 700) => {
+    let fullCapturePending = false;
+    const dirtyBodies = new Set();
+    const scheduleCapture = (delay = 700, full = true) => {
+      if (full) fullCapturePending = true;
       if (deepLoadRunning) return;
       // 스트리밍 중 계속 스캔하지 않고 마지막 DOM 변화 뒤 한 번만 읽는다.
       if (captureTimer) clearTimeout(captureTimer);
@@ -1325,7 +1332,10 @@
         captureTimer = null;
         // 전체 색인 중에는 deepIndex가 직접 읽고 카운트한다.
         if (deepLoadRunning) return;
-        void captureRendered();
+        const bodies = fullCapturePending ? null : [...dirtyBodies];
+        dirtyBodies.clear();
+        fullCapturePending = false;
+        if (bodies === null || bodies.length) void captureRendered(null, null, bodies);
       }, delay);
     };
 
@@ -1334,20 +1344,32 @@
     // characterData만 봐서 이런 메시지는 실시간 색인에서 빠질 수 있었다.
     new MutationObserver(records => {
       const native = records.filter(record => !isOwnMutation(record,
-        '[id^="zeta-chat-search-"], [id^="zeta-room-manager-"], [id^="zsnai-"], [id^="zs-inline-"]'));
+        '[id^="zeta-chat-search-"], [id^="zeta-room-manager-"], [id^="zeta-capture-"], [id^="zsnai-"], [id^="zs-inline-"]'));
       if (!native.length) return;
       const log = chatLog();
-      const touchesMessages = native.some(record => {
+      let touchesMessages = false;
+      let touchesMenu = false;
+      const menuSelector = '[data-sentry-component="ChatSidebar"], #portal-container, [role="dialog"]';
+      for (const record of native) {
         const target = record.target instanceof Element ? record.target : record.target.parentElement;
-        if (target?.closest(MESSAGE_SELECTOR) || (log && (record.target === log || log.contains(record.target)))) return true;
-        return [...record.addedNodes, ...record.removedNodes].some(node =>
-          node instanceof Element && (node.matches(CHAT_SELECTOR + ',' + MESSAGE_SELECTOR) || node.querySelector(CHAT_SELECTOR + ',' + MESSAGE_SELECTOR))
-        );
-      });
-      if (native.some(record => !log || (record.target !== log && !log.contains(record.target)))) scheduleMenu();
+        const body = target?.closest(MESSAGE_SELECTOR);
+        // Capture previews can contain copied/masked BodyView nodes; index the live log only.
+        if (body && log?.contains(body)) { dirtyBodies.add(body); touchesMessages = true; }
+        if (target?.closest(menuSelector)) touchesMenu = true;
+        for (const node of [...record.addedNodes, ...record.removedNodes]) {
+          if (!(node instanceof Element)) continue;
+          if (node.matches(menuSelector) || node.querySelector(menuSelector)) touchesMenu = true;
+        }
+        for (const node of record.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          const bodies = node.matches(MESSAGE_SELECTOR) ? [node] : node.querySelectorAll(MESSAGE_SELECTOR);
+          for (const added of bodies) if (log?.contains(added)) { dirtyBodies.add(added); touchesMessages = true; }
+        }
+      }
+      if (touchesMenu) scheduleMenu();
       if (touchesMessages) {
         revealPendingJump();
-        if (!deepLoadRunning) scheduleCapture();
+        if (!deepLoadRunning) scheduleCapture(700, false);
       }
     }).observe(document.documentElement, {
       childList: true,

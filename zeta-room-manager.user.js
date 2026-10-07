@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.92
+// @version      0.23.93
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.92';
+  const SCRIPT_VERSION = '0.23.93';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -65,6 +65,11 @@
   });
 
   let observer = null;
+  let fullRefreshPending = true;
+  const dirtyListItems = new Set();
+  let searchRevision = 0;
+  let roomSearchCache = null;
+  let plotSearchCache = null;
   let suspendObserverRefresh = false;
   let lastRoomContextRecord = null;
   // 삭제 성공 직후 제타의 이전 DOM이 잠깐 남아 있어도 다시 색인되지 않도록 막는다.
@@ -148,6 +153,7 @@
   function putEntry(key, value) {
     if (value?.type === 'room' && isRecentlyDeletedRoomId(value.id)) return;
     if (value?.type === 'plot' && isRecentlyDeletedPlotId(value.id)) return;
+    searchRevision++;
     if (dataLoaded) dataIndex[key] = value;
     else pendingIndex[key] = value;
   }
@@ -158,6 +164,7 @@
   }
 
   function putMeta(id, value) {
+    searchRevision++;
     if (dataLoaded) dataPlotMeta[id] = value;
     else pendingPlotMeta[id] = value;
   }
@@ -166,6 +173,7 @@
     if (dataLoaded) return;
     // 아래에서 state.index를 다시 건드려도 여기로 되돌아오지 않게 먼저 세운다.
     dataLoaded = true;
+    searchRevision++;
 
     const loaded = loadStoredData();
     dataIndex = loaded.index;
@@ -246,6 +254,7 @@
   }
 
   function saveStateNow(force = false) {
+    searchRevision++;
     if (force !== true) stateDirty = true;
     clearTimeout(saveTimer);
     saveTimer = null;
@@ -285,6 +294,7 @@
   // 인덱스가 커지면 JSON.stringify 비용이 커진다.
   // 렌더 루프에서 매번 저장하면 검색 입력이 눈에 띄게 끊기므로 묶어서 저장한다.
   function saveState() {
+    searchRevision++;
     stateDirty = true;
     if (collectionRunning() || convertRunning || saveTimer) return;
     saveTimer = setTimeout(saveStateNow, 400);
@@ -4657,10 +4667,13 @@
         .map(link => extractId(link.href, 'room'))
         .filter(Boolean)
     );
-    const found = Object.values(state.index)
-      .filter(entry => entry?.type === 'room' && entry.href)
-      .filter(entry => matchesSearch(entry, q))
-      .filter(entry => !nativeIds.has(entry.id));
+    ensureDataLoaded();
+    if (!roomSearchCache || roomSearchCache.query !== q || roomSearchCache.revision !== searchRevision) {
+      roomSearchCache = { query: q, revision: searchRevision, entries: Object.values(dataIndex)
+        .filter(entry => entry?.type === 'room' && entry.href)
+        .filter(entry => matchesSearch(entry, q)) };
+    }
+    const found = roomSearchCache.entries.filter(entry => !nativeIds.has(entry.id));
 
     const alive = found.filter(entry => !isDeadEntry(entry));
     const matches = alive.slice(0, 20);
@@ -4679,6 +4692,9 @@
       box = document.createElement('div');
       box.id = NATIVE_RESULTS_ID;
     }
+    const renderKey = JSON.stringify([q, status, deadCount, matches.map(entry => [entry.id, entry.href, entryTitle(entry), searchDetail(entry, ''), entry.image])]);
+    if (box.__zrmRenderKey === renderKey && box.parentElement === host) return;
+    box.__zrmRenderKey = renderKey;
     box.textContent = '';
 
     for (const entry of matches) {
@@ -4751,6 +4767,15 @@
     }
   }
 
+  let roomSearchFrame = null;
+  function scheduleRoomSearch() {
+    if (roomSearchFrame !== null) return;
+    roomSearchFrame = requestAnimationFrame(() => {
+      roomSearchFrame = null;
+      if (currentSection() === 'room') renderNativeAliasResults(nativeRoomQuery());
+    });
+  }
+
   function bindNativeRoomSearch() {
     const input = nativeRoomSearchInput();
     if (!input || input.dataset.zrmAliasSearchBound === '1') return;
@@ -4765,11 +4790,11 @@
         setTimeout(() => {
           pendingSearchLoad = false;
           ensureDataLoaded();
-          scheduleRefresh();
+          scheduleRoomSearch();
         }, 0);
         return;
       }
-      scheduleRefresh();
+      scheduleRoomSearch();
     };
     input.addEventListener('input', update);
     input.addEventListener('search', update);
@@ -4813,12 +4838,14 @@
         .map(link => extractId(link.href, 'plot'))
         .filter(Boolean)
     );
-    const matches = Object.values(state.index)
-      .filter(entry => entry?.type === 'plot' && entry.href)
-      .filter(entry => matchesSearch(entry, q))
-      .filter(entry => !nativeIds.has(entry.id))
-      .filter(entry => !isDeadEntry(entry))
-      .slice(0, 20);
+    ensureDataLoaded();
+    if (!plotSearchCache || plotSearchCache.query !== q || plotSearchCache.revision !== searchRevision) {
+      plotSearchCache = { query: q, revision: searchRevision, entries: Object.values(dataIndex)
+        .filter(entry => entry?.type === 'plot' && entry.href)
+        .filter(entry => matchesSearch(entry, q)) };
+    }
+    const matches = plotSearchCache.entries.filter(entry => !nativeIds.has(entry.id))
+      .filter(entry => !isDeadEntry(entry)).slice(0, 20);
 
     const status = matches.length ? '' : plotIndexStatusText();
 
@@ -4832,6 +4859,9 @@
       box = document.createElement('div');
       box.id = PLOT_NATIVE_RESULTS_ID;
     }
+    const renderKey = JSON.stringify([q, status, matches.map(entry => [entry.id, entry.href, entryTitle(entry), searchDetail(entry, ''), entry.image])]);
+    if (box.__zrmRenderKey === renderKey && box.parentElement === host) return;
+    box.__zrmRenderKey = renderKey;
     box.textContent = '';
 
     for (const entry of matches) {
@@ -4879,6 +4909,7 @@
     if (document.documentElement.dataset.zrmPlotSearchDelegated === '1') return;
     document.documentElement.dataset.zrmPlotSearchDelegated = '1';
 
+    let searchFrame = null;
     const update = event => {
       if (currentSection() !== 'plot-search') return;
       const target = event.target;
@@ -4887,9 +4918,10 @@
       if (!input || target !== input) return;
 
       // React가 입력 이벤트 직후 검색 결과 영역을 다시 그릴 수 있으므로
-      // 현재 입력값으로 즉시 그리고 다음 프레임에도 한 번 복구한다.
-      renderNativePlotAliasResults(input.value || '');
-      requestAnimationFrame(() => {
+      // 같은 프레임의 입력 이벤트를 묶어 React 갱신 뒤 한 번 그린다.
+      if (searchFrame !== null) return;
+      searchFrame = requestAnimationFrame(() => {
+        searchFrame = null;
         if (currentSection() === 'plot-search') {
           renderNativePlotAliasResults(nativePlotSearchInput()?.value || '');
         }
@@ -4904,6 +4936,23 @@
   function refresh() {
     observer?.disconnect();
     const section = currentSection();
+    const incremental = !fullRefreshPending && ['room', 'plot', 'plot-search'].includes(section);
+    const changedItems = [...dirtyListItems];
+    dirtyListItems.clear();
+    fullRefreshPending = false;
+    if (incremental) {
+      for (const item of changedItems) {
+        if (!item.isConnected) continue;
+        const type = item.matches('[data-sentry-component="CreatorCenterMyPlotListItem"]') ? 'plot' : 'room';
+        const record = parseItem(item, type);
+        if (record) { applyAlias(record); makeRenameButton(record); }
+      }
+      if (section === 'plot' && plotDeleteMode) refreshPlotDeleteMode();
+      if (section === 'room') renderNativeAliasResults(nativeRoomQuery());
+      if (section === 'plot-search') renderNativePlotAliasResults(nativePlotSearchInput()?.value || '');
+      observer?.observe(document.documentElement, { childList: true, subtree: true });
+      return;
+    }
     removeLegacyPanel();
 
     if (plotDeleteMode && section !== 'plot') stopPlotDeleteMode(true);
@@ -4973,8 +5022,9 @@
     return Boolean(el.isContentEditable);
   }
 
-  function scheduleRefresh(force = false) {
+  function scheduleRefresh(force = false, incremental = false) {
     if (suspendObserverRefresh) return;
+    if (!incremental) fullRefreshPending = true;
 
     const now = Date.now();
     const section = currentSection();
@@ -4997,7 +5047,7 @@
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
       if (isVirtualList && listScrollWait()) {
-        scheduleRefresh();
+        scheduleRefresh(false, true);
         return;
       }
       lastRefreshAt = Date.now();
@@ -5014,13 +5064,32 @@
   }
 
   function needsRefresh(records) {
-    const inChat = currentSection() === 'chat';
-    return records.some(record => {
-      if (isOwnMutation(record, '[id^="zeta-room-manager-"], [id^="zeta-chat-search-"], [id^="zsnai-"], [id^="zs-inline-"]')) return false;
+    const section = currentSection();
+    const itemSelector = '[data-sentry-component="SwipeableRoomListItem"], [data-sentry-component="CreatorCenterMyPlotListItem"]';
+    const structural = 'main#contents, #portal-container, [role="dialog"], [data-sentry-component="KeyboardAvoidingView"], [data-sentry-component="RoomList"], [data-sentry-component="CreatorCenterSearchPage"], input, header';
+    let changed = false;
+    for (const record of records) {
+      if (isOwnMutation(record, '[id^="zeta-room-manager-"], [id^="zeta-chat-search-"], [id^="zeta-capture-"], [id^="zsnai-"], [id^="zs-inline-"]')) continue;
       const target = record.target instanceof Element ? record.target : record.target.parentElement;
-      if (inChat && target?.closest('[data-sentry-component="BodyView"], [role="log"][aria-label="Chat messages"]')) return false;
-      return true;
-    });
+      if (!target || target.closest('style, script, link')) continue;
+      if (section === 'chat' && target.closest('[data-sentry-component="BodyView"], [role="log"][aria-label="Chat messages"]')) continue;
+      const item = target.closest(itemSelector);
+      if (item) { dirtyListItems.add(item); changed = true; continue; }
+      const nodes = [...record.addedNodes, ...record.removedNodes].filter(node => node instanceof Element);
+      let itemsChanged = false;
+      for (const node of nodes) {
+        if (node.matches(itemSelector)) { dirtyListItems.add(node); itemsChanged = true; }
+        for (const row of node.querySelectorAll(itemSelector)) { dirtyListItems.add(row); itemsChanged = true; }
+      }
+      if (itemsChanged) changed = true;
+      if (target.closest('#portal-container, [role="dialog"], [data-sentry-component="KeyboardAvoidingView"], header') ||
+          nodes.some(node => node.matches(structural) || !!node.querySelector(structural)) ||
+          (!itemsChanged && target.closest('main#contents') && nodes.length)) {
+        fullRefreshPending = true;
+        changed = true;
+      }
+    }
+    return changed;
   }
 
   function start() {
@@ -5073,7 +5142,7 @@
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
 
     observer = new MutationObserver(records => {
-      if (needsRefresh(records)) scheduleRefresh();
+      if (needsRefresh(records)) scheduleRefresh(false, true);
     });
     refresh();
 

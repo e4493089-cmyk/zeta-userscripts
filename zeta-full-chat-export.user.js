@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.12
+// @version      0.3.13
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -587,9 +587,8 @@
         behavior: 'auto'
       });
       await wait(interval);
-      order = capture(messages, order, root, log);
-
       const signature = messageDomSignature(root);
+      if (signature !== previousSignature) order = capture(messages, order, root, log);
       const atBottom = reverse
         ? Math.abs(log.scrollTop) < 3
         : log.scrollTop + log.clientHeight >= log.scrollHeight - 3;

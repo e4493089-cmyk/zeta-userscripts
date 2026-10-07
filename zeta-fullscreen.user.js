@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.25
+// @version      0.1.26
 // @description  스냅샷 버튼이 있으면 바로 위에, 없으면 실제 액션 버튼 자리와 같은 채팅 영역 왼쪽 아래에 전체화면 버튼을 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -174,7 +174,7 @@
 
     const composer = document.querySelector(COMPOSER_SELECTOR);
     if (composer && mountInEmptyPanelSlot(composer)) {
-      watchAnchorParent(getNativePanelSlot(composer));
+      watchAnchorParent(getNativePanelSlot(composer)?.parentElement);
       syncButtonVisibility();
       return true;
     }
@@ -204,9 +204,9 @@
 
     const mounted = mountBestAvailable();
 
-    // 스냅샷 액션이 늦게 생기는 방은 잠깐 더 확인해서
-    // 빈 액션 자리 fallback에서 실제 액션 패널 위쪽으로 옮긴다.
-    if (attempt < 19 && (!mounted || !document.querySelector(PANEL_SELECTOR))) {
+    // 아직 버튼 자리를 찾지 못한 진입 화면만 잠깐 재시도한다.
+    // fallback 설치 후 늦게 나타난 실제 패널은 같은 부모 감시가 처리한다.
+    if (attempt < 19 && !mounted) {
       retryTimer = setTimeout(() => setupWhenReady(attempt + 1), 150);
     }
   }
@@ -232,8 +232,9 @@
     if (typeof original !== 'function') return;
 
     history[name] = function (...args) {
+      const before = location.href;
       const result = original.apply(this, args);
-      queueMicrotask(syncRoute);
+      if (location.href !== before) queueMicrotask(syncRoute);
       return result;
     };
   }

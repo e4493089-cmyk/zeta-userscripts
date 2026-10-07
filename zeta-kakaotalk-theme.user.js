@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.49
+// @version      3.50.50
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9885,6 +9885,9 @@
       el.classList.remove('kt-snapshot-loading-card')
     );
 
+    const rootText = normalizeText(root.textContent);
+    if (!rootText.includes('잊지 못할 순간을 만들고 있어요') || !rootText.includes('스냅샷 생성은')) return;
+
     const candidates = Array.from(root.querySelectorAll('div')).filter(el => {
       const txt = normalizeText(el.textContent);
       return (
@@ -9920,82 +9923,77 @@
 
   function apply() {
     setActiveState();
+    try {
+      if (isProfileEditPage()) {
+        clearMarkersOutsideChat();
+        clearAuxiliaryMarkers();
+        clearBookmarkMarkers();
+        markProfileEditPage();
+        markProfileImageMenu();
+        return;
+      }
 
-    /* 오버레이/동적 카드류는 현재 경로와 무관하게 먼저 보정 */
-    markThemeDialogs();
-    markSnapshotLoading();
+      if (isBookmarkPage()) {
+        clearMarkersOutsideChat();
+        clearAuxiliaryMarkers();
+        clearProfileEditMarkers();
+        clearSavedRoomMarkers();
+        markBookmarkPage();
+        markSavedTitlePopup();
+        return;
+      }
 
-    if (isProfileEditPage()) {
-      clearMarkersOutsideChat();
-      clearAuxiliaryMarkers();
+      if (isSavedRoomsPage()) {
+        clearMarkersOutsideChat();
+        clearAuxiliaryMarkers();
+        clearProfileEditMarkers();
+        clearBookmarkMarkers();
+        clearSavedRoomMarkers();
+        markSavedTitlePopup();
+        return;
+      }
+
+      if (isSavedRoomPage()) {
+        clearMarkersOutsideChat();
+        clearAuxiliaryMarkers();
+        clearProfileEditMarkers();
+        clearBookmarkMarkers();
+        markSavedRoomPage();
+        markSavedTitlePopup();
+        return;
+      }
+
+      clearProfileEditMarkers();
       clearBookmarkMarkers();
-      markProfileEditPage();
+      clearSavedRoomMarkers();
+      clearSavedTitlePopupMarkers();
+
+      if (!isExactChatRoom()) {
+        clearMarkersOutsideChat();
+        clearAuxiliaryMarkers();
+        return;
+      }
+
+      clearAuxiliaryMarkers();
+      markChatHeader();
+      markTopSpacer();
+      markBubbles();
+      markProfileSelect();
+      markProfileHub();
       markProfileImageMenu();
-      return;
-    }
-
-    if (isBookmarkPage()) {
-      clearMarkersOutsideChat();
-      clearAuxiliaryMarkers();
-      clearProfileEditMarkers();
-      clearSavedRoomMarkers();
-      markBookmarkPage();
-      markSavedTitlePopup();
-      return;
-    }
-
-    if (isSavedRoomsPage()) {
-      clearMarkersOutsideChat();
-      clearAuxiliaryMarkers();
-      clearProfileEditMarkers();
-      clearBookmarkMarkers();
-      clearSavedRoomMarkers();
-      markSavedTitlePopup();
+      markActionPanel();
+      markSidebarMenu();
+      markSnapshotModals();
+      markMessagePhone();
+      markComposer();
+      markMessageActionSheet();
+      markContinueScreen();
+      markDeleteMode();
+    } finally {
+      // Reapply after marker cleanup, exactly once for every screen branch.
       markThemeDialogs();
       markSnapshotLoading();
-      return;
     }
-
-    if (isSavedRoomPage()) {
-      clearMarkersOutsideChat();
-      clearAuxiliaryMarkers();
-      clearProfileEditMarkers();
-      clearBookmarkMarkers();
-      markSavedRoomPage();
-      markSavedTitlePopup();
-      markThemeDialogs();
-      markSnapshotLoading();
-      return;
-    }
-
-    clearProfileEditMarkers();
-    clearBookmarkMarkers();
-    clearSavedRoomMarkers();
-    clearSavedTitlePopupMarkers();
-
-    if (!isExactChatRoom()) {
-      clearMarkersOutsideChat();
-      clearAuxiliaryMarkers();
-      return;
-    }
-
-    clearAuxiliaryMarkers();
-    markChatHeader();
-    markTopSpacer();
-    markBubbles();
-    markProfileSelect();
-    markProfileHub();
-    markProfileImageMenu();
-    markActionPanel();
-    markSidebarMenu();
-    markSnapshotModals();
-    markMessagePhone();
-    markComposer();
-    markMessageActionSheet();
-    markContinueScreen();
-    markDeleteMode();
-    markThemeDialogs();
-    markSnapshotLoading();
   }
 
   // Screen reconciliation is reserved for navigation and structural changes.
@@ -10028,14 +10026,18 @@
     // These lookups are limited to known popup/menu selectors; no main-text scan.
     document.documentElement.classList.toggle(DIARY_ACTIVE, isDiaryOpen());
     document.documentElement.classList.toggle(ENDING_ACTIVE, isEndingOpen());
-    markProfileSelect();
-    markProfileHub();
-    markProfileImageMenu();
-    markActionPanel();
-    markSidebarMenu();
-    markSnapshotModals();
-    markMessageActionSheet();
-    markSavedTitlePopup();
+    const touches = selector => layers.some(layer => layer.isConnected &&
+      (layer.matches(selector) || !!layer.querySelector(selector)));
+    if (touches('[data-sentry-component="PlayerCharacterSelect"]')) markProfileSelect();
+    if (touches('[role="dialog"][aria-label="대화 프로필"]')) markProfileHub();
+    if (touches('[data-sentry-component="KeyboardAvoidingView"]')) {
+      markProfileImageMenu();
+      markMessageActionSheet();
+    }
+    if (touches('[data-testid="action-panel-grid"], [role="dialog"][aria-label="Chat actions"]')) markActionPanel();
+    if (touches('[data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"]')) markSidebarMenu();
+    if (touches('[aria-label="Snapshot archive"], [aria-label="Show or hide snapshot controls"]')) markSnapshotModals();
+    if (touches('[data-sentry-component="Popup"]')) markSavedTitlePopup();
   }
 
   function queueOverlayLayer(target, addedNodes = []) {
