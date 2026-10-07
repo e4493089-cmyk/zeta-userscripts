@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.7
+// @version      0.2.8
 // @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분을 글자 수만큼 ■로 가립니다. 네모 색은 원래 글자색을 따릅니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-user-mask.user.js
@@ -19,6 +19,7 @@
   const userNames = new Set();
   let applying = false;
   let scheduled = false;
+  let captureActive = false;
 
   function installStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -215,7 +216,8 @@
     installStyle();
     collectUserNames();
 
-    if (!isCaptureActive()) {
+    captureActive = isCaptureActive();
+    if (!captureActive) {
       restoreMasks();
       return;
     }
@@ -241,9 +243,28 @@
     collectUserNames();
     apply();
 
-    const observer = new MutationObserver(scheduleApply);
-    // 이름 마스킹은 캡처 UI가 생기거나 사라질 때만 다시 적용하면 된다.
-    // 평소 채팅 답변의 글자 스트리밍은 감시하지 않는다.
+    const captureSelector = [
+      '[data-sentry-component="CaptureModeHeader"]',
+      '[data-sentry-component="CaptureModeBottom"]',
+      '[data-sentry-component="CapturePreview"]',
+      '[data-sentry-component="ChatMessageCaptureSelector"]'
+    ].join(',');
+
+    const observer = new MutationObserver(records => {
+      if (captureActive) {
+        scheduleApply();
+        return;
+      }
+
+      const captureAppeared = records.some(record =>
+        [...record.addedNodes].some(node =>
+          node instanceof Element &&
+          (node.matches(captureSelector) || node.querySelector(captureSelector))
+        )
+      );
+      if (captureAppeared) scheduleApply();
+    });
+    // 캡처가 닫혀 있을 때 일반 채팅 DOM 변화는 깨우지 않는다.
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true
