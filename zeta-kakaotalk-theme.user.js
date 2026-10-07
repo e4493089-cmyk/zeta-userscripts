@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.46
+// @version      3.50.47
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9972,11 +9972,18 @@
   let applyTimer = null;
   let lastApplyAt = 0;
 
-  function scheduleApply() {
-    if (applyTimer) return;
+  let applyPendingQuiet = false;
 
+  function scheduleApply(streaming = false) {
+    const quiet = streaming === true;
+    if (applyTimer) {
+      // Text streaming gets one trailing pass; menu/structure changes take priority.
+      if (!applyPendingQuiet) return;
+      clearTimeout(applyTimer);
+    }
+    applyPendingQuiet = quiet;
     const now = performance.now();
-    const wait = Math.max(0, APPLY_MIN_GAP - (now - lastApplyAt));
+    const wait = Math.max(quiet ? 260 : 0, APPLY_MIN_GAP - (now - lastApplyAt));
     applyTimer = setTimeout(() => {
       applyTimer = null;
       requestAnimationFrame(() => {
@@ -10036,7 +10043,14 @@
     apply();
     patchHistory();
 
-    const observer = new MutationObserver(scheduleApply);
+    const observer = new MutationObserver(records => {
+      const onlyMessageText = records.every(record => {
+        const target = record.target instanceof Element ? record.target : record.target.parentElement;
+        return target?.closest('[data-sentry-component="BodyView"]') &&
+          [...record.addedNodes, ...record.removedNodes].every(node => node.nodeType === Node.TEXT_NODE);
+      });
+      scheduleApply(onlyMessageText);
+    });
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true

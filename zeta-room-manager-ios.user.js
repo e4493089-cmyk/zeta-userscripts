@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.91
+// @version      0.20.92
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.91';
+  const SCRIPT_VERSION = '0.20.92';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -5008,6 +5008,30 @@
     }, wait);
   }
 
+  function isOwnMutation(record, selector) {
+    const target = record.target instanceof Element ? record.target : record.target.parentElement;
+    if (target?.closest(selector)) return true;
+    if (record.type !== 'childList') return false;
+    const nodes = [...record.addedNodes, ...record.removedNodes];
+    return nodes.length > 0 && nodes.every(node => node instanceof Element && node.matches(selector));
+  }
+
+  function needsRefresh(records) {
+    const inChat = currentSection() === 'chat';
+    return records.some(record => {
+      if (isOwnMutation(record, '[id^="zeta-room-manager-"], [id^="zeta-chat-search-"], [id^="zsnai-"], [id^="zs-inline-"]')) return false;
+      const target = record.target instanceof Element ? record.target : record.target.parentElement;
+      // Streaming message prose cannot change aliases or room metadata.
+      // New messages and speaker labels still trigger the passive metadata harvest.
+      if (inChat && target?.closest('[data-sentry-component="BodyView"]') && !target.closest('.caption1')) {
+        return [...record.addedNodes, ...record.removedNodes].some(node =>
+          node instanceof Element && (node.matches('.caption1') || node.querySelector('.caption1'))
+        );
+      }
+      return true;
+    });
+  }
+
   function start() {
     // v1은 API 실행 시작 시점에 너무 일찍 기록되던 잠금이므로 사용하지 않는다.
     try { localStorage.removeItem(LEGACY_ROOM_API_BACKFILL_LOCK_KEY); } catch (_) {}
@@ -5045,7 +5069,9 @@
     document.addEventListener('contextmenu', rememberRoomContextTarget, true);
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
 
-    observer = new MutationObserver(() => scheduleRefresh());
+    observer = new MutationObserver(records => {
+      if (needsRefresh(records)) scheduleRefresh();
+    });
     bindSwipeOpenLock();
     refresh();
 

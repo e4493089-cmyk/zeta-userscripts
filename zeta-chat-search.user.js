@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.3
+// @version      0.3.4
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.3.3';
+  const SCRIPT_VERSION = '0.3.4';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -1293,6 +1293,14 @@
   }
 
   // ── 시작 ─────────────────────────────────────────────────────────────
+  function isOwnMutation(record, selector) {
+    const target = record.target instanceof Element ? record.target : record.target.parentElement;
+    if (target?.closest(selector)) return true;
+    if (record.type !== 'childList') return false;
+    const nodes = [...record.addedNodes, ...record.removedNodes];
+    return nodes.length > 0 && nodes.every(node => node instanceof Element && node.matches(selector));
+  }
+
   function start() {
     document.getElementById(MENU_ROW_ID)?.remove();
     injectStyle();
@@ -1324,10 +1332,23 @@
     // 새 메시지가 붙는 순간뿐 아니라, Zeta가 가상 목록의 기존 노드에
     // id/data-key를 뒤늦게 연결하는 경우도 감지한다. 예전에는 childList와
     // characterData만 봐서 이런 메시지는 실시간 색인에서 빠질 수 있었다.
-    new MutationObserver(() => {
-      scheduleMenu();
-      revealPendingJump();
-      if (!deepLoadRunning) scheduleCapture();
+    new MutationObserver(records => {
+      const native = records.filter(record => !isOwnMutation(record,
+        '[id^="zeta-chat-search-"], [id^="zeta-room-manager-"], [id^="zsnai-"], [id^="zs-inline-"]'));
+      if (!native.length) return;
+      const log = chatLog();
+      const touchesMessages = native.some(record => {
+        const target = record.target instanceof Element ? record.target : record.target.parentElement;
+        if (target?.closest(MESSAGE_SELECTOR) || (log && (record.target === log || log.contains(record.target)))) return true;
+        return [...record.addedNodes, ...record.removedNodes].some(node =>
+          node instanceof Element && (node.matches(CHAT_SELECTOR + ',' + MESSAGE_SELECTOR) || node.querySelector(CHAT_SELECTOR + ',' + MESSAGE_SELECTOR))
+        );
+      });
+      if (native.some(record => !log || (record.target !== log && !log.contains(record.target)))) scheduleMenu();
+      if (touchesMessages) {
+        revealPendingJump();
+        if (!deepLoadRunning) scheduleCapture();
+      }
     }).observe(document.documentElement, {
       childList: true,
       characterData: true,
