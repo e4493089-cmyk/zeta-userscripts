@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.23
+// @version      0.1.24
 // @description  스냅샷 버튼이 있으면 바로 위에, 없으면 실제 액션 버튼 자리와 같은 채팅 영역 왼쪽 아래에 전체화면 버튼을 표시합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
@@ -137,7 +137,8 @@
     editObserver = new MutationObserver(() => {
       syncButtonVisibility();
     });
-    editObserver.observe(document.body, {
+    const editRoot = document.querySelector('main#contents') || document.body;
+    editObserver.observe(editRoot, {
       childList: true,
       subtree: true,
       attributes: true,
