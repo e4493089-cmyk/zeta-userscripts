@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.11
+// @version      0.3.12
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-full-chat-export.user.js
@@ -1240,14 +1240,29 @@
     if (menu) menu.hidden = true;
   });
 
-  const observer = new MutationObserver(() => {
-    clearTimeout(observer.timer);
-    observer.timer = setTimeout(installUi, 250);
-  });
+  function patchRouteSync() {
+    const sync = () => setTimeout(installUi, 0);
+    for (const name of ['pushState', 'replaceState']) {
+      const original = history[name];
+      if (typeof original !== 'function' || original.__zfceWrapped) continue;
+      const wrapped = function (...args) {
+        const before = location.href;
+        const result = original.apply(this, args);
+        if (location.href !== before) sync();
+        return result;
+      };
+      wrapped.__zfceWrapped = true;
+      history[name] = wrapped;
+    }
+    window.addEventListener('popstate', sync);
+    window.addEventListener('pageshow', sync);
+  }
 
   function start() {
     installUi();
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    // UI는 document.body 직속이라 React 채팅 DOM이 바뀔 때마다 재설치할 필요가 없다.
+    // SPA 경로가 실제로 바뀔 때만 표시 여부를 갱신한다.
+    patchRouteSync();
   }
 
   if (document.readyState === 'loading') {
