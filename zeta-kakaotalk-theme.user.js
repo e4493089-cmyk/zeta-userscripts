@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.47
+// @version      3.50.48
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -176,60 +176,60 @@
     }
 
     /* 상대 말풍선 */
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) {
       background: var(--kt-white) !important;
       color: var(--kt-ai-dialogue) !important;
       border: 0 !important;
       box-shadow: 0 1px 2px rgba(0,0,0,.05) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) p {
       color: var(--kt-ai-dialogue) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other em {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) em {
       color: var(--kt-ai-action) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other em [class*="text-primary-"],
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other em [data-placeholder] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) em [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) em [data-placeholder] {
       color: var(--kt-ai-action) !important;
     }
 
     /* 내 말풍선 */
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) {
       background: var(--kt-yellow) !important;
       color: var(--kt-user-dialogue) !important;
       border: 0 !important;
       box-shadow: 0 1px 2px rgba(0,0,0,.05) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) p {
       color: var(--kt-user-dialogue) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me em {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) em {
       color: var(--kt-user-action) !important;
     }
 
     /* **강조** */
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat strong,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat b,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat .font-bold {
       color: #514A27 !important;
       font-weight: 700 !important;
     }
 
     /* Zeta 기본 보라색 토큰 제거 */
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) [class*="text-primary-"],
     html.${ACTIVE} [data-sentry-component="RightTextContent"] [data-placeholder] {
       color: inherit !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me em [class*="text-primary-"],
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me em [data-placeholder] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) em [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) em [data-placeholder] {
       color: var(--kt-user-action) !important;
     }
 
@@ -342,20 +342,20 @@
        마크다운 - 상대 말풍선
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat strong,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat b,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat .font-bold {
       color: #30414B !important;
       font-weight: 700 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat code {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat code {
       color: #30414B !important;
       background: #EEF2F4 !important;
       border: 1px solid rgba(48,65,75,.10) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat blockquote {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote {
       color: #455B68 !important;
       background: rgba(178,199,217,.20) !important;
       border-radius: 6px !important;
@@ -363,43 +363,43 @@
       padding-bottom: 4px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat blockquote p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote p {
       color: #455B68 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote > div:first-child {
       background: #8097A6 !important;
       width: 3px !important;
       border-radius: 999px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat a {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat a {
       color: #35617D !important;
       text-decoration: underline !important;
       text-underline-offset: 2px;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat del,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat s {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat del,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat s {
       color: #87939A !important;
       text-decoration-color: #87939A !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat h1,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat h2,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat h3,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat h4,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat h5,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat h6 {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h1,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h2,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h3,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h4,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h5,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h6 {
       color: #2D3C45 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat hr {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat hr {
       border-color: #CDD6DB !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat li,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-other .chat li > span[aria-hidden="true"] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat li,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat li > span[aria-hidden="true"] {
       color: #3D4E58 !important;
     }
 
@@ -409,20 +409,20 @@
        노란 배경 위에서 명령별 차이가 보이도록 분리
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat strong,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat b,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat .font-bold {
       color: #493D08 !important;
       font-weight: 750 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat code {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat code {
       color: #433A13 !important;
       background: rgba(255,255,255,.52) !important;
       border: 1px solid rgba(73,61,8,.12) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat blockquote {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote {
       color: #584D20 !important;
       background: rgba(255,255,255,.28) !important;
       border-radius: 6px !important;
@@ -430,44 +430,44 @@
       padding-bottom: 4px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat blockquote p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote p {
       color: #584D20 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote > div:first-child {
       background: #83742D !important;
       width: 3px !important;
       border-radius: 999px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat a {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat a {
       color: #5A4C00 !important;
       text-decoration: underline !important;
       text-underline-offset: 2px;
       font-weight: 600 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat del,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat s {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat del,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat s {
       color: #857A49 !important;
       text-decoration-color: #756A37 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat h1,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat h2,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat h3,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat h4,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat h5,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat h6 {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h1,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h2,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h3,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h4,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h5,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h6 {
       color: #443900 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat hr {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat hr {
       border-color: rgba(73,61,8,.25) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat li,
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"].kt-me .chat li > span[aria-hidden="true"] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat li,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat li > span[aria-hidden="true"] {
       color: #4D431C !important;
     }
 
@@ -8883,7 +8883,29 @@
 
   `;
 
+  // Resolve known routes from the URL before looking at the outgoing screen's DOM.
+  function themeRoute() {
+    const path = location.pathname.replace(/\/+$/, '');
+    if (/^\/[^/]+\/rooms\/[^/]+\/bookmarks$/.test(path)) return BOOKMARK_ACTIVE;
+    if (/^\/[^/]+\/rooms\/[^/]+$/.test(path)) return ACTIVE;
+    if (/^\/[^/]+\/rooms$/.test(path)) return ROOM_LIST_ACTIVE;
+    if (/^\/[^/]+\/plots\/[^/]+\/saved-rooms\/[^/]+$/.test(path)) return SAVED_ROOM_ACTIVE;
+    if (/^\/[^/]+\/plots\/[^/]+\/saved-rooms$/.test(path)) return SAVED_ROOMS_ACTIVE;
+    if (/^\/[^/]+\/(?:my-plot-chat-profile\/[^/]+\/[^/]+\/edit|chat-profile\/edit\/[^/]+|chat-profile\/create)$/.test(path)) return PROFILE_EDIT_ACTIVE;
+    return null;
+  }
+
+  function syncRouteState() {
+    const route = themeRoute();
+    if (!route) return;
+    for (const name of [ACTIVE, ROOM_LIST_ACTIVE, PROFILE_EDIT_ACTIVE, BOOKMARK_ACTIVE, SAVED_ROOMS_ACTIVE, SAVED_ROOM_ACTIVE]) {
+      document.documentElement.classList.toggle(name, name === route);
+    }
+  }
+
   function isExactChatRoom() {
+    const route = themeRoute();
+    if (route) return route === ACTIVE;
     const path = location.pathname.replace(/\/+$/, '');
     return (
       /^\/[^/]+\/rooms\/[^/]+$/.test(path) ||
@@ -8893,6 +8915,8 @@
   }
 
   function isRoomListPage() {
+    const route = themeRoute();
+    if (route) return route === ROOM_LIST_ACTIVE;
     const path = location.pathname.replace(/\/+$/, '');
     return (
       /^\/[^/]+\/rooms$/.test(path) ||
@@ -8901,6 +8925,8 @@
   }
 
   function isProfileEditPage() {
+    const route = themeRoute();
+    if (route) return route === PROFILE_EDIT_ACTIVE;
     const path = location.pathname.replace(/\/+$/, '');
     return (
       /^\/[^/]+\/my-plot-chat-profile\/[^/]+\/[^/]+\/edit$/.test(path) ||
@@ -8916,6 +8942,8 @@
   }
 
   function isBookmarkPage() {
+    const route = themeRoute();
+    if (route) return route === BOOKMARK_ACTIVE;
     const path = location.pathname.replace(/\/+$/, '');
     return (
       /^\/[^/]+\/rooms\/[^/]+\/bookmarks$/.test(path) ||
@@ -8924,6 +8952,8 @@
   }
 
   function isSavedRoomsPage() {
+    const route = themeRoute();
+    if (route) return route === SAVED_ROOMS_ACTIVE;
     const path = location.pathname.replace(/\/+$/, '');
     return (
       /^\/[^/]+\/plots\/[^/]+\/saved-rooms$/.test(path) ||
@@ -8932,6 +8962,8 @@
   }
 
   function isSavedRoomPage() {
+    const route = themeRoute();
+    if (route) return route === SAVED_ROOM_ACTIVE;
     const path = location.pathname.replace(/\/+$/, '');
     return (
       /^\/[^/]+\/plots\/[^/]+\/saved-rooms\/[^/]+$/.test(path) ||
@@ -9997,6 +10029,7 @@
     const pushState = history.pushState;
     history.pushState = function (...args) {
       const result = pushState.apply(this, args);
+      syncRouteState();
       scheduleApply();
       return result;
     };
@@ -10004,11 +10037,15 @@
     const replaceState = history.replaceState;
     history.replaceState = function (...args) {
       const result = replaceState.apply(this, args);
+      syncRouteState();
       scheduleApply();
       return result;
     };
 
-    window.addEventListener('popstate', scheduleApply);
+    window.addEventListener('popstate', () => {
+      syncRouteState();
+      scheduleApply();
+    });
   }
 
 
@@ -10040,8 +10077,12 @@
 
   function start() {
     installBoardReactionProxy();
-    apply();
     patchHistory();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', apply, { once: true });
+    } else {
+      apply();
+    }
 
     const observer = new MutationObserver(records => {
       const onlyMessageText = records.every(record => {
@@ -10073,9 +10114,5 @@
   if (document.documentElement.dataset.ktThemeRuntime === '1') return;
   document.documentElement.dataset.ktThemeRuntime = '1';
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  } else {
-    start();
-  }
+  start();
 })();
