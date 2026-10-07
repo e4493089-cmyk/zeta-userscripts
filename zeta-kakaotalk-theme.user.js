@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.48
+// @version      3.50.49
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9771,8 +9771,9 @@
       });
   }
 
-  function markThemeDialogs() {
-    const portal = document.getElementById('portal-container') || document.body;
+  function markThemeDialogs(scope = null) {
+    const portal = scope || document.getElementById('portal-container') || document.body;
+    if (!portal) return;
 
     /* 채팅의 '정말로 삭제하시겠어요?' 팝업만 카카오톡 테마로 처리.
        제타그램 패널이 열린 상태에서는 이 추가 규칙을 적용하지 않는다. */
@@ -9801,7 +9802,7 @@
       );
     };
 
-    const layers = Array.from(portal.children && portal.children.length ? portal.children : [portal]);
+    const layers = scope ? [scope] : Array.from(portal.children && portal.children.length ? portal.children : [portal]);
 
     layers.forEach(layer => {
       const layerText = normalizeText(layer.textContent);
@@ -9918,7 +9919,6 @@
   }
 
   function apply() {
-    installStyle();
     setActiveState();
 
     /* 오버레이/동적 카드류는 현재 경로와 무관하게 먼저 보정 */
@@ -9998,24 +9998,17 @@
     markSnapshotLoading();
   }
 
-  // 동적 UI는 계속 생기지만 모든 childList 변화마다 프레임 단위로 전체 apply를
-  // 돌릴 필요는 없다. 첫 반응은 빠르게 유지하되 최대 약 5회/초로 제한한다.
+  // Screen reconciliation is reserved for navigation and structural changes.
+  // Streaming text, ordinary bubbles, and virtual room rows are styled by CSS.
   const APPLY_MIN_GAP = 180;
   let applyTimer = null;
   let lastApplyAt = 0;
+  let overlayFrame = null;
+  const pendingLayers = new Set();
 
-  let applyPendingQuiet = false;
-
-  function scheduleApply(streaming = false) {
-    const quiet = streaming === true;
-    if (applyTimer) {
-      // Text streaming gets one trailing pass; menu/structure changes take priority.
-      if (!applyPendingQuiet) return;
-      clearTimeout(applyTimer);
-    }
-    applyPendingQuiet = quiet;
-    const now = performance.now();
-    const wait = Math.max(quiet ? 260 : 0, APPLY_MIN_GAP - (now - lastApplyAt));
+  function scheduleApply() {
+    if (applyTimer) return;
+    const wait = Math.max(0, APPLY_MIN_GAP - (performance.now() - lastApplyAt));
     applyTimer = setTimeout(() => {
       applyTimer = null;
       requestAnimationFrame(() => {
@@ -10023,6 +10016,70 @@
         apply();
       });
     }, wait);
+  }
+
+  function refreshOverlayLayers() {
+    overlayFrame = null;
+    const layers = Array.from(pendingLayers);
+    pendingLayers.clear();
+    for (const layer of layers) {
+      if (layer.isConnected) markThemeDialogs(layer);
+    }
+    // These lookups are limited to known popup/menu selectors; no main-text scan.
+    document.documentElement.classList.toggle(DIARY_ACTIVE, isDiaryOpen());
+    document.documentElement.classList.toggle(ENDING_ACTIVE, isEndingOpen());
+    markProfileSelect();
+    markProfileHub();
+    markProfileImageMenu();
+    markActionPanel();
+    markSidebarMenu();
+    markSnapshotModals();
+    markMessageActionSheet();
+    markSavedTitlePopup();
+  }
+
+  function queueOverlayLayer(target, addedNodes = []) {
+    const portal = target.closest('#portal-container');
+    if (!portal) return false;
+    let layer = target;
+    while (layer.parentElement && layer.parentElement !== portal && layer !== portal) {
+      layer = layer.parentElement;
+    }
+    if (layer === portal) {
+      for (const child of addedNodes) {
+        if (child instanceof Element) pendingLayers.add(child);
+      }
+    } else {
+      pendingLayers.add(layer);
+    }
+    if (overlayFrame === null) overlayFrame = requestAnimationFrame(refreshOverlayLayers);
+    return true;
+  }
+
+  const PASSIVE_CONTENT = '[data-sentry-component="BodyView"], [role="log"][aria-label="Chat messages"], [data-sentry-component="RoomList"], [data-testid^="room-list-item-"], [testid^="room-list-item-"]';
+  const SPECIAL_CONTENT = '[data-testid="message-phone-shell"], [data-sentry-component="DeleteModeHeader"], [role="dialog"], [data-sentry-component="KeyboardAvoidingView"]';
+  const SCREEN_STRUCTURE = 'main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
+
+  function isSpecialContent(node) {
+    return node instanceof Element && (node.matches(SPECIAL_CONTENT) || !!node.querySelector(SPECIAL_CONTENT));
+  }
+
+  function handleThemeMutations(records) {
+    let screenChanged = false;
+    for (const record of records) {
+      const target = record.target instanceof Element ? record.target : record.target.parentElement;
+      if (!target || target.closest('style, script, link')) continue;
+      // Portal text updates can change a button label; handle only that layer.
+      if (queueOverlayLayer(target, record.addedNodes)) continue;
+      const elements = [...record.addedNodes, ...record.removedNodes].filter(node => node instanceof Element);
+      if (target.closest(PASSIVE_CONTENT) && !target.closest(SPECIAL_CONTENT) && !elements.some(isSpecialContent)) continue;
+      // Plain text replacements elsewhere do not need screen reconciliation.
+      if (!elements.length) continue;
+      if (target.closest('main#contents') || elements.some(node => node.matches(SCREEN_STRUCTURE) || !!node.querySelector(SCREEN_STRUCTURE))) {
+        screenChanged = true;
+      }
+    }
+    if (screenChanged) scheduleApply();
   }
 
   function patchHistory() {
@@ -10084,14 +10141,7 @@
       apply();
     }
 
-    const observer = new MutationObserver(records => {
-      const onlyMessageText = records.every(record => {
-        const target = record.target instanceof Element ? record.target : record.target.parentElement;
-        return target?.closest('[data-sentry-component="BodyView"]') &&
-          [...record.addedNodes, ...record.removedNodes].every(node => node.nodeType === Node.TEXT_NODE);
-      });
-      scheduleApply(onlyMessageText);
-    });
+    const observer = new MutationObserver(handleThemeMutations);
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true
