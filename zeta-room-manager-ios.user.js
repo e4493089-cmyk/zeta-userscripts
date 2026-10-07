@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (iOS)
 // @namespace    zeta-room-manager-ios
-// @version      0.20.90
+// @version      0.20.91
 // @description  iOS/Stay용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager-ios.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.20.90';
+  const SCRIPT_VERSION = '0.20.91';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
   window.__zrmRoomManagerIosVersion = SCRIPT_VERSION;
 
@@ -3353,7 +3353,24 @@
     tools.classList.remove('zrm-tools-fallback');
     tools.classList.add('zrm-tools-fixed');
     if (tools.parentElement !== document.body) document.body.appendChild(tools);
-    placeCollectionTools(tools);
+
+    // 목록 DOM은 스크롤/가상화 중 계속 바뀐다. 같은 헤더 기준으로는
+    // 매 refresh마다 getComputedStyle/getBoundingClientRect를 다시 하지 않는다.
+    const anchor = roomSearchControl() || creatorCenterSearchLink() || null;
+    const themeKey = document.documentElement.className + '|' +
+      (document.documentElement.getAttribute('style') || '');
+    if (
+      tools.__zrmPlacementAnchor !== anchor ||
+      tools.dataset.zrmPlacementSection !== section ||
+      tools.dataset.zrmThemeKey !== themeKey ||
+      !tools.dataset.zrmTop ||
+      !tools.dataset.zrmLeft
+    ) {
+      tools.__zrmPlacementAnchor = anchor;
+      tools.dataset.zrmPlacementSection = section;
+      tools.dataset.zrmThemeKey = themeKey;
+      placeCollectionTools(tools, anchor);
+    }
   }
 
   // Room Manager 아이콘은 옆의 ZETA 기본 헤더 아이콘 색을 그대로 따라간다.
@@ -3364,26 +3381,30 @@
     try { color = source ? getComputedStyle(source).color : ''; } catch (_) {}
 
     if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') {
-      tools.style.removeProperty('--zrm-tools-icon-color');
-      tools.style.removeProperty('--zrm-tools-hover-bg');
+      if (tools.style.getPropertyValue('--zrm-tools-icon-color')) {
+        tools.style.removeProperty('--zrm-tools-icon-color');
+        tools.style.removeProperty('--zrm-tools-hover-bg');
+      }
       return;
     }
 
-    tools.style.setProperty('--zrm-tools-icon-color', color);
+    if (tools.style.getPropertyValue('--zrm-tools-icon-color') !== color) {
+      tools.style.setProperty('--zrm-tools-icon-color', color);
+    }
 
     const rgb = color.match(/rgba?\(\s*(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)/i);
     if (rgb) {
       const luminance = 0.2126 * Number(rgb[1]) + 0.7152 * Number(rgb[2]) + 0.0722 * Number(rgb[3]);
-      tools.style.setProperty(
-        '--zrm-tools-hover-bg',
-        luminance < 150 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.08)'
-      );
+      const hover = luminance < 150 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.08)';
+      if (tools.style.getPropertyValue('--zrm-tools-hover-bg') !== hover) {
+        tools.style.setProperty('--zrm-tools-hover-bg', hover);
+      }
     }
   }
 
   // 헤더의 검색 버튼 왼쪽에 나란히 세운다. 헤더가 없으면 화면 구석에 둔다.
-  function placeCollectionTools(tools) {
-    const anchor = roomSearchControl() || creatorCenterSearchLink() || null;
+  function placeCollectionTools(tools, providedAnchor = null) {
+    const anchor = providedAnchor || roomSearchControl() || creatorCenterSearchLink() || null;
     syncCollectionToolsContrast(tools, anchor);
     const rect = anchor ? anchor.getBoundingClientRect() : null;
 
@@ -4118,8 +4139,10 @@
 
   function renderedItems() {
     const out = [];
-    const roomItems = new Set(document.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]'));
-    document.querySelectorAll('a[href*="/rooms/"]').forEach(link => {
+    // 대화방 화면에서는 RoomList 안만 찾는다. 전체 document를 매번 두 번 훑지 않는다.
+    const roomScope = document.querySelector('[data-sentry-component="RoomList"]') || document;
+    const roomItems = new Set(roomScope.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]'));
+    roomScope.querySelectorAll('a[href*="/rooms/"]').forEach(link => {
       const item = link.closest('[data-sentry-component="SwipeableRoomListItem"], li, [role="listitem"]') || link.parentElement?.parentElement;
       if (item) roomItems.add(item);
     });
@@ -4954,17 +4977,30 @@
     }, { capture: true, passive: true });
   }
 
-  // 목록을 스크롤하면 제타가 매 프레임 DOM을 바꾼다. 그때마다 전체 갱신을
-  // 돌리면 스크롤이 끊긴다. 최소 간격을 두고 마지막 요청만 처리한다.
+  // 목록 가상화 중 연속 DOM 변경을 200ms마다 처리하지 않고,
+  // 마지막 변화 뒤 한 번만 전체 refresh한다.
   const REFRESH_MIN_GAP = 200;
+  const LIST_REFRESH_DEBOUNCE = 260;
   let refreshTimer = null;
   let lastRefreshAt = 0;
 
-  function scheduleRefresh() {
+  function scheduleRefresh(force = false) {
     if (suspendObserverRefresh) return;
-    if (refreshTimer) return;
 
-    const wait = Math.max(0, REFRESH_MIN_GAP - (Date.now() - lastRefreshAt));
+    const now = Date.now();
+    const section = currentSection();
+    const isVirtualList = section === 'room' || section === 'plot' || section === 'plot-search';
+
+    if (refreshTimer) {
+      if (!force && isVirtualList) clearTimeout(refreshTimer);
+      else return;
+      refreshTimer = null;
+    }
+
+    const cadenceGap = Math.max(0, REFRESH_MIN_GAP - (now - lastRefreshAt));
+    const quietGap = !force && isVirtualList ? LIST_REFRESH_DEBOUNCE : 0;
+    const wait = Math.max(cadenceGap, quietGap);
+
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
       lastRefreshAt = Date.now();
@@ -5009,12 +5045,12 @@
     document.addEventListener('contextmenu', rememberRoomContextTarget, true);
     document.addEventListener('touchstart', rememberRoomContextTarget, { capture: true, passive: true });
 
-    observer = new MutationObserver(scheduleRefresh);
+    observer = new MutationObserver(() => scheduleRefresh());
     bindSwipeOpenLock();
     refresh();
 
     // Zeta SPA 이동 감지: 상시 500ms 폴링 대신 history/popstate 이벤트에서만 갱신한다.
-    const notifyRouteChange = () => scheduleRefresh();
+    const notifyRouteChange = () => scheduleRefresh(true);
     const wrapHistory = method => {
       const original = history[method];
       if (typeof original !== 'function' || original.__zrmWrapped) return;
