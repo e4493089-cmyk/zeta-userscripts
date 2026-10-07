@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.45
+// @version      3.50.46
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9966,16 +9966,24 @@
     markSnapshotLoading();
   }
 
-  let queued = false;
+  // 동적 UI는 계속 생기지만 모든 childList 변화마다 프레임 단위로 전체 apply를
+  // 돌릴 필요는 없다. 첫 반응은 빠르게 유지하되 최대 약 5회/초로 제한한다.
+  const APPLY_MIN_GAP = 180;
+  let applyTimer = null;
+  let lastApplyAt = 0;
 
   function scheduleApply() {
-    if (queued) return;
-    queued = true;
+    if (applyTimer) return;
 
-    requestAnimationFrame(() => {
-      queued = false;
-      apply();
-    });
+    const now = performance.now();
+    const wait = Math.max(0, APPLY_MIN_GAP - (now - lastApplyAt));
+    applyTimer = setTimeout(() => {
+      applyTimer = null;
+      requestAnimationFrame(() => {
+        lastApplyAt = performance.now();
+        apply();
+      });
+    }, wait);
   }
 
   function patchHistory() {
