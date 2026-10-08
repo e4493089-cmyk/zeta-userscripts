@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.52
+// @version      3.50.53
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -640,9 +640,9 @@
       border-top-color: var(--kt-line) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatComposer"] .kt-composer-box {
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] :is(.kt-composer-box, div:has(> textarea[aria-label="내용 입력하기"])) {
       background: var(--kt-soft) !important;
-      border: 1px solid #E9E9E9 !important;
+      border: 1px solid var(--kt-line) !important;
     }
 
     html.${ACTIVE} textarea[aria-label="내용 입력하기"] {
@@ -5070,7 +5070,7 @@
 
     html.${ACTIVE} [data-sentry-component="ChatComposer"]
       > div:last-child:has(button[aria-label="Back to choices"])
-      .kt-composer-box {
+      :is(.kt-composer-box, div:has(> textarea[aria-label="내용 입력하기"])) {
       min-width: 0 !important;
       background: #F5F5F5 !important;
       border: 1px solid #E2E5E7 !important;
@@ -9593,22 +9593,6 @@
     });
   }
 
-  function markComposer() {
-    const textarea = document.querySelector(
-      'textarea[aria-label="내용 입력하기"]'
-    );
-
-    if (!textarea) return;
-
-    let p = textarea.parentElement;
-
-    for (let i = 0; p && i < 4; i++, p = p.parentElement) {
-      if (p.querySelector(':scope > textarea[aria-label="내용 입력하기"]')) {
-        p.classList.add('kt-composer-box');
-        break;
-      }
-    }
-  }
 
 
   function normalizeText(value) {
@@ -9997,7 +9981,6 @@
       markSidebarMenu();
       markSnapshotModals();
       markMessagePhone();
-      markComposer();
       markMessageActionSheet();
       markContinueScreen();
       markDeleteMode();
