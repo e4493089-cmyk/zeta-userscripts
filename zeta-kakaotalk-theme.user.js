@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.51
+// @version      3.50.52
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -2405,53 +2405,53 @@
        별도 dialog 라벨이 없어 JS로 현재 시트만 마킹
     ========================================================= */
 
-    html.${PROFILE_EDIT_ACTIVE} #portal-container .kt-profile-image-backdrop {
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container .kt-profile-image-backdrop {
       background: rgba(43,57,66,.30) !important;
     }
 
-    html.${PROFILE_EDIT_ACTIVE} #portal-container .kt-profile-image-sheet {
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container .kt-profile-image-sheet {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-top: 1px solid var(--kt-line) !important;
       box-shadow: 0 -10px 28px rgba(38,52,61,.14) !important;
     }
 
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet > div:first-child svg {
       color: #C2C9CF !important;
     }
 
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet .kt-profile-image-action {
       background: var(--kt-yellow) !important;
       color: var(--kt-user-dialogue, var(--kt-text)) !important;
       border-color: var(--kt-user-line, rgba(0,0,0,.08)) !important;
     }
 
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet .kt-profile-image-action:hover,
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet .kt-profile-image-action:active {
       background: var(--kt-yellow-hover) !important;
     }
 
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet .kt-profile-image-action span,
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet .kt-profile-image-action svg {
       color: var(--kt-user-dialogue, var(--kt-text)) !important;
       opacity: 1 !important;
     }
 
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet .kt-profile-image-action:disabled {
       background: var(--kt-soft2) !important;
       color: var(--kt-muted) !important;
     }
 
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet .kt-profile-image-action:disabled span,
-    html.${PROFILE_EDIT_ACTIVE} #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       .kt-profile-image-sheet .kt-profile-image-action:disabled svg {
       color: var(--kt-muted) !important;
     }
