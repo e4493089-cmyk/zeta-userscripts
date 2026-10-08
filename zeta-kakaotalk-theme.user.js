@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.50
+// @version      3.50.51
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -8004,73 +8004,73 @@
        ChatProfileEditForm.tsx / portal-container Modal.tsx
     ========================================================= */
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="KeyboardAvoidingView"]:has(
         [data-sentry-component="ChatProfileEditForm"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.28) !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="KeyboardAvoidingView"]:has(
         [data-sentry-component="ChatProfileEditForm"]
-      ) > div[class*="bg-gray-main"] {
+      ) > div[class*="bg-gray-main"]:not([role="presentation"]) {
       background: #FFFFFF !important;
       color: #202124 !important;
       box-shadow: 0 10px 32px rgba(32,42,48,.16) !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="KeyboardAvoidingView"]:has(
         [data-sentry-component="ChatProfileEditForm"]
-      ) > div[class*="bg-gray-main"] > div:first-child {
+      ) > div[class*="bg-gray-main"]:not([role="presentation"]) > div:first-child {
       background: #FFFFFF !important;
       color: #202124 !important;
       border-bottom-color: #E7EAEC !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="KeyboardAvoidingView"]:has(
         [data-sentry-component="ChatProfileEditForm"]
-      ) > div[class*="bg-gray-main"] > div:first-child h3,
-    html.kt-profile-edit-active #portal-container
+      ) > div[class*="bg-gray-main"]:not([role="presentation"]) > div:first-child h3,
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="KeyboardAvoidingView"]:has(
         [data-sentry-component="ChatProfileEditForm"]
-      ) > div[class*="bg-gray-main"] > div:first-child button,
-    html.kt-profile-edit-active #portal-container
+      ) > div[class*="bg-gray-main"]:not([role="presentation"]) > div:first-child button,
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="KeyboardAvoidingView"]:has(
         [data-sentry-component="ChatProfileEditForm"]
-      ) > div[class*="bg-gray-main"] > div:first-child svg {
+      ) > div[class*="bg-gray-main"]:not([role="presentation"]) > div:first-child svg {
       color: #26343C !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"],
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"] > div {
       background: #FFFFFF !important;
       color: #202124 !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       [data-sentry-component="Preview"] .title18,
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       [data-sentry-component="FormSection"] :is(.heading3,.body16) {
       color: #2B3439 !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
-      [data-sentry-component="FormSection"] :is(.body12,[class*="text-white/50"]),
-    html.kt-profile-edit-active #portal-container
+      [data-sentry-component="FormSection"] :is(.body12,[class~="text-white/50"]),
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       [data-sentry-component="TextareaField"] :is(.caption12,.text-primary-300) {
       color: #77848A !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       label[data-sentry-component="Input"] {
       background: #F5F6F7 !important;
@@ -8079,10 +8079,10 @@
       box-shadow: none !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       label[data-sentry-component="Input"]:focus-within,
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       textarea[data-sentry-component="Textarea"]:focus {
       background: #FFFFFF !important;
@@ -8090,10 +8090,10 @@
       box-shadow: 0 0 0 3px rgba(254,229,0,.20) !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       input[data-sentry-component="Input"],
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       textarea[data-sentry-component="Textarea"] {
       background: #F5F6F7 !important;
@@ -8103,14 +8103,14 @@
       box-shadow: none !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       :is(input,textarea)::placeholder {
       color: #9AA2A6 !important;
       opacity: 1 !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       [data-sentry-component="Preview"] div[class*="bg-primary-400"] {
       background: var(--kt-yellow) !important;
@@ -8119,32 +8119,44 @@
       box-shadow: 0 1px 3px rgba(0,0,0,.12) !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       [data-sentry-component="Preview"] div[class*="bg-primary-400"] svg {
       color: #303030 !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
-      .kt-profile-edit-submit {
+      .kt-profile-edit-submit,
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
+      [data-sentry-component="ChatProfileEditForm"]
+      > button[data-sentry-component="Button"] {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       box-shadow: none !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
       .kt-profile-edit-submit:hover:not(:disabled),
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
-      .kt-profile-edit-submit:active:not(:disabled) {
+      .kt-profile-edit-submit:active:not(:disabled),
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
+      [data-sentry-component="ChatProfileEditForm"]
+      > button[data-sentry-component="Button"]:hover:not(:disabled),
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
+      [data-sentry-component="ChatProfileEditForm"]
+      > button[data-sentry-component="Button"]:active:not(:disabled) {
       background: var(--kt-yellow-hover) !important;
     }
 
-    html.kt-profile-edit-active #portal-container
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
       [data-sentry-component="ChatProfileEditForm"]
-      .kt-profile-edit-submit:disabled {
+      .kt-profile-edit-submit:disabled,
+    html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
+      [data-sentry-component="ChatProfileEditForm"]
+      > button[data-sentry-component="Button"]:disabled {
       background: #E7EAEC !important;
       color: #A0A8AC !important;
     }
