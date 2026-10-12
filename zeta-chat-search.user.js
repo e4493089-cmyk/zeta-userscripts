@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.6
+// @version      0.3.7
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.3.6';
+  const SCRIPT_VERSION = '0.3.7';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -36,20 +36,15 @@
   const DB_NAME = 'zeta-chat-search';
   const DB_VERSION = 1;
   const STORE = 'messages';
-  const JUMP_REQUEST_KEY = 'zcs-pending-api-jump';
   const JUMP_HIGHLIGHT_KEY = 'zcs-pending-highlight';
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const clean = value => String(value || '').replace(/​/g, '').replace(/\s+/g, ' ').trim();
   const fold = value => clean(value).toLocaleLowerCase('ko-KR');
 
-  // 책갈피 이동용 cursor 주입과 제타의 실제 메시지 삭제 요청 감지를 한 곳에서 처리한다.
+  // 제타의 실제 메시지 삭제 요청을 관찰한다.
   // 새 요청은 만들지 않고 페이지가 원래 보내는 XHR/fetch만 관찰한다.
   function installNativeRequestInterceptor() {
-    let pending = null;
-    try { pending = JSON.parse(sessionStorage.getItem(JUMP_REQUEST_KEY) || 'null'); } catch (_) {}
-    if (!pending?.roomId || !pending?.cursor || pending.roomId !== currentRoomId()) pending = null;
-
     const proto = window.XMLHttpRequest?.prototype;
     if (proto && proto.open && !proto.open.__zcsNativePatched) {
       const originalOpen = proto.open;
@@ -60,24 +55,6 @@
       function wrappedOpen(method, value, ...rest) {
         let nextValue = value;
         try {
-          const url = new URL(String(value), location.href);
-          const expectedPath = pending ? '/v1/rooms/' + pending.roomId + '/messages' : '';
-          const isInitialMessagesRequest =
-            pending &&
-            String(method || 'GET').toUpperCase() === 'GET' &&
-            url.pathname === expectedPath &&
-            !url.searchParams.has('cursor') &&
-            !url.searchParams.has('prevCursor');
-
-          if (isInitialMessagesRequest) {
-            url.searchParams.set('limit', '10');
-            url.searchParams.set('cursor', pending.roomId + ':' + pending.cursor);
-            nextValue = url.href;
-            sessionStorage.removeItem(JUMP_REQUEST_KEY);
-            sessionStorage.setItem(JUMP_HIGHLIGHT_KEY, 'message-' + pending.cursor);
-            pending = null;
-          }
-
           xhrMethod.set(this, String(method || 'GET').toUpperCase());
           xhrUrl.set(this, String(nextValue || ''));
         } catch (_) {}
@@ -648,20 +625,65 @@
     return match ? match[1] : '';
   }
 
+  // Next App Router context is accessible from the live chat's React ancestors.
+  // Use only the App Router shape: Zeta's route wrapper takes a different argument.
+  function findAppRouter() {
+    const roots = [chatLog(), document.querySelector('[data-sentry-component="ChatRoomReadyView"]'), document.querySelector('main')].filter(Boolean);
+    const visited = new Set();
+    const isRouter = value => value && typeof value.replace === 'function' &&
+      typeof value.push === 'function' && typeof value.prefetch === 'function' &&
+      typeof value.refresh === 'function' && typeof value.back === 'function';
+    for (const node of roots) {
+      const key = Object.keys(node).find(name => name.startsWith('__reactFiber'));
+      let fiber = key ? node[key] : null;
+      for (let depth = 0; fiber && depth < 100; depth++, fiber = fiber.return) {
+        if (visited.has(fiber)) break;
+        visited.add(fiber);
+        const value = fiber.memoizedProps?.value;
+        if (isRouter(value)) return value;
+        let dependency = fiber.dependencies?.firstContext;
+        for (let count = 0; dependency && count < 30; count++, dependency = dependency.next) {
+          if (isRouter(dependency.memoizedValue)) return dependency.memoizedValue;
+        }
+      }
+    }
+    return null;
+  }
+
   async function tryNativeCursor(row, status) {
     const roomId = currentRoomId();
     const cursor = messageCursor(row.id);
-    if (!roomId || !cursor) return false;
+    if (!roomId || !cursor) return null;
+    const router = findAppRouter();
+    if (!router) return null;
 
-    status('이동 중');
+    status('해당 대화를 불러오는 중');
+    const url = new URL(location.href);
+    url.searchParams.set('cursor', roomId + ':' + cursor);
+    url.hash = '';
+    try { sessionStorage.setItem(JUMP_HIGHLIGHT_KEY, row.id); } catch (_) {}
     try {
-      sessionStorage.setItem(JUMP_REQUEST_KEY, JSON.stringify({ roomId, cursor }));
-      sessionStorage.setItem(JUMP_HIGHLIGHT_KEY, row.id);
+      // BookmarkList uses the same room URL with cursor through client navigation.
+      // Never use location.reload/assign or a plain link as a fallback.
+      router.replace(url.pathname + url.search, { scroll: false });
     } catch (_) {
-      return false;
+      try { sessionStorage.removeItem(JUMP_HIGHLIGHT_KEY); } catch (_) {}
+      return null;
     }
-    location.reload();
-    return true;
+    for (let round = 0; round < 150 && !deepLoadAborted; round++) {
+      if (currentRoomId() !== roomId) break;
+      const target = findRenderedMessage(row.id);
+      if (target) {
+        target.scrollIntoView({ block: 'center', behavior: 'auto' });
+        target.classList.add(HIGHLIGHT_CLASS);
+        setTimeout(() => target.classList.remove(HIGHLIGHT_CLASS), 2600);
+        try { sessionStorage.removeItem(JUMP_HIGHLIGHT_KEY); } catch (_) {}
+        return true;
+      }
+      await sleep(100);
+    }
+    try { sessionStorage.removeItem(JUMP_HIGHLIGHT_KEY); } catch (_) {}
+    return false;
   }
 
   function revealPendingJump() {
@@ -693,7 +715,8 @@
 
     // 제타 책갈피와 같은 cursor 이동을 먼저 쓴다. 전체 대화를 한 칸씩
     // 훑는 것보다 빠르고, 가상 스크롤에서 메시지가 빠지는 문제도 피한다.
-    if (await tryNativeCursor(row, status)) return true;
+    const nativeResult = await tryNativeCursor(row, status);
+    if (nativeResult !== null) return nativeResult;
 
     // cursor 이동을 지원하지 않는 화면에서는 기존 스크롤 탐색으로 대체한다.
     status('이동 중');
@@ -711,7 +734,12 @@
         if (Math.abs(log.scrollTop - beforeTop) <= 2) break;
       }
     }
-    return Boolean(findRenderedMessage(row.id));
+    const target = findRenderedMessage(row.id);
+    if (!target) return false;
+    target.scrollIntoView({ block: 'center', behavior: 'auto' });
+    target.classList.add(HIGHLIGHT_CLASS);
+    setTimeout(() => target.classList.remove(HIGHLIGHT_CLASS), 2200);
+    return true;
   }
 
   // ── 검색 패널 ────────────────────────────────────────────────────────
@@ -934,7 +962,11 @@
         highlightInto(body, snippetOf(row.text, query), query);
 
         item.append(who, body);
-        item.addEventListener('click', async () => {
+        item.addEventListener('click', async event => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (panel.classList.contains('zcs-jumping-overlay')) return;
+          input.blur();
           // 이동 중에는 긴 결과 목록을 접고 상태만 보이는 작은 창으로 만든다.
           const card = panel.querySelector('.zcs-card');
           panel.classList.add('zcs-jumping-overlay');
@@ -945,7 +977,7 @@
           } else {
             panel.classList.remove('zcs-jumping-overlay');
             card.classList.remove('zcs-jumping');
-            status('그 대화까지 가지 못했어요. 전체 색인을 돌린 뒤 다시 눌러 주세요.');
+            status('대화를 불러오지 못했어요. 잠시 후 다시 눌러 주세요.');
           }
         });
         list.appendChild(item);
