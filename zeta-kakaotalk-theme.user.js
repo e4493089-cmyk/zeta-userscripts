@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.53
+// @version      3.50.54
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -10061,7 +10061,29 @@
     return node instanceof Element && (node.matches(SPECIAL_CONTENT) || !!node.querySelector(SPECIAL_CONTENT));
   }
 
+  // Snapshot loading cards are inserted inside the otherwise passive chat log.
+  // Refresh only their marker, without reconciling all chat UI on every message.
+  let snapshotLoadingFrame = null;
+  function queueSnapshotLoading(records) {
+    const changed = records.some(record => {
+      const target = record.target instanceof Element ? record.target : record.target.parentElement;
+      if (!target || target.closest('style, script, link')) return false;
+      if (target.closest('.kt-snapshot-loading-card')) return true;
+      return Array.from(record.addedNodes).some(node => {
+        const text = node.textContent || '';
+        return text.includes('잊지 못할 순간을 만들고 있어요') ||
+          text.includes('스냅샷 생성은');
+      });
+    });
+    if (!changed || snapshotLoadingFrame !== null) return;
+    snapshotLoadingFrame = requestAnimationFrame(() => {
+      snapshotLoadingFrame = null;
+      markSnapshotLoading();
+    });
+  }
+
   function handleThemeMutations(records) {
+    queueSnapshotLoading(records);
     let screenChanged = false;
     for (const record of records) {
       const target = record.target instanceof Element ? record.target : record.target.parentElement;
