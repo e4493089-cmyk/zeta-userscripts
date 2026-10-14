@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.54
+// @version      3.50.55
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9792,6 +9792,8 @@
         isChatDeleteConfirm(text) ||
         text.includes('비공개 대화로 전환할까요?') ||
         text.includes('스냅샷 생성에 실패하면 피스는 환불돼요') ||
+        (text.includes('대화 내용이 바뀌면') &&
+          text.includes('스냅샷은 자동으로 삭제돼요')) ||
         (text.includes('신고가 접수되었어요') &&
           text.includes('신고한 대화를 삭제할까요?')) ||
         text.includes('스냅샷에 대한 의견을 보내주세요')
