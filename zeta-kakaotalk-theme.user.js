@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.55
+// @version      3.50.56
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -7785,10 +7785,23 @@
       scrollbar-color: rgba(70,88,99,.22) transparent !important;
     }
 
+    /* 캡처 페이지 사이에 래퍼가 추가되어도 저장 대상 배경에 직접 적용한다. */
+    html.${ACTIVE} [data-sentry-component="CapturePreview"] [data-capture-page="true"],
     html.${ACTIVE} [data-sentry-component="CapturePreview"]
       > div[class*="overflow-y-auto"] > div
       > div[class*="bg-gray-main"] {
       background: var(--kt-chat) !important;
+      color: var(--kt-chat-text) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="CapturePreview"]
+      > div:last-child:not([class*="overflow-y-auto"]) {
+      color: var(--kt-chat-text) !important;
+    }
+
+    html.${ACTIVE} [data-sentry-component="CapturePreview"]
+      > div:last-child:not([class*="overflow-y-auto"]) > span {
+      color: var(--kt-chat-text) !important;
     }
 
 
