@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.56
+// @version      3.50.57
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -5105,6 +5105,33 @@
     }
 
 
+    /* 신고 완료 시트: 원래 높이/닫기/스크롤 구조를 유지한다. */
+    html.${ACTIVE} .kt-snapshot-report-complete > div.absolute.inset-0 {
+      background: rgba(43,57,66,.34) !important;
+      backdrop-filter: blur(7px) !important;
+    }
+    html.${ACTIVE} .kt-snapshot-report-complete > div[class*="rounded-t-"] {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      border-color: var(--kt-line) !important;
+    }
+    html.${ACTIVE} .kt-snapshot-report-complete :is(h3,h4,button[aria-label="Close"],svg) {
+      color: var(--kt-text) !important;
+    }
+    html.${ACTIVE} .kt-snapshot-report-complete span[class*="text-white/"] {
+      color: var(--kt-sub) !important;
+    }
+    html.${ACTIVE} .kt-snapshot-report-complete [class*="border-b-white/"] {
+      border-color: var(--kt-line) !important;
+    }
+    html.${ACTIVE} .kt-snapshot-report-complete button[class*="bg-primary-"] {
+      background: var(--kt-yellow) !important;
+      color: var(--kt-user-dialogue) !important;
+    }
+    html.${ACTIVE} .kt-snapshot-report-complete button[class*="bg-primary-"]:hover {
+      background: var(--kt-yellow-hover) !important;
+    }
+
     /* =========================================================
        스냅샷 이미지 신고 바텀시트
     ========================================================= */
@@ -9784,6 +9811,18 @@
     const portal = scope || document.getElementById('portal-container') || document.body;
     if (!portal) return;
 
+    // 신고 완료 화면은 확인 팝업과 달리 한 개 버튼을 가진 하단 시트다.
+    [portal, ...portal.querySelectorAll('[data-sentry-component="KeyboardAvoidingView"]')].filter(el =>
+      el.matches('[data-sentry-component="KeyboardAvoidingView"]')
+    ).forEach(view => {
+      const sheet = Array.from(view.children).find(el =>
+        String(el.className).includes('rounded-t-') &&
+        normalizeText(el.querySelector('h3')?.textContent) === '이미지 신고 완료' &&
+        normalizeText(el.textContent).includes('신고한 이미지를 삭제할까요?')
+      );
+      if (sheet) view.classList.add('kt-snapshot-report-complete');
+    });
+
     /* 채팅의 '정말로 삭제하시겠어요?' 팝업만 카카오톡 테마로 처리.
        제타그램 패널이 열린 상태에서는 이 추가 규칙을 적용하지 않는다. */
     const isChatDeleteConfirm = text =>
@@ -9805,6 +9844,8 @@
         isChatDeleteConfirm(text) ||
         text.includes('비공개 대화로 전환할까요?') ||
         text.includes('스냅샷 생성에 실패하면 피스는 환불돼요') ||
+        text.includes('스냅샷을 재생성하면') ||
+        text.includes('스냅샷을 삭제할까요?') ||
         (text.includes('대화 내용이 바뀌면') &&
           text.includes('스냅샷은 자동으로 삭제돼요')) ||
         (text.includes('신고가 접수되었어요') &&
@@ -9864,7 +9905,8 @@
           txt === '전환' ||
           txt === '삭제하기' ||
           txt === '새로하기' ||
-          txt === '의견 보내기'
+          txt === '의견 보내기' ||
+          txt.startsWith('재생성')
         ) {
           btn.classList.add('kt-dialog-confirm');
         }
