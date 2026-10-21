@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.63
+// @version      3.50.64
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9052,19 +9052,19 @@
     html.${ACTIVE} :is([data-testid="snapshot-action-button"], button:has(> svg[data-sentry-source-file="SnapshotButton.tsx"])) > svg,
     html.${ACTIVE} #portal-container [data-testid="action-panel-grid"] > button[data-testid="snapshot-action-button"] > svg {
       display: block !important;
-      width: 20px !important;
-      height: 20px !important;
+      width: 16px !important;
+      height: 16px !important;
       color: #53636C !important;
       opacity: 1 !important;
       visibility: visible !important;
     }
     html.${ACTIVE} #portal-container [data-testid="action-panel-grid"] > button[data-testid="snapshot-action-button"] > span:first-child:has(svg) {
       display: flex !important;
-      width: 20px !important;
-      height: 20px !important;
-      min-width: 20px !important;
-      min-height: 20px !important;
-      flex: 0 0 20px !important;
+      width: 16px !important;
+      height: 16px !important;
+      min-width: 16px !important;
+      min-height: 16px !important;
+      flex: 0 0 16px !important;
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
