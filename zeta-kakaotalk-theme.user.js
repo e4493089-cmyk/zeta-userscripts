@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.59
+// @version      3.50.60
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9027,7 +9027,7 @@
       gap: 0 !important;
       border: 0 !important;
       border-radius: 50% !important;
-      background: transparent !important;
+      background: var(--kt-soft2) !important;
       box-shadow: none !important;
       font-size: 0 !important;
       line-height: 1 !important;
