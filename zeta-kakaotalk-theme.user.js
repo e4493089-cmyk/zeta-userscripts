@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.60
+// @version      3.50.61
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9012,8 +9012,8 @@
     }
 
     /* 스냅샷 생성 버튼은 작은 카메라 하나만 표시한다. */
-    html.${ACTIVE} [data-testid="snapshot-action-button"],
-    html.${ACTIVE} #portal-container [data-testid="action-panel-grid"] > button[data-testid="snapshot-action-button"] {
+    html.${ACTIVE} :is([data-testid="snapshot-action-button"], button:has(> svg[data-sentry-source-file="SnapshotButton.tsx"])),
+    html.${ACTIVE} #portal-container [data-testid="action-panel-grid"] > button:is([data-testid="snapshot-action-button"], button:has(> svg[data-sentry-source-file="SnapshotButton.tsx"])) {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
@@ -9027,24 +9027,24 @@
       gap: 0 !important;
       border: 0 !important;
       border-radius: 50% !important;
-      background: var(--kt-soft2) !important;
+      background: #EEF1F3 !important;
       box-shadow: none !important;
       font-size: 0 !important;
       line-height: 1 !important;
       overflow: hidden !important;
     }
-    html.${ACTIVE} [data-testid="snapshot-action-button"] > *,
-    html.${ACTIVE} #portal-container [data-testid="action-panel-grid"] > button[data-testid="snapshot-action-button"] > * {
+    html.${ACTIVE} :is([data-testid="snapshot-action-button"], button:has(> svg[data-sentry-source-file="SnapshotButton.tsx"])) > *,
+    html.${ACTIVE} #portal-container [data-testid="action-panel-grid"] > button:is([data-testid="snapshot-action-button"], button:has(> svg[data-sentry-source-file="SnapshotButton.tsx"])) > * {
       display: none !important;
     }
-    html.${ACTIVE} [data-testid="snapshot-action-button"]::before {
+    html.${ACTIVE} :is([data-testid="snapshot-action-button"], button:has(> svg[data-sentry-source-file="SnapshotButton.tsx"]))::before {
       content: "📷";
       display: block !important;
       font-size: 20px !important;
       line-height: 1 !important;
       pointer-events: none !important;
     }
-    html.${ACTIVE} [data-testid="snapshot-action-button"]:disabled {
+    html.${ACTIVE} :is([data-testid="snapshot-action-button"], button:has(> svg[data-sentry-source-file="SnapshotButton.tsx"])):disabled {
       opacity: .45 !important;
     }
 
@@ -9524,7 +9524,7 @@
 
 
   function markActionPanel() {
-    document.querySelectorAll('[data-testid="snapshot-action-button"]').forEach(button => {
+    document.querySelectorAll(':is([data-testid="snapshot-action-button"], button:has(> svg[data-sentry-source-file="SnapshotButton.tsx"]))').forEach(button => {
       if (!button.getAttribute('aria-label')) button.setAttribute('aria-label', '스냅샷 생성');
     });
     /* 2026-09: 플러그인 시트에서 aria-label="Chat actions"가 제거됨.
