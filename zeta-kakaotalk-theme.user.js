@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.62
+// @version      3.50.63
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9068,6 +9068,26 @@
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
+    }
+
+    /* fenced markdown blocks: keep an opaque light surface and readable ink. */
+    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] .chat pre.chat[class] {
+      background: rgb(245,245,245) !important;
+      color: rgb(48,52,56) !important;
+      -webkit-text-fill-color: rgb(48,52,56) !important;
+      border: 1px solid rgb(225,228,231) !important;
+      border-radius: 12px !important;
+      white-space: pre-wrap !important;
+      overflow-wrap: anywhere !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] .chat pre.chat[class] * {
+      background: transparent !important;
+      color: inherit !important;
+      -webkit-text-fill-color: inherit !important;
+      border: 0 !important;
     }
 
   `;
