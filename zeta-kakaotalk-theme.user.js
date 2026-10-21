@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.57
+// @version      3.50.58
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -8932,6 +8932,84 @@
       color: #D95757 !important;
     }
 
+
+    /* 2026-10 통합 입력창: 외부 버튼 래퍼가 아닌 실제 버튼에 스타일 적용.
+       숨겨진 IME focus bridge와 입력창 자동 높이는 원본 동작을 유지한다. */
+    html.${ACTIVE} [data-sentry-component="ChatRoomReadyView"] > div:has(> header[data-sentry-component="Header"]) > header {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      border-color: var(--kt-line) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatRoomReadyView"] > div > header[data-sentry-component="Header"] nav {
+      background: transparent !important;
+      color: var(--kt-text) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatRoomReadyView"] > div > header[data-sentry-component="Header"] :is(button,span,svg) {
+      color: var(--kt-text) !important;
+    }
+    html.${ACTIVE} [data-testid="chat-bottom-dock"],
+    html.${ACTIVE} [data-testid="chat-bottom-dock"] [data-sentry-component="ChatComposer"] {
+      background: var(--kt-white) !important;
+      background-image: none !important;
+      color: var(--kt-text) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="composer-input-box"] {
+      background: var(--kt-soft) !important;
+      color: var(--kt-text) !important;
+      border: 1px solid var(--kt-line) !important;
+      border-radius: 24px !important;
+      box-shadow: none !important;
+      min-width: 0 !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="composer-input-box"] textarea[name="message"] {
+      background: transparent !important;
+      color: var(--kt-text) !important;
+      -webkit-text-fill-color: var(--kt-text) !important;
+      caret-color: var(--kt-text) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="composer-input-box"] textarea[name="message"]::placeholder {
+      color: var(--kt-muted) !important;
+      -webkit-text-fill-color: var(--kt-muted) !important;
+      opacity: 1 !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="action-panel-button"],
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="action-panel-button"]:hover {
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] :is([data-testid="action-panel-open-button"],button[aria-label="Suggested replies"]) {
+      background: var(--kt-soft2) !important;
+      color: var(--kt-sub) !important;
+      border: 1px solid var(--kt-line) !important;
+      border-radius: 999px !important;
+      box-shadow: none !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] :is([data-testid="action-panel-open-button"],button[aria-label="Suggested replies"]) :is(svg,span) {
+      background: transparent !important;
+      color: var(--kt-sub) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] button[aria-label="Insert asterisk"] svg {
+      color: var(--kt-sub) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="chat-send-button"],
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="chat-send-button"] svg {
+      background-color: var(--kt-yellow) !important;
+      color: var(--kt-user-dialogue) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="chat-send-button"]:hover:not(:disabled) {
+      background-color: var(--kt-yellow-hover) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="chat-send-button"] svg {
+      background: transparent !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="chat-send-button"]:disabled {
+      background: var(--kt-soft2) !important;
+      color: var(--kt-muted) !important;
+    }
+    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="chat-send-button"]:disabled svg {
+      color: var(--kt-muted) !important;
+    }
 
   `;
 
