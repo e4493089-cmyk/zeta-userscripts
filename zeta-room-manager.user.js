@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.93
+// @version      0.23.94
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.93';
+  const SCRIPT_VERSION = '0.23.94';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1386,12 +1386,23 @@
     return Object.values(state.index).filter(entry => entry && entry.type === 'room' && entry.id).length;
   }
 
+  // 수집 중 React가 스크롤 DOM을 교체하지 않았다면 매번 전체 목록과
+  // 모든 후보 요소의 computed style을 다시 훑지 않는다.
+  let roomCollectionHostCache = null;
   function roomCollectionScrollHost() {
+    const cached = roomCollectionHostCache;
+    if (cached && cached.isConnected &&
+        cached !== document.scrollingElement &&
+        cached !== document.documentElement && cached !== document.body &&
+        cached.scrollHeight > cached.clientHeight + 20) {
+      const visibleItem = document.querySelector('[data-sentry-component="SwipeableRoomListItem"]');
+      if (visibleItem && cached.contains(visibleItem)) return cached;
+    }
     const first = roomItemsFromDocument(document)[0];
     let node = first && first.parentElement;
     while (node && node !== document.body && node !== document.documentElement) {
       const style = getComputedStyle(node);
-      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 20) return node;
+      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 20) return (roomCollectionHostCache = node);
       node = node.parentElement;
     }
 
@@ -1402,9 +1413,9 @@
         return /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 20;
       });
       candidates.sort((x, y) => y.scrollHeight - x.scrollHeight);
-      if (candidates[0]) return candidates[0];
+      if (candidates[0]) return (roomCollectionHostCache = candidates[0]);
     }
-    return document.scrollingElement || document.documentElement;
+    return (roomCollectionHostCache = document.scrollingElement || document.documentElement);
   }
 
 
@@ -2204,6 +2215,7 @@
     roomCollectionPromise = (async () => {
       collectionAborted = false;
       harvestedItems.clear();
+      roomCollectionHostCache = null;
       void holdScreenAwake();
 
       // 끝까지 정상 수집한 회차는 실제 방 목록을 기준으로 오래된 삭제 방도 정리한다.
@@ -2232,7 +2244,8 @@
 
       if (originalTop > 1) {
         const moved = await moveAndWaitForCollection(
-          'room', roomCollectionScrollHost, host, () => setScrollTop(host, 0)
+          'room', roomCollectionScrollHost, host, () => setScrollTop(host, 0),
+          ROOM_COLLECTION_CHANGE_TIMEOUT_MS
         );
         host = moved.host;
         if (moved.changed) await sleep(ROOM_COLLECTION_SETTLE_MS);
@@ -2274,7 +2287,7 @@
           const waited = await moveAndWaitForCollection(
             'room', roomCollectionScrollHost, host,
             () => setScrollTop(host, before.height),
-            COLLECTION_BOTTOM_TIMEOUT_MS
+            ROOM_COLLECTION_BOTTOM_TIMEOUT_MS
           );
           if (collectionAborted) break;
           host = waited.host;
@@ -2299,7 +2312,8 @@
           const targetTop = Math.min(before.height, before.top + step);
           const waited = await moveAndWaitForCollection(
             'room', roomCollectionScrollHost, host,
-            () => setScrollTop(host, targetTop)
+            () => setScrollTop(host, targetTop),
+            ROOM_COLLECTION_CHANGE_TIMEOUT_MS
           );
           if (collectionAborted) break;
           host = waited.host;
@@ -2377,6 +2391,7 @@
     })().finally(() => {
       forceReconcileSeenRoomKeys = null;
       roomCollectionPromise = null;
+      roomCollectionHostCache = null;
       roomCollectionProgress.running = false;
       saveStateNow(true);
       suspendObserverRefresh = false;
@@ -2458,11 +2473,15 @@
     else host.scrollTop = value;
   }
 
-  const COLLECTION_STEP_RATIO = 0.70;
-  const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.70;
+  // 방 목록은 이전 안정화판의 화면 겹침(15%)을 유지하면서 대기를 단축한다.
+  // 플롯 수집의 보수적 설정은 이번 변경에서 건드리지 않는다.
+  const COLLECTION_STEP_RATIO = 0.85;
+  const MOBILE_ROOM_COLLECTION_STEP_RATIO = 0.85;
   const PLOT_COLLECTION_STEP_RATIO = 0.70;
   const PLOT_COLLECTION_SETTLE_MS = 160;
-  const ROOM_COLLECTION_SETTLE_MS = 140;
+  const ROOM_COLLECTION_SETTLE_MS = 65;
+  const ROOM_COLLECTION_CHANGE_TIMEOUT_MS = 300;
+  const ROOM_COLLECTION_BOTTOM_TIMEOUT_MS = 900;
   const COLLECTION_CHANGE_TIMEOUT_MS = 550;
   const COLLECTION_BOTTOM_TIMEOUT_MS = 1800;
 
