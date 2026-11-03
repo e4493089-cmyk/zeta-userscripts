@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.94
+// @version      0.23.95
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.94';
+  const SCRIPT_VERSION = '0.23.95';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1252,8 +1252,9 @@
   }
 
   function roomItemsFromDocument(doc) {
-    const roomItems = new Set(doc.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]'));
-    doc.querySelectorAll('a[href*="/rooms/"]').forEach(link => {
+    const scope = doc.querySelector('[data-sentry-component="RoomList"]') || doc;
+    const roomItems = new Set(scope.querySelectorAll('[data-sentry-component="SwipeableRoomListItem"]'));
+    scope.querySelectorAll('a[href*="/rooms/"]').forEach(link => {
       const item = link.closest('[data-sentry-component="SwipeableRoomListItem"], li, [role="listitem"]')
         || (link.parentElement && link.parentElement.parentElement);
       if (item) roomItems.add(item);
@@ -2269,7 +2270,7 @@
           setScrollTop(host, Math.min(live.height, Math.max(live.top, oldTop)));
         }
 
-        harvestRoomDocument(document);
+        // The previous move already harvested this window.
         const before = collectionSnapshot('room', host);
         const count = roomCollectionCount();
         roomCollectionProgress.count = count;
@@ -2469,7 +2470,9 @@
 
   function setScrollTop(host, value) {
     const root = host === document.scrollingElement || host === document.documentElement || host === document.body;
-    if (root) window.scrollTo(0, value);
+    // CSS smooth scrolling must not leave the collector reading an intermediate window.
+    if (root) window.scrollTo({ top: value, left: 0, behavior: 'instant' });
+    else if (typeof host.scrollTo === 'function') host.scrollTo({ top: value, behavior: 'instant' });
     else host.scrollTop = value;
   }
 
@@ -2555,8 +2558,11 @@
       };
 
       const scheduleCheck = () => {
-        cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(check);
+        if (done || raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          check();
+        });
       };
 
       const mutationObserver = new MutationObserver(scheduleCheck);
@@ -4138,16 +4144,18 @@
 
     // 카드에 텍스트로 안 보여도 React props 안의 plot 데이터에서 이름을 보강한다.
     heavyParses++;
-    if (collectionRunning()) harvestReactPlotData(item);
+    // Room rows share list ancestors. Walking those ancestors for every row repeatedly
+    // harvests unrelated plots and merges each one across the entire stored index.
+    // Resolve the matching entity once; ingest its plot below for this room only.
+    const ownEntity = reactEntityForId(item, id);
+    if (collectionRunning() && type !== 'room') harvestReactPlotData(item);
     harvestedItems.set(key, original);
     const searchMeta = collectSearchMeta(item, titleEl);
-    // 플롯 목록 항목은 API 보강 대상이 아니라 화면 데이터가 유일한 출처다.
-    const ownEntity = reactEntityForId(item, id);
     // 방 항목의 React 데이터는 조상 쪽에 room = {id, plot, ...} 형태로 있다.
     // reactEntityForId가 돌려주는 건 room 자체이므로 plot을 꺼내 써야 한다.
     // 그대로 쓰면 plotId 자리에 방 ID가 들어가 플롯 연결이 전부 어긋난다.
     const ownPlot = ownEntity && typeof ownEntity.plot === 'object' ? ownEntity.plot : null;
-    const roomPlot = type === 'room' ? (quickPlot || reactRoomPlotMeta(item) || ownPlot) : null;
+    const roomPlot = type === 'room' ? (ownPlot || quickPlot || reactRoomPlotMeta(item)) : null;
     const plotEntity = type === 'plot' ? ownEntity : null;
     const plotEntityMeta = plotEntity
       ? ingestPlotMeta(
