@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.95
+// @version      0.23.96
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.95';
+  const SCRIPT_VERSION = '0.23.96';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -914,7 +914,15 @@
           requestBody = init.body ?? null;
         } catch (_) {}
 
-        const response = await originalFetch.apply(this, arguments);
+        const tracked = requestMethod === 'GET' && /\/v2\/rooms(?:[/?#]|$)/i.test(requestUrl || '');
+        const ticket = tracked ? {} : null;
+        if (ticket) pendingRoomListRequests.add(ticket);
+        let response;
+        try {
+          response = await originalFetch.apply(this, arguments);
+        } finally {
+          if (ticket) pendingRoomListRequests.delete(ticket);
+        }
         try {
           applyNativeRoomDeletion(requestMethod, requestUrl, response.ok);
           applyNativePlotDeletion(requestMethod, requestUrl, requestBody, response.ok);
@@ -971,7 +979,18 @@
         } catch (_) {}
       }, { once: true });
 
-      return xhrSend.apply(this, arguments);
+      const tracked = method === 'GET' && /\/v2\/rooms(?:[/?#]|$)/i.test(url);
+      const ticket = tracked ? {} : null;
+      if (ticket) {
+        pendingRoomListRequests.add(ticket);
+        xhr.addEventListener('loadend', () => pendingRoomListRequests.delete(ticket), { once: true });
+      }
+      try {
+        return xhrSend.apply(this, arguments);
+      } catch (error) {
+        if (ticket) pendingRoomListRequests.delete(ticket);
+        throw error;
+      }
     };
   }
 
@@ -1422,6 +1441,7 @@
 
   // ── 대화방 수집 공용 상태 ─────────────────────────────────────────────
   const ROOM_UUID = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
+  const pendingRoomListRequests = new Set();
   let collectionAborted = false;
   let forceReconcileSeenRoomKeys = null;
   let wakeLock = null;
@@ -2270,7 +2290,8 @@
           setScrollTop(host, Math.min(live.height, Math.max(live.top, oldTop)));
         }
 
-        // The previous move already harvested this window.
+        // Catch rows rendered after the previous wait or a scroll host replacement.
+        harvestRoomDocument(document);
         const before = collectionSnapshot('room', host);
         const count = roomCollectionCount();
         roomCollectionProgress.count = count;
@@ -2295,10 +2316,12 @@
           if (waited.changed) await sleep(ROOM_COLLECTION_SETTLE_MS);
           harvestRoomDocument(document);
           const after = collectionSnapshot('room', host);
-          const stillBottom = after.top + after.client >= after.height - Math.max(80, after.client * 0.15);
-          if (!waited.changed && stillBottom && sameCollectionWindow(before, after)) {
+          const stillBottom = after.top + after.client >= after.height - 4;
+          if (!waited.changed && stillBottom && !pendingRoomListRequests.size
+              && Math.abs(before.top - after.top) <= 2
+              && sameCollectionWindow(before, after)) {
             stableBottomRounds += 1;
-            if (stableBottomRounds >= 2) {
+            if (stableBottomRounds >= 4) {
               listCompleted = true;
               break;
             }
@@ -2309,7 +2332,7 @@
         } else {
           stableBottomRounds = 0;
           const roomStepRatio = mobileList ? MOBILE_ROOM_COLLECTION_STEP_RATIO : COLLECTION_STEP_RATIO;
-          const step = Math.max(320, Math.floor(before.client * roomStepRatio));
+          const step = Math.max(1, Math.floor(before.client * roomStepRatio));
           const targetTop = Math.min(before.height, before.top + step);
           const waited = await moveAndWaitForCollection(
             'room', roomCollectionScrollHost, host,
@@ -2484,7 +2507,7 @@
   const PLOT_COLLECTION_SETTLE_MS = 160;
   const ROOM_COLLECTION_SETTLE_MS = 65;
   const ROOM_COLLECTION_CHANGE_TIMEOUT_MS = 300;
-  const ROOM_COLLECTION_BOTTOM_TIMEOUT_MS = 900;
+  const ROOM_COLLECTION_BOTTOM_TIMEOUT_MS = 1500;
   const COLLECTION_CHANGE_TIMEOUT_MS = 550;
   const COLLECTION_BOTTOM_TIMEOUT_MS = 1800;
 
