@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.96
+// @version      0.23.97
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-room-manager.user.js
@@ -15,7 +15,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.96';
+  const SCRIPT_VERSION = '0.23.97';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -1790,8 +1790,9 @@
         box-shadow: 0 20px 60px rgba(0,0,0,.4);
         box-sizing: border-box;
       }
-      .zrm-modal .zrm-result-title { font-size: 13px; font-weight: 700; }
+      .zrm-modal .zrm-result-title { flex: 0 0 auto; font-size: 13px; font-weight: 700; }
       .zrm-modal .zrm-result-stats {
+        flex: 0 0 auto;
         display: flex;
         gap: 10px;
         margin: 12px 0 4px;
@@ -1816,11 +1817,15 @@
         color: #6d52ff;
       }
       .zrm-modal .zrm-result-fail .zrm-result-stat-value { color: #b4232a; }
-      .zrm-modal .zrm-result-list {
+      .zrm-modal .zrm-result-body {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
+        overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
+      }
+      .zrm-modal .zrm-result-list {
+        display: block;
         margin-top: 12px;
         padding: 10px;
         border-radius: 12px;
@@ -1968,6 +1973,10 @@
     statValues[1].textContent = failCount + '개';
     card.appendChild(stats);
 
+    const resultBody = document.createElement('div');
+    resultBody.className = 'zrm-result-body';
+    if (found.length || list.length) card.appendChild(resultBody);
+
     if (found.length) {
       const box = document.createElement('div');
       box.className = 'zrm-result-list';
@@ -1985,7 +1994,7 @@
         row.append(room, document.createElement('br'), names);
         box.appendChild(row);
       }
-      card.appendChild(box);
+      resultBody.appendChild(box);
     }
 
     if (list.length) {
@@ -2005,7 +2014,8 @@
         row.append(name, document.createElement('br'), url);
         box.appendChild(row);
       }
-      card.appendChild(box);
+      // Failed rows need attention; show them before the long success list.
+      resultBody.prepend(box);
     }
 
     const copyText = [
