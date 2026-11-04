@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.64
+// @version      3.50.65
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
@@ -9068,6 +9068,25 @@
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
+    }
+
+
+    /* 스냅샷 실패 상태: 기본 다크 테마의 흰 글자/낮은 불투명도 보정.
+       버튼은 실패 이유를 표시하므로 문구와 비활성 상태를 유지한다. */
+    html.${ACTIVE} [data-sentry-component="LastMessageControlBar"] > button[disabled][data-sentry-component="LogRawButton"]:has(> span[class*="text-white/20"]) {
+      background: var(--kt-soft2) !important;
+      border-color: var(--kt-line) !important;
+      color: var(--kt-sub) !important;
+      opacity: 1 !important;
+    }
+    html.${ACTIVE} [data-sentry-component="LastMessageControlBar"] > button[disabled][data-sentry-component="LogRawButton"]:has(> span[class*="text-white/20"]) > :is(span, svg) {
+      color: var(--kt-sub) !important;
+      opacity: 1 !important;
+    }
+    html.${ACTIVE} [data-sentry-component="BodyView"] > div.justify-end > div.button10[class*="text-white/50"][class*="opacity-30"],
+    html.${ACTIVE} [data-sentry-component="BodyView"] > div.justify-end > div.button10[class*="text-white/50"][class*="opacity-30"] svg {
+      color: var(--kt-chat-sub) !important;
+      opacity: 1 !important;
     }
 
     /* fenced markdown blocks: keep an opaque light surface and readable ink. */
