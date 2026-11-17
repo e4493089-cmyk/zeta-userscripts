@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.80
+// @version      3.50.81
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -4628,14 +4628,14 @@
     }
 
     html.${DIARY_ACTIVE} [role="dialog"][aria-label="일기"],
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPanel"],
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])),
     html.${DIARY_ACTIVE} [data-testid="character-diary-safe-area"] {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
     }
 
     /* 공통 상단바 */
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPanel"] >
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])) >
       [data-testid="character-diary-safe-area"] > header {
       background: var(--kt-white) !important;
       color: var(--kt-text) !important;
@@ -4643,31 +4643,31 @@
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPanel"] header h2,
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPanel"] header button,
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPanel"] header svg {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])) header h2,
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])) header button,
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])) header svg {
       color: var(--kt-text) !important;
     }
 
     /* 목록 화면 */
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"] {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8) {
       color: var(--kt-text) !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"] > p,
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8) > p,
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8)
       > div > span,
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryHistoryList"] > p {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryHistoryList"], .scene-web [data-testid="character-diary-safe-area"] .mt-4:has(button.rounded-16)) > p {
       color: #62727C !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"] h3,
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8) h3,
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8)
       button[aria-current] > span:last-child {
       color: #26343C !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8)
       button[aria-current="true"] img {
       border-color: var(--kt-yellow) !important;
       --tw-ring-color: var(--kt-yellow) !important;
@@ -4676,26 +4676,26 @@
     }
 
     /* 새 일기 열기 */
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"]
-      > button[data-sentry-component="Button"] {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8)
+      > :is(button[data-sentry-component="Button"], button.w-full) {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #E4CF00 !important;
       box-shadow: 0 2px 5px rgba(91,82,16,.12) !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"]
-      > button[data-sentry-component="Button"]:hover {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8)
+      > :is(button[data-sentry-component="Button"], button.w-full):hover {
       background: var(--kt-yellow-hover) !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"]
-      > button[data-sentry-component="Button"] span {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8)
+      > :is(button[data-sentry-component="Button"], button.w-full) span {
       color: #191919 !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryCharacterList"]
-      > button[data-sentry-component="Button"] span:last-child {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryCharacterList"], .scene-web [data-testid="character-diary-safe-area"] .px-4.pt-5.pb-8)
+      > :is(button[data-sentry-component="Button"], button.w-full) span:last-child {
       color: #776B19 !important;
     }
 
@@ -4764,39 +4764,39 @@
     }
 
     /* 보유 일기 카드 */
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryHistoryList"] li > button {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryHistoryList"], .scene-web [data-testid="character-diary-safe-area"] .mt-4:has(button.rounded-16)) :is(li > button, button.rounded-16) {
       background: rgba(255,255,255,.94) !important;
       color: #26343C !important;
       border: 1px solid rgba(69,87,97,.10) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.07) !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryHistoryList"] li > button:hover {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryHistoryList"], .scene-web [data-testid="character-diary-safe-area"] .mt-4:has(button.rounded-16)) :is(li > button, button.rounded-16):hover {
       background: #FFFFFF !important;
       border-color: rgba(69,87,97,.18) !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryHistoryList"]
-      li > button > span:first-child {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryHistoryList"], .scene-web [data-testid="character-diary-safe-area"] .mt-4:has(button.rounded-16))
+      :is(li > button, button.rounded-16) > span:first-child {
       color: #75691D !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryHistoryList"]
-      li > button > span:nth-child(2) {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryHistoryList"], .scene-web [data-testid="character-diary-safe-area"] .mt-4:has(button.rounded-16))
+      :is(li > button, button.rounded-16) > span:nth-child(2) {
       color: #26343C !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryHistoryList"] svg {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryHistoryList"], .scene-web [data-testid="character-diary-safe-area"] .mt-4:has(button.rounded-16)) svg {
       color: #7A8991 !important;
     }
 
     /* 본문: 채팅 배경 위에 흰 종이 한 장 */
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryPanel"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"]))
       section[data-sentry-component="HorizontalScroll"] {
       background: #FFFFFF !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryReaderSlide"] {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryReaderSlide"], .scene-web [data-testid="character-diary-safe-area"] [class~="px-[22px]"].pt-6.pb-10) {
       margin: 12px 12px 16px !important;
       padding: 24px 22px 32px !important;
       width: calc(100% - 24px) !important;
@@ -4809,28 +4809,28 @@
       box-shadow: 0 3px 10px rgba(45,61,71,.10) !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryReaderSlide"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryReaderSlide"], .scene-web [data-testid="character-diary-safe-area"] [class~="px-[22px]"].pt-6.pb-10)
       > p:first-child,
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryReaderSlide"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryReaderSlide"], .scene-web [data-testid="character-diary-safe-area"] [class~="px-[22px]"].pt-6.pb-10)
       > p:first-child span {
       color: #667780 !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryReaderSlide"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryReaderSlide"], .scene-web [data-testid="character-diary-safe-area"] [class~="px-[22px]"].pt-6.pb-10)
       > p:first-child span:last-child {
       color: #75691D !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryReaderSlide"] h3 {
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryReaderSlide"], .scene-web [data-testid="character-diary-safe-area"] [class~="px-[22px]"].pt-6.pb-10) h3 {
       color: #202124 !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryReaderSlide"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryReaderSlide"], .scene-web [data-testid="character-diary-safe-area"] [class~="px-[22px]"].pt-6.pb-10)
       > div.h-px {
       background: #DDE4E8 !important;
     }
 
-    html.${DIARY_ACTIVE} [data-sentry-component="DiaryReaderSlide"]
+    html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryReaderSlide"], .scene-web [data-testid="character-diary-safe-area"] [class~="px-[22px]"].pt-6.pb-10)
       > div:last-child p {
       color: #34434C !important;
     }
@@ -9299,7 +9299,7 @@
 
   function isDiaryOpen() {
     return !!document.querySelector(
-      '[role="dialog"][aria-label="일기"] [data-sentry-component="DiaryPanel"]'
+      '[data-sentry-component="DiaryPanel"], [data-testid="character-diary-safe-area"]'
     );
   }
 
