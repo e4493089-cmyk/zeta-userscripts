@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.9
+// @version      0.3.10
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -17,6 +17,7 @@
   const inChatFrame = location.origin === 'https://frame.pingpong.ai';
   let frameRoomId = '';
   const contextChannel = 'zcs-room-context';
+  let pendingFrameJump = '';
   if (inChatFrame) {
     if (new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io' || window.parent === window) return;
     frameRoomId = await new Promise(resolve => {
@@ -25,6 +26,9 @@
             event.data?.type !== contextChannel || !/^[A-Za-z0-9_-]{1,100}$/.test(event.data.roomId || '')) return;
         clearInterval(timer);
         window.removeEventListener('message', receive);
+        if (event.data.highlight) {
+          try { sessionStorage.setItem('zcs-pending-highlight', event.data.highlight); } catch (_) {}
+        }
         resolve(event.data.roomId);
       };
       window.addEventListener('message', receive);
@@ -37,7 +41,28 @@
       const frame = [...document.querySelectorAll('iframe')].find(frame => frame.contentWindow === event.source && frame.src.startsWith('https://frame.pingpong.ai/v1/index.html'));
       const roomId = location.pathname.match(/\/rooms\/([^/?#]+)/)?.[1];
       if (frame && roomId && event.origin === 'https://frame.pingpong.ai' && event.data?.type === contextChannel) {
-        event.source.postMessage({ type: contextChannel, roomId }, event.origin);
+        if (event.data.jumpId) {
+          const id = event.data.jumpId;
+          const router = findAppRouter();
+          const cursor = /^message-MESSAGE-\\d+-[A-Za-z0-9_-]+$/.test(id) ? messageCursor(id) : '';
+          if (!router || !cursor || event.data.roomId !== roomId) {
+            event.source.postMessage({ type: contextChannel + '-jump', id, ok: false }, event.origin);
+            return;
+          }
+          pendingFrameJump = id;
+          const url = new URL(location.href);
+          url.searchParams.set('cursor', roomId + ':' + cursor);
+          try {
+            router.replace(url.pathname + url.search, { scroll: false });
+            event.source.postMessage({ type: contextChannel + '-jump', id, ok: true }, event.origin);
+          } catch (_) {
+            pendingFrameJump = '';
+            event.source.postMessage({ type: contextChannel + '-jump', id, ok: false }, event.origin);
+          }
+          return;
+        }
+        event.source.postMessage({ type: contextChannel, roomId, highlight: pendingFrameJump }, event.origin);
+        pendingFrameJump = '';
       }
     });
   }
@@ -45,7 +70,7 @@
 
   if (window.top !== window.self && !inChatFrame) return;
 
-  const SCRIPT_VERSION = '0.3.7';
+  const SCRIPT_VERSION = '0.3.10';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -683,6 +708,24 @@
     return null;
   }
 
+  function requestFrameCursor(row, status) {
+    status('해당 대화를 바로 불러오는 중');
+    try { sessionStorage.setItem(JUMP_HIGHLIGHT_KEY, row.id); } catch (_) {}
+    return new Promise(resolve => {
+      const finish = ok => { clearTimeout(timer); window.removeEventListener('message', receive); resolve(ok); };
+      const receive = event => {
+        if (event.source === window.parent && event.origin === 'https://zeta-ai.io' &&
+          event.data?.type === contextChannel + '-jump' && event.data.id === row.id) {
+          if (!event.data.ok) status('바로 이동 연결을 찾지 못했어. 페이지를 새로고침한 뒤 다시 시도해줘.');
+          finish(!!event.data.ok);
+        }
+      };
+      const timer = setTimeout(() => { status('바로 이동 요청에 응답이 없어. 부모 페이지에도 최신 스크립트가 실행 중인지 확인해줘.'); finish(false); }, 5000);
+      window.addEventListener('message', receive);
+      window.parent.postMessage({ type: contextChannel, jumpId: row.id, roomId: currentRoomId() }, 'https://zeta-ai.io');
+    });
+  }
+
   async function tryNativeCursor(row, status) {
     const roomId = currentRoomId();
     const cursor = messageCursor(row.id);
@@ -748,7 +791,7 @@
 
     // 제타 책갈피와 같은 cursor 이동을 먼저 쓴다. 전체 대화를 한 칸씩
     // 훑는 것보다 빠르고, 가상 스크롤에서 메시지가 빠지는 문제도 피한다.
-    const nativeResult = inChatFrame ? null : await tryNativeCursor(row, status);
+    const nativeResult = inChatFrame ? await requestFrameCursor(row, status) : await tryNativeCursor(row, status);
     if (nativeResult !== null) return nativeResult;
 
     // cursor 이동을 지원하지 않는 화면에서는 기존 스크롤 탐색으로 대체한다.
