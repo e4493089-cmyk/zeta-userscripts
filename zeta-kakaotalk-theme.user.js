@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.84
+// @version      3.50.85
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1472,16 +1472,16 @@
 
     /* 친구 목록 / 채팅 목록 */
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ContactList"],
+      :is([data-sentry-component="ContactList"], .kt-message-list),
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ThreadList"] {
+      :is([data-sentry-component="ThreadList"], .kt-message-list) {
       background: #FFFFFF !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ContactList"] > li > button,
+      :is([data-sentry-component="ContactList"], .kt-message-list) :is(li > button, .kt-message-list > button),
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ThreadList"] > li > button {
+      :is([data-sentry-component="ThreadList"], .kt-message-list) :is(li > button, .kt-message-list > button) {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-radius: 10px !important;
@@ -1491,21 +1491,21 @@
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ContactList"] > li > button:hover,
+      :is([data-sentry-component="ContactList"], .kt-message-list) :is(li > button, .kt-message-list > button):hover,
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ThreadList"] > li > button:hover {
+      :is([data-sentry-component="ThreadList"], .kt-message-list) :is(li > button, .kt-message-list > button):hover {
       background: #F5F7F8 !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ContactList"] .body2,
+      :is([data-sentry-component="ContactList"], .kt-message-list) :is(.body2, .body14, .font-semibold, .font-medium),
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ThreadList"] .body2 {
+      :is([data-sentry-component="ThreadList"], .kt-message-list) :is(.body2, .body14, .font-semibold, .font-medium) {
       color: #26343C !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ThreadList"] .caption1 {
+      :is([data-sentry-component="ThreadList"], .kt-message-list) :is(.caption1, [class*="text-white/50"]) {
       color: #7D898F !important;
     }
 
@@ -1526,7 +1526,7 @@
       color: inherit !important;
     }
 
-    html.${ACTIVE} .kt-message-tabs > button[aria-pressed="true"] {
+    html.${ACTIVE} .kt-message-tabs > button:is([aria-pressed="true"], .kt-message-tab-active) {
       color: #26343C !important;
       box-shadow: inset 0 3px 0 var(--kt-yellow) !important;
       background: #FFFDF0 !important;
@@ -1554,7 +1554,7 @@
     ========================================================= */
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ThreadView"] {
+      :is([data-sentry-component="ThreadView"], .kt-message-thread) {
       background: var(--kt-chat) !important;
       color: var(--kt-text) !important;
       scrollbar-width: none !important;
@@ -1562,7 +1562,7 @@
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="ThreadView"]::-webkit-scrollbar {
+      :is([data-sentry-component="ThreadView"], .kt-message-thread)::-webkit-scrollbar {
       width: 0 !important;
       height: 0 !important;
       display: none !important;
@@ -1570,74 +1570,75 @@
 
     /* 상대 메시지 */
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Bubble"][data-sender="CHARACTER"] p {
+      :is([data-sentry-component="Bubble"][data-sender="CHARACTER"], .kt-message-other) p {
       background: #FFFFFF !important;
       color: #202124 !important;
       box-shadow: 0 1px 2px rgba(0,0,0,.05) !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Bubble"][data-sender="CHARACTER"]
-      [data-sentry-component="BubbleTail"] {
+      :is([data-sentry-component="Bubble"][data-sender="CHARACTER"], .kt-message-other)
+      :is([data-sentry-component="BubbleTail"], .kt-message-tail) {
       fill: #FFFFFF !important;
       color: #FFFFFF !important;
     }
 
     /* 내 메시지 */
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Bubble"][data-sender="USER"] p {
+      :is([data-sentry-component="Bubble"][data-sender="USER"], .kt-message-me) p {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       box-shadow: 0 1px 2px rgba(0,0,0,.05) !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Bubble"][data-sender="USER"]
-      [data-sentry-component="BubbleTail"] {
+      :is([data-sentry-component="Bubble"][data-sender="USER"], .kt-message-me)
+      :is([data-sentry-component="BubbleTail"], .kt-message-tail) {
       fill: var(--kt-yellow) !important;
       color: var(--kt-yellow) !important;
     }
 
     /* 메시지 입력창 */
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Composer"] {
+      :is([data-sentry-component="Composer"], .kt-message-composer) {
       background: #FFFFFF !important;
       border-top: 1px solid #E4E9EC !important;
     }
 
+    html.${ACTIVE} .kt-message-panel .kt-message-input-box,
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Composer"] > div > div {
+      :is([data-sentry-component="Composer"], .kt-message-composer) > div > div {
       background: #F5F6F7 !important;
       border: 1px solid #DEE4E8 !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Composer"] input[aria-label="메시지 입력"] {
+      :is([data-sentry-component="Composer"], .kt-message-composer) input:is([aria-label="메시지 입력"], [data-kt-message-input]) {
       background: transparent !important;
       color: #191919 !important;
       caret-color: #191919 !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Composer"] input[aria-label="메시지 입력"]::placeholder {
+      :is([data-sentry-component="Composer"], .kt-message-composer) input:is([aria-label="메시지 입력"], [data-kt-message-input])::placeholder {
       color: #999FA3 !important;
       opacity: 1 !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Composer"] button[aria-label="보내기"] {
+      :is([data-sentry-component="Composer"], .kt-message-composer) button:is([aria-label="보내기"], .kt-message-send) {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #E6D000 !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Composer"] button[aria-label="보내기"] svg {
+      :is([data-sentry-component="Composer"], .kt-message-composer) button:is([aria-label="보내기"], .kt-message-send) svg {
       color: #191919 !important;
     }
 
     html.${ACTIVE} .kt-message-panel
-      [data-sentry-component="Composer"] button[aria-label="보내기"]:disabled {
+      :is([data-sentry-component="Composer"], .kt-message-composer) button:is([aria-label="보내기"], .kt-message-send):disabled {
       background: #E7EAEC !important;
       color: #A7AFB3 !important;
       border-color: #E0E4E6 !important;
@@ -9879,53 +9880,74 @@
 
 
   function markMessagePhone() {
-    const shell = document.querySelector(
-      '[data-testid="message-phone-shell"]'
+    const shell = document.querySelector('[data-testid="message-phone-shell"]');
+    const content = shell?.querySelector('[data-testid="message-phone-content"]');
+    let panel = content && Array.from(content.children).find(el =>
+      String(el.className).includes('z-10') && String(el.className).includes('rounded-')
     );
 
-    if (!shell) return;
-
-    const content = shell.querySelector(
-      '[data-testid="message-phone-content"]'
-    );
-
-    if (!content) return;
-
-    const panel = Array.from(content.children).find(el => {
-      const cls = String(el.className || '');
-      return (
-        el instanceof HTMLElement &&
-        cls.includes('z-10') &&
-        cls.includes('rounded-[24px]')
-      );
-    });
-
+    // The message app also renders without the old shell/content wrappers.
+    // Identify only its friend/chat tabs or its message composer plus close control.
+    if (!panel) {
+      const tab = Array.from(document.querySelectorAll('button')).find(button => {
+        if (normalizeText(button.textContent) !== '친구') return false;
+        return Array.from(button.parentElement?.children || []).some(sibling =>
+          sibling.tagName === 'BUTTON' && normalizeText(sibling.textContent) === '채팅'
+        );
+      });
+      const input = document.querySelector('input[aria-label="메시지 입력"], input[placeholder="메시지 입력"]');
+      for (let node = (tab || input)?.parentElement; node && node !== document.body; node = node.parentElement) {
+        if (!String(node.className).includes('rounded-')) continue;
+        const close = node.querySelector('button[aria-label="Close"], button[aria-label="닫기"]');
+        if (close || (tab && node.contains(tab.parentElement))) { panel = node; break; }
+      }
+    }
     if (!panel) return;
-
     panel.classList.add('kt-message-panel');
 
-    /* 친구/채팅 두 탭이 있는 하단 바 */
-    Array.from(panel.querySelectorAll('div')).forEach(el => {
-      const buttons = Array.from(el.children).filter(
-        child => child.tagName === 'BUTTON'
-      );
+    const input = panel.querySelector('input[aria-label="메시지 입력"], input[placeholder="메시지 입력"]');
+    const thread = input && panel.querySelector('[data-sentry-component="ThreadView"], [class*="overflow-y-auto"]');
+    if (thread) {
+      thread.classList.add('kt-message-thread');
+      thread.querySelectorAll('p').forEach(text => {
+        let row = text.parentElement;
+        while (row && row !== thread && !row.classList.contains('justify-end') &&
+          !row.classList.contains('justify-start') && !row.classList.contains('items-end') &&
+          !row.classList.contains('items-start')) row = row.parentElement;
+        if (!row || row === thread) return;
+        const mine = row.classList.contains('justify-end') || row.classList.contains('items-end');
+        const bubble = text.parentElement;
+        bubble.classList.toggle('kt-message-me', mine);
+        bubble.classList.toggle('kt-message-other', !mine);
+        bubble.querySelectorAll('svg').forEach(tail => tail.classList.add('kt-message-tail'));
+      });
+    }
+    if (input) {
+      let composer = input.closest('form') || input.parentElement;
+      while (composer?.parentElement && composer.parentElement !== panel &&
+        !composer.querySelector('button')) composer = composer.parentElement;
+      composer?.classList.add('kt-message-composer');
+      input.setAttribute('data-kt-message-input', '');
+      input.parentElement?.classList.add('kt-message-input-box');
+      const send = composer?.querySelector('button[aria-label="보내기"], button[type="submit"]') ||
+        Array.from(composer?.querySelectorAll('button') || []).find(button => button.querySelector('svg'));
+      send?.classList.add('kt-message-send');
+    } else {
+      const list = panel.querySelector('[data-sentry-component="ContactList"], [data-sentry-component="ThreadList"], ul, [class*="overflow-y-auto"]');
+      list?.classList.add('kt-message-list');
+    }
 
-      if (buttons.length !== 2) return;
-
-      const labels = buttons.map(btn =>
-        (btn.textContent || '').replace(/\s+/g, ' ').trim()
-      );
-
-      if (
-        labels.includes('친구') &&
-        labels.includes('채팅')
-      ) {
-        el.classList.add('kt-message-tabs');
-      }
+    const heading = normalizeText(panel.firstElementChild?.textContent);
+    panel.querySelectorAll('div').forEach(el => {
+      const buttons = Array.from(el.children).filter(child => child.tagName === 'BUTTON');
+      const labels = buttons.map(button => normalizeText(button.textContent));
+      if (buttons.length !== 2 || !labels.includes('친구') || !labels.includes('채팅')) return;
+      el.classList.add('kt-message-tabs');
+      buttons.forEach(button => button.classList.toggle('kt-message-tab-active',
+        normalizeText(button.textContent) === heading
+      ));
     });
   }
-
-
 
   function normalizeText(value) {
     return (value || '').replace(/\s+/g, ' ').trim();
@@ -10380,6 +10402,7 @@
       markMessageActionSheet();
     }
     if (touches('[data-testid="action-panel-grid"], [role="dialog"][aria-label="Chat actions"]')) markActionPanel();
+    markMessagePhone();
     if (touches('[data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"]')) markSidebarMenu();
     if (touches('[aria-label="Snapshot archive"], [aria-label="Show or hide snapshot controls"]')) markSnapshotModals();
     if (touches('[data-sentry-component="Popup"]')) markSavedTitlePopup();
@@ -10404,8 +10427,8 @@
   }
 
   const PASSIVE_CONTENT = '[data-sentry-component="BodyView"], [role="log"][aria-label="Chat messages"], [data-sentry-component="RoomList"], [data-testid^="room-list-item-"], [testid^="room-list-item-"]';
-  const SPECIAL_CONTENT = '[data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="message-phone-shell"], [data-sentry-component="DeleteModeHeader"], [role="dialog"], [data-sentry-component="KeyboardAvoidingView"]';
-  const SCREEN_STRUCTURE = '[data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="anonymous-board-safe-area"], [data-testid="zetagram-panel"], [data-testid="capture-mode-header-back"], main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
+  const SPECIAL_CONTENT = '[data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="message-phone-backdrop"], [data-testid="message-phone-shell"], [data-sentry-component="DeleteModeHeader"], [role="dialog"], [data-sentry-component="KeyboardAvoidingView"]';
+  const SCREEN_STRUCTURE = '[data-testid="message-phone-backdrop"], [data-testid="message-phone-shell"], [data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="anonymous-board-safe-area"], [data-testid="zetagram-panel"], [data-testid="capture-mode-header-back"], main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
 
   function isSpecialContent(node) {
     return node instanceof Element && (node.matches(SPECIAL_CONTENT) || !!node.querySelector(SPECIAL_CONTENT));
