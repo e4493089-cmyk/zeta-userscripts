@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.10
+// @version      0.3.11
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -44,7 +44,7 @@
         if (event.data.jumpId) {
           const id = event.data.jumpId;
           const router = findAppRouter();
-          const cursor = /^message-MESSAGE-\\d+-[A-Za-z0-9_-]+$/.test(id) ? messageCursor(id) : '';
+          const cursor = /^message-MESSAGE-\d+-[A-Za-z0-9_-]+$/.test(id) ? messageCursor(id) : '';
           if (!router || !cursor || event.data.roomId !== roomId) {
             event.source.postMessage({ type: contextChannel + '-jump', id, ok: false }, event.origin);
             return;
@@ -70,7 +70,7 @@
 
   if (window.top !== window.self && !inChatFrame) return;
 
-  const SCRIPT_VERSION = '0.3.10';
+  const SCRIPT_VERSION = '0.3.11';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
