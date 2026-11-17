@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.69
+// @version      3.50.70
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -273,28 +273,32 @@
     }
 
     /* 정보박스 */
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] {
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) {
       background: transparent !important;
       color: var(--kt-chat-sub) !important;
       border: 0 !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-bold,
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .font-semibold {
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) .font-bold,
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) .font-semibold {
       color: var(--kt-chat-text) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] [class*="text-white/"],
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] .chat {
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) [class*="text-white"],
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) .chat {
       color: var(--kt-chat-sub) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="InfoBoxContent"][class*="mx-2"] svg {
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) svg {
       color: var(--kt-chat-text) !important;
     }
 
-    /* 내레이션 마크다운 요소도 채팅 배경 대비를 그대로 사용 */
+        html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) [class*="text-primary-"] {
+      color: var(--kt-chat-text) !important;
+    }
+
+/* 내레이션 마크다운 요소도 채팅 배경 대비를 그대로 사용 */
     html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) code,
     html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) a,
     html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) del,
@@ -3250,7 +3254,7 @@
 
     /* 모델 카드 */
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) {
       background: #F5F7F8 !important;
       border: 1px solid #E1E6E9 !important;
       color: #26343C !important;
@@ -3258,45 +3262,45 @@
     }
 
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"]:hover {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]):hover {
       background: #F0F3F5 !important;
     }
 
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"][aria-checked="true"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"])[aria-checked="true"] {
       background: #FFF9C9 !important;
       border-color: #D9C84D !important;
       box-shadow: 0 0 0 1px rgba(217,200,77,.10) !important;
     }
 
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] .text-gray-200 {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) .text-gray-200 {
       color: #2E3A40 !important;
     }
 
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] [class*="text-primary-"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) [class*="text-primary-"] {
       color: #6C6124 !important;
     }
 
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] > svg {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) > svg {
       color: #5B6870 !important;
     }
 
     /* 모델 로고 원본이 흰색 PNG라 라이트 카드에서는 검게 반전 */
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] img[alt="zeta"],
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) img[alt="zeta"],
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] img[alt="koji"],
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) img[alt="koji"],
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] img[alt="luca"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) img[alt="luca"] {
       filter: invert(1) !important;
     }
 
     /* 선택창도 로고 자체 크기는 건드리지 않고 좌우 빈 캔버스만 줄인다. */
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] img[alt="zeta"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) img[alt="zeta"] {
       width: 104px !important;
       height: 24px !important;
       object-fit: contain !important;
@@ -3722,7 +3726,7 @@
     }
 
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) {
       background: #F5F7F8 !important;
       border: 1px solid #E1E6E9 !important;
       color: #26343C !important;
@@ -3730,38 +3734,38 @@
     }
 
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"]:hover {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]):hover {
       background: #F0F3F5 !important;
     }
 
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"][aria-checked="true"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"])[aria-checked="true"] {
       background: #FFF9C9 !important;
       border-color: #D9C84D !important;
       box-shadow: 0 0 0 1px rgba(217,200,77,.10) !important;
     }
 
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] .text-gray-200 {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) .text-gray-200 {
       color: #2E3A40 !important;
     }
 
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] [class*="text-primary-"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) [class*="text-primary-"] {
       color: #6C6124 !important;
     }
 
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] > svg {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) > svg {
       color: #5B6870 !important;
     }
 
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] img[alt="zeta"],
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) img[alt="zeta"],
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] img[alt="koji"],
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) img[alt="koji"],
     html:has(section[role="dialog"][aria-label="AI 모델 선택"]) section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] img[alt="luca"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) img[alt="luca"] {
       filter: invert(1) !important;
     }
 
@@ -4068,6 +4072,12 @@
        레이아웃은 그대로, 색만 카톡 라이트 톤
     ========================================================= */
 
+    html.scene-web.${ACTIVE} .bg-gray-sub1:has(section[role="dialog"] > [role="radiogroup"]) {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      border-color: var(--kt-line) !important;
+    }
+
     html.${ACTIVE} #portal-container
       [data-sentry-component="KeyboardAvoidingView"]:has(
         section[role="dialog"][aria-label="AI 모델 선택"]
@@ -4112,7 +4122,7 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) {
       background: #F5F7F8 !important;
       color: #26343C !important;
       border: 1px solid #E1E6E9 !important;
@@ -4121,16 +4131,16 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"]:hover {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]):hover {
       background: #F0F3F5 !important;
     }
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"][aria-checked="true"],
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"])[aria-checked="true"],
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"][class*="border-primary-"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"])[class*="border-primary-"] {
       background: #FFF8BF !important;
       border-color: #D8C94D !important;
       color: #2E3A40 !important;
@@ -4138,29 +4148,29 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] .text-gray-200,
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) .text-gray-200,
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] [class*="text-white"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) [class*="text-white"] {
       color: #2F3B42 !important;
     }
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] [class*="text-primary-"] {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) [class*="text-primary-"] {
       color: #6E6323 !important;
     }
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] > svg {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) > svg {
       color: #55646D !important;
     }
 
     /* 보유 피스 / 충전 링크도 보라색 대신 노랑 포인트 */
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="AI 모델 선택"]
-      button:has(span):not([data-sentry-component="ModelItem"]) {
+      button:has(span):not(:is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"])) {
       color: #5F5520 !important;
     }
 
@@ -4503,9 +4513,9 @@
 
     html:has(section[role="dialog"][aria-label="AI 모델 선택"])
       section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] > div > span.mt-1,
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) > div > span.mt-1,
     html.${ACTIVE} section[role="dialog"][aria-label="AI 모델 선택"]
-      [data-sentry-component="ModelItem"] > div > span.mt-1 {
+      :is([data-sentry-component="ModelItem"], [role="radiogroup"] > button[role="radio"]) > div > span.mt-1 {
       color: #2E3A40 !important;
       opacity: 1 !important;
     }
@@ -8980,20 +8990,20 @@
       -webkit-text-fill-color: var(--kt-muted) !important;
       opacity: 1 !important;
     }
-    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="action-panel-button"],
-    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="action-panel-button"]:hover {
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-button"],
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-button"]:hover {
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
     }
-    html.${ACTIVE} [data-sentry-component="ChatComposer"] :is([data-testid="action-panel-open-button"],button[aria-label="Suggested replies"]) {
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) :is([data-testid="action-panel-open-button"],button[aria-label="Suggested replies"]) {
       background: var(--kt-soft2) !important;
       color: var(--kt-sub) !important;
       border: 1px solid var(--kt-line) !important;
       border-radius: 999px !important;
       box-shadow: none !important;
     }
-    html.${ACTIVE} [data-sentry-component="ChatComposer"] :is([data-testid="action-panel-open-button"],button[aria-label="Suggested replies"]) :is(svg,span) {
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) :is([data-testid="action-panel-open-button"],button[aria-label="Suggested replies"]) :is(svg,span) {
       background: transparent !important;
       color: var(--kt-sub) !important;
     }
