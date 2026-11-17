@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.66
+// @version      3.50.67
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -9114,10 +9114,34 @@
     }
 
   
+
+    /* Character profile gallery, including the expanded description. */
+    html.scene-web.${ACTIVE} #portal-container .size-full.bg-gray-main:has([aria-label="Character images"]) {
+      background: var(--kt-chat) !important;
+    }
+    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+    }
+    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] :is(h3, .body1, button, button svg) {
+      color: var(--kt-text) !important;
+    }
+    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] > [style*="linear-gradient"] {
+      background: none !important;
+    }
+    html.scene-web.${ACTIVE} [aria-label="Character image thumbnails"] > div {
+      background: var(--kt-soft) !important;
+      border-color: var(--kt-line) !important;
+    }
+    html.scene-web.${ACTIVE} [aria-label="Character image thumbnails"] > div:has([aria-current="true"]) {
+      border-color: var(--kt-yellow) !important;
+    }
+
     /* Room UI rendered by frame.pingpong.ai. Scope to the scene's chat surfaces. */
     html.scene-web.${ACTIVE} #zeta > div:has([role="log"]),
     html.scene-web.${ACTIVE} #zeta .top-0.bg-gray-main,
-    html.scene-web.${ACTIVE} [data-testid="chat-bottom-dock"] {
+    html.scene-web.${ACTIVE} [data-testid="chat-bottom-dock"],
+    html.scene-web.${ACTIVE} [data-testid="chat-bottom-dock"] > .bg-linear-to-b {
       background: var(--kt-chat) !important;
       color: var(--kt-chat-text) !important;
     }
