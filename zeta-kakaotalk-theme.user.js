@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.71
+// @version      3.50.72
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -203,6 +203,13 @@
 
     html.${ACTIVE} :is([data-sentry-component="RightTextContent"] .caption1, .scene-web [role="log"] .flex-col:has(> .relative .bg-bubble-user) > .caption1) {
       color: var(--kt-user-name) !important;
+    }
+
+    html.${ACTIVE} .zeta-capture-user-mask {
+      color: inherit !important;
+      -webkit-text-fill-color: currentColor !important;
+      background: transparent !important;
+      text-shadow: none !important;
     }
 
     /* 상대 말풍선 */
