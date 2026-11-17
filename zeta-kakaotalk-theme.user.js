@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.74
+// @version      3.50.75
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -998,8 +998,7 @@
     }
 
     /* 실제 메뉴 패널 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-left: 1px solid #DDE4E8 !important;
@@ -1007,19 +1006,16 @@
     }
 
     /* 메뉴 스크롤 영역 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] > div:first-child {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] > div:first-child {
       background: #FFFFFF !important;
       scrollbar-color: rgba(70, 88, 99, .20) transparent !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] > div:first-child::-webkit-scrollbar {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] > div:first-child::-webkit-scrollbar {
       width: 5px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] > div:first-child::-webkit-scrollbar-thumb {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] > div:first-child::-webkit-scrollbar-thumb {
       background: rgba(70, 88, 99, .20) !important;
       border-radius: 999px !important;
     }
@@ -1085,96 +1081,87 @@
     }
 
     /* 사이드 메뉴 구분선 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] div[class*="border-t-white/5"] {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] div[class*="border-t-white/5"] {
       border-top-color: #E7EBEE !important;
     }
 
     /* 일반 메뉴 버튼 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] button[data-sentry-component="LogRawButton"] {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(button[data-sentry-component="LogRawButton"], button.zeta-menu-action) {
       color: #26343C !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] button[data-sentry-component="LogRawButton"]:hover {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(button[data-sentry-component="LogRawButton"], button.zeta-menu-action):hover {
       background: #F6F8F9 !important;
     }
 
     /* 메뉴의 주 텍스트 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] .text-gray-200 {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(.text-gray-200, .text-white) {
       color: #26343C !important;
     }
 
     /* 메뉴의 보조 텍스트 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] [class*="text-white/50"] {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] [class*="text-white/50"] {
       color: #7A878E !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] svg[class*="text-white/50"] {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] svg[class*="text-white/50"] {
       color: #8A969C !important;
     }
 
     /* 새로하기 설명 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] .body12[class*="text-white/50"] {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] .body12[class*="text-white/50"] {
       color: #8A969C !important;
     }
 
     /* 현재 선택값: 프로필/상태창/선택지 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] .body14[class*="text-white/50"] {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] .body14[class*="text-white/50"] {
       color: #6F7D84 !important;
     }
 
     /* 클릭 피드백 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
-      [role="dialog"][aria-label="Chat menu"] button:active {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] button:active {
       background: #EEF2F4 !important;
     }
 
     /* 위험 액션: 대화 삭제 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-danger {
       color: #D94B4B !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-danger:hover {
       background: #FFF1F1 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-danger span,
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-danger svg {
       color: #D94B4B !important;
     }
 
     /* 하단 '대화방 나가기' 영역 */
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-footer {
       background: #F8F9FA !important;
       border-top: 1px solid #E4E9EC !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-footer button {
       color: #D94B4B !important;
       background: transparent !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-footer button:hover {
       background: #FFF1F1 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-footer svg,
-    html.${ACTIVE} [data-sentry-component="ChatSidebar"]
+    html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
       .kt-sidebar-footer span {
       color: #D94B4B !important;
     }
@@ -9693,20 +9680,13 @@
 
 
   function markSidebarMenu() {
-    const sidebar = document.querySelector(
-      '[data-sentry-component="ChatSidebar"]'
-    );
-
-    if (!sidebar) return;
-
-    const dialog = sidebar.querySelector(
-      '[role="dialog"][aria-label="Chat menu"]'
-    );
+    const dialog = document.querySelector('[role="dialog"][aria-label="Chat menu"]');
 
     if (!dialog) return;
 
     /* 위험 액션 */
     dialog.querySelectorAll('button').forEach(btn => {
+      btn.classList.add('zeta-menu-action');
       const label = (btn.textContent || '').replace(/\s+/g, ' ').trim();
 
       btn.classList.toggle(
