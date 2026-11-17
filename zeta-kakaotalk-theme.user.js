@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.70
+// @version      3.50.71
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -90,6 +90,28 @@
       --kt-meta-title: #46545E;
       --kt-meta-text: #64717A;
     }
+
+
+    /* Embedded chat defaults. Component rules below refine these surfaces. */
+    html.scene-web.${ACTIVE} :where(.bg-gray-main) { background-color: var(--kt-chat) !important; }
+    html.scene-web.${ACTIVE} :where(.bg-gray-sub1, .bg-gray-900) { background-color: var(--kt-white) !important; }
+    html.scene-web.${ACTIVE} :where(.bg-gray-sub2, .bg-gray-800) { background-color: var(--kt-soft) !important; }
+    html.scene-web.${ACTIVE} :where(.bg-gray-sub3, .bg-gray-700) { background-color: var(--kt-soft2) !important; }
+    html.scene-web.${ACTIVE} :where([class~="bg-white/5"], [class~="bg-white/10"]) { background-color: var(--kt-soft) !important; }
+    html.scene-web.${ACTIVE} :where(.bg-primary-400, .bg-primary-300, .bg-primary-200) {
+      background-color: var(--kt-yellow) !important;
+      color: var(--kt-user-dialogue) !important;
+    }
+    html.scene-web.${ACTIVE} :where(.text-white, .text-gray-100, .text-gray-200, .text-gray-300) { color: var(--kt-text) !important; }
+    html.scene-web.${ACTIVE} :where([class*="text-white/"], .text-gray-400, .text-gray-500) { color: var(--kt-sub) !important; }
+    html.scene-web.${ACTIVE} :where(.text-gray-600, .text-gray-700, .text-gray-800) { color: var(--kt-muted) !important; }
+    html.scene-web.${ACTIVE} :where([class*="text-primary-"]) { color: var(--kt-user-action) !important; }
+    html.scene-web.${ACTIVE} :where([class*="border-white/"], .border-gray-sub2, .border-gray-sub3) { border-color: var(--kt-line) !important; }
+    html.scene-web.${ACTIVE} :where([class*="border-primary-"]) { border-color: var(--kt-yellow-hover) !important; }
+    html.scene-web.${ACTIVE} :where([role="dialog"]) { background-color: var(--kt-white) !important; color: var(--kt-text) !important; }
+    html.scene-web.${ACTIVE} :where([role="dialog"] .bg-gray-main) { background-color: var(--kt-white) !important; }
+    html.scene-web.${ACTIVE} :where(button[aria-checked="true"], button[aria-selected="true"]) { border-color: var(--kt-yellow-hover) !important; }
+    html.scene-web.${ACTIVE} :where(button:disabled, input:disabled, textarea:disabled) { opacity: .55; }
 
     /* 홈 상단 APP 출시 배너 숨김 */
     [data-sentry-component="Home"]
