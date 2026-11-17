@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.11
+// @version      0.3.12
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -41,6 +41,15 @@
       const frame = [...document.querySelectorAll('iframe')].find(frame => frame.contentWindow === event.source && frame.src.startsWith('https://frame.pingpong.ai/v1/index.html'));
       const roomId = location.pathname.match(/\/rooms\/([^/?#]+)/)?.[1];
       if (frame && roomId && event.origin === 'https://frame.pingpong.ai' && event.data?.type === contextChannel) {
+        if (event.data.exportId && typeof event.data.exportText === 'string' && event.data.roomId === roomId) {
+          try {
+            saveIndexedText(event.data.exportText, roomId);
+            event.source.postMessage({ type: contextChannel + '-export', id: event.data.exportId, ok: true }, event.origin);
+          } catch (_) {
+            event.source.postMessage({ type: contextChannel + '-export', id: event.data.exportId, ok: false }, event.origin);
+          }
+          return;
+        }
         if (event.data.jumpId) {
           const id = event.data.jumpId;
           const router = findAppRouter();
@@ -70,7 +79,7 @@
 
   if (window.top !== window.self && !inChatFrame) return;
 
-  const SCRIPT_VERSION = '0.3.11';
+  const SCRIPT_VERSION = '0.3.12';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
 
   const MENU_ROW_ID = 'zeta-chat-search-menu';
@@ -906,10 +915,28 @@
     return output.join('\n');
   }
 
-  function downloadIndexedTxt(rows, roomId) {
+  async function downloadIndexedTxt(rows, roomId) {
     const text = buildIndexedTxt(rows);
     if (!text) return false;
 
+    if (inChatFrame) {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      return new Promise((resolve, reject) => {
+        const cleanup = () => { clearTimeout(timer); window.removeEventListener('message', receive); };
+        const receive = event => {
+          if (event.source !== window.parent || event.origin !== 'https://zeta-ai.io' || event.data?.type !== contextChannel + '-export' || event.data.id !== id) return;
+          cleanup();
+          if (event.data.ok) resolve(true); else reject(new Error('파일 저장 요청을 처리하지 못했어.'));
+        };
+        const timer = setTimeout(() => { cleanup(); reject(new Error('바깥 페이지에서 응답이 없어. 업데이트 후 페이지를 새로고침해줘.')); }, 5000);
+        window.addEventListener('message', receive);
+        window.parent.postMessage({ type: contextChannel, roomId, exportId: id, exportText: text }, 'https://zeta-ai.io');
+      });
+    }
+    return saveIndexedText(text, roomId);
+  }
+
+  function saveIndexedText(text, roomId) {
     const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1065,7 +1092,10 @@
       try {
         // 검색창을 연 뒤 추가된 상태창까지 내보내기 직전에 갱신한다.
         await reload();
-        downloadIndexedTxt(rows, roomId);
+        const requested = await downloadIndexedTxt(rows, roomId);
+        status(requested ? 'TXT 파일 다운로드를 요청했어. 브라우저 다운로드 목록을 확인해줘.' : '내보낼 색인이 없어.');
+      } catch (error) {
+        status('내보내기 실패: ' + error.message);
       } finally {
         exportButton.disabled = !rows.length;
       }
