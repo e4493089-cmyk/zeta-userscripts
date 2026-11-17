@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Zeta Capture OOC Hide
 // @namespace    zeta-capture-ooc-hide
-// @version      0.1.11
+// @version      0.1.12
 // @description  Zeta 캡처 미리보기에서 내 말풍선과 내레이터의 OOC: 구문을 인식해 골라 제거합니다.
 // @match        https://zeta-ai.io/*
+// @match        https://frame.pingpong.ai/v1/index.html
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-ooc-hide.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-capture-ooc-hide.user.js
 // @run-at       document-start
@@ -12,6 +13,8 @@
 
 (() => {
   'use strict';
+  const inChatFrame = location.origin === 'https://frame.pingpong.ai';
+  if (inChatFrame && (new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io' || (document.referrer && new URL(document.referrer).origin !== 'https://zeta-ai.io'))) return;
 
   const STYLE_ID = 'zeta-capture-ooc-hide-style';
   const CONTROL_ID = 'zeta-capture-ooc-hide-control';
@@ -45,7 +48,7 @@
   }
 
   function getPreview() {
-    return document.querySelector('[data-sentry-component="CapturePreview"]');
+    return document.querySelector(':is([data-sentry-component="CapturePreview"], section:has(> header button[aria-label="Save captured image"]))');
   }
 
   function inCurrentPreview(node) {
@@ -199,7 +202,7 @@
   }
 
   function candidateKey(root, text) {
-    const bubble = root.closest('[data-sentry-component="ChatBubbleContainer"]') || root;
+    const bubble = root.closest('[data-sentry-component="ChatBubbleContainer"], .message-context-menu-trigger') || root;
     return `${shortHash(normalizeText(bubble.textContent))}:${shortHash(normalizeText(text))}`;
   }
 
@@ -259,14 +262,14 @@
     const found = new Set();
     previewRoot.querySelectorAll(
       '[data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"] .chat, ' +
-      '[data-sentry-component="ChatBubbleContainer"].kt-me .chat'
+      '[data-sentry-component="ChatBubbleContainer"].kt-me .chat, .message-context-menu-trigger.bg-bubble-user .chat'
     ).forEach(el => found.add(el));
     return [...found];
   }
 
   function narratorChatRoots() {
     if (!previewRoot) return [];
-    return [...previewRoot.querySelectorAll('[data-sentry-component="NarratorBubble"] .chat')];
+    return [...previewRoot.querySelectorAll(':is([data-sentry-component="NarratorBubble"], .message-context-menu-trigger.bg-gray-main) .chat')];
   }
 
   function allChatRoots() {
@@ -275,7 +278,7 @@
 
   function markPureNarrators() {
     if (!previewRoot) return;
-    previewRoot.querySelectorAll('[data-sentry-component="NarratorBubble"]').forEach(narrator => {
+    previewRoot.querySelectorAll(':is([data-sentry-component="NarratorBubble"], .message-context-menu-trigger.bg-gray-main)').forEach(narrator => {
       if (!(narrator instanceof Element)) return;
       const chat = narrator.querySelector('.chat');
       if (!(chat instanceof Element)) return;
@@ -380,7 +383,7 @@
       allChatRoots().forEach(chat => {
         // 순수 OOC 내레이터는 바깥 NarratorBubble 전체를 후보로 잡았으므로
         // 안쪽 텍스트를 다시 쪼개지 않는다.
-        if (chat.closest(`[data-sentry-component="NarratorBubble"].${NARRATOR_WHOLE}`)) return;
+        if (chat.closest(`:is([data-sentry-component="NarratorBubble"], .message-context-menu-trigger.bg-gray-main).${NARRATOR_WHOLE}`)) return;
         markWholeBlocks(chat);
         wrapInlineOoc(chat);
       });
@@ -615,7 +618,7 @@
       const nodes = [...record.addedNodes, ...record.removedNodes];
       return !nodes.length || !nodes.every(node => node instanceof Element && node.id === CONTROL_ID);
     });
-    const selector = '[data-sentry-component="CapturePreview"]';
+    const selector = ':is([data-sentry-component="CapturePreview"], section:has(> header button[aria-label="Save captured image"]))';
 
     if (previewRoot) {
       return records.some(record => {
