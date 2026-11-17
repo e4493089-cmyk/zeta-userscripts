@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.75
+// @version      3.50.76
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1143,13 +1143,16 @@
 
     /* 하단 '대화방 나가기' 영역 */
     html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
-      .kt-sidebar-footer {
+      .kt-sidebar-footer,
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] .kt-sidebar-footer .bg-gray-main,
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] .kt-sidebar-footer .bg-gray-sub1 {
       background: #F8F9FA !important;
       border-top: 1px solid #E4E9EC !important;
     }
 
     html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
-      .kt-sidebar-footer button {
+      .kt-sidebar-footer button,
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] button.kt-sidebar-footer {
       color: #D94B4B !important;
       background: transparent !important;
     }
@@ -9691,18 +9694,20 @@
 
       btn.classList.toggle(
         'kt-sidebar-danger',
-        label === '대화 삭제' || label === '대화방 나가기'
+        label === '대화 삭제' || /(?:대화방|플롯).*나가기/.test(label)
       );
     });
 
-    /* 다이얼로그 마지막 직접 자식이 '대화방 나가기' footer */
-    const directChildren = Array.from(dialog.children);
-    const footer = directChildren.find(el => {
-      const label = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      return label === '대화방 나가기';
-    });
-
-    if (footer) {
+    dialog.querySelectorAll('.kt-sidebar-footer').forEach(el => el.classList.remove('kt-sidebar-footer'));
+    const leave = Array.from(dialog.querySelectorAll('button')).find(button =>
+      /(?:대화방|플롯).*나가기/.test(normalizeText(button.textContent))
+    );
+    if (leave) {
+      let footer = leave;
+      while (footer.parentElement && footer.parentElement !== dialog &&
+        footer.parentElement.querySelectorAll('button').length === 1) {
+        footer = footer.parentElement;
+      }
       footer.classList.add('kt-sidebar-footer');
     }
   }
