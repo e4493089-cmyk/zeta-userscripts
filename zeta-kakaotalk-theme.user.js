@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.86
+// @version      3.50.87
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1444,23 +1444,23 @@
     }
 
     /* 팝업 상단 헤더 */
-    html.${ACTIVE} .kt-message-panel > div:first-child {
+    html.${ACTIVE} .kt-message-panel > :is(div:first-child, header, .kt-message-header) {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-bottom-color: #E6EBEE !important;
     }
 
-    html.${ACTIVE} .kt-message-panel > div:first-child p,
-    html.${ACTIVE} .kt-message-panel > div:first-child span {
+    html.${ACTIVE} .kt-message-panel > :is(div:first-child, header, .kt-message-header) p,
+    html.${ACTIVE} .kt-message-panel > :is(div:first-child, header, .kt-message-header) span {
       color: #26343C !important;
     }
 
-    html.${ACTIVE} .kt-message-panel > div:first-child button {
+    html.${ACTIVE} .kt-message-panel > :is(div:first-child, header, .kt-message-header) button {
       background: transparent !important;
       color: #26343C !important;
     }
 
-    html.${ACTIVE} .kt-message-panel > div:first-child button svg {
+    html.${ACTIVE} .kt-message-panel > :is(div:first-child, header, .kt-message-header) button svg {
       color: #26343C !important;
     }
 
@@ -1515,24 +1515,24 @@
       border-top: 1px solid #E5EAED !important;
     }
 
-    html.${ACTIVE} .kt-message-tabs > button {
+    html.${ACTIVE} :is(.kt-message-tabs > button, .kt-message-tab) {
       background: transparent !important;
       color: #9AA4A9 !important;
       border-radius: 0 !important;
     }
 
-    html.${ACTIVE} .kt-message-tabs > button svg,
-    html.${ACTIVE} .kt-message-tabs > button span {
+    html.${ACTIVE} :is(.kt-message-tabs > button, .kt-message-tab) svg,
+    html.${ACTIVE} :is(.kt-message-tabs > button, .kt-message-tab) span {
       color: inherit !important;
     }
 
-    html.${ACTIVE} .kt-message-tabs > button:is([aria-pressed="true"], .kt-message-tab-active) {
+    html.${ACTIVE} :is(.kt-message-tabs > button, .kt-message-tab):is([aria-pressed="true"], .kt-message-tab-active) {
       color: #26343C !important;
       box-shadow: inset 0 3px 0 var(--kt-yellow) !important;
       background: #FFFDF0 !important;
     }
 
-    html.${ACTIVE} .kt-message-tabs > button[aria-pressed="false"]:hover {
+    html.${ACTIVE} :is(.kt-message-tabs > button, .kt-message-tab)[aria-pressed="false"]:hover {
       background: #F7F8F9 !important;
     }
 
@@ -4650,12 +4650,15 @@
 
     html.${DIARY_ACTIVE} [role="dialog"][aria-label="일기"],
     html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])),
+    html.${ACTIVE} .kt-dream-panel,
     html.${DIARY_ACTIVE} [data-testid="character-diary-safe-area"] {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
     }
 
     /* 공통 상단바 */
+    html.${ACTIVE} :is(.kt-dream-header, .kt-dream-footer),
+    html.${DIARY_ACTIVE} [data-testid="character-diary-safe-area"] :is(header, .kt-plugin-header, .kt-plugin-footer),
     html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])) >
       [data-testid="character-diary-safe-area"] > header {
       background: var(--kt-white) !important;
@@ -4664,6 +4667,8 @@
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
+    html.${ACTIVE} :is(.kt-dream-header, .kt-dream-footer) :is(h2, h3, p, span, button, svg),
+    html.${DIARY_ACTIVE} :is(.kt-plugin-header, .kt-plugin-footer) :is(h2, h3, p, span, button, svg),
     html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])) header h2,
     html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])) header button,
     html.${DIARY_ACTIVE} :is([data-sentry-component="DiaryPanel"], .scene-web div:has(> [data-testid="character-diary-safe-area"])) header svg {
@@ -5908,9 +5913,10 @@
     }
 
     /* 제타그램 본체 */
+    html.${ACTIVE} #portal-container [data-testid="zetagram-panel"].kt-zetagram-surface,
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      div:has(> :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header))):has(> [data-testid="zetagram-feed"]) {
+      :is(.kt-zetagram-surface, div:has(> :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header), .kt-zetagram-header)):has(> [data-testid="zetagram-feed"])) {
       background: #FFFFFF !important;
       color: #262626 !important;
       color-scheme: light !important;
@@ -5922,7 +5928,7 @@
     /* 상단 Instagram식 흰 헤더 */
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header)) {
+      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header), .kt-zetagram-header) {
       min-height: 50px !important;
       padding: 8px 12px 7px 14px !important;
       background: #FFFFFF !important;
@@ -5939,26 +5945,26 @@
 
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header)) button:is([aria-label="닫기"], [aria-label="Close"]) {
+      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header), .kt-zetagram-header) button:is([aria-label="닫기"], [aria-label="Close"]) {
       background: transparent !important;
       color: #262626 !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header)) button:is([aria-label="닫기"], [aria-label="Close"]):hover {
+      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header), .kt-zetagram-header) button:is([aria-label="닫기"], [aria-label="Close"]):hover {
       background: #F2F2F2 !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header)) button:is([aria-label="닫기"], [aria-label="Close"]) svg {
+      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header), .kt-zetagram-header) button:is([aria-label="닫기"], [aria-label="Close"]) svg {
       color: #262626 !important;
     }
 
     /* 피드 */
     html.${ACTIVE} #portal-container
-      [data-testid="zetagram-feed"] {
+      :is([data-testid="zetagram-feed"], .kt-zetagram-footer) {
       background: #FFFFFF !important;
       color: #262626 !important;
       scrollbar-width: none !important;
@@ -6457,12 +6463,12 @@
 
     /* ---------- 게시판 전체 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"],
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel),
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"],
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardPanel"], .kt-board-content),
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="anonymous-board-safe-area"] {
       background: #FFFFFF !important;
       color: #20242A !important;
@@ -6471,37 +6477,37 @@
 
     /* 다크 테마 잔재 공통 제거 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"] .text-white {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardPanel"], .kt-board-content) :is(.text-white, .text-gray-50, .text-gray-100, .text-gray-200) {
       color: #20242A !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"] [class*="text-white/"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardPanel"], .kt-board-content) :is([class*="text-white/"], .text-gray-300, .text-gray-400) {
       color: #7B858F !important;
       opacity: 1 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"] [class*="border-white/"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardPanel"], .kt-board-content) [class*="border-white/"] {
       border-color: #E6E9ED !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"] [class*="bg-white/10"],
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardPanel"], .kt-board-content) [class*="bg-white/10"],
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"] [class*="bg-white/15"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardPanel"], .kt-board-content) [class*="bg-white/15"] {
       background: #F1F3F5 !important;
     }
 
     /* ---------- 상단 헤더 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header) {
       background: #FFFFFF !important;
       color: #20242A !important;
       border-bottom: 1px solid #E6E9ED !important;
@@ -6509,95 +6515,95 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"] h2 {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header) h2 {
       color: #20242A !important;
       font-weight: 700 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header)
       button[aria-label="닫기"],
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header)
       button[aria-label="뒤로"] {
       color: #303841 !important;
       background: transparent !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header)
       button[aria-label="닫기"] svg,
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header)
       button[aria-label="뒤로"] svg {
       color: #303841 !important;
     }
 
     /* 글쓰기 헤더: 취소 / 등록 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"] nav
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header) nav
       > button:first-child:not([aria-label]) {
       color: #6F7882 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"] nav
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header) nav
       > button:last-child:not([aria-label]) {
       color: #355E7A !important;
       font-weight: 700 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      header[data-sentry-component="Header"] nav
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(header, .kt-board-header) nav
       > button:last-child:not([aria-label]):disabled {
       color: #B9C0C7 !important;
     }
 
     /* ---------- 탭 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardTabs"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardTabs"], [role="tablist"], .kt-board-tabs) {
       background: #FFFFFF !important;
       border-bottom: 1px solid #E6E9ED !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardTabs"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardTabs"], [role="tablist"], .kt-board-tabs)
       [role="tab"] {
       color: #8A939C !important;
       background: transparent !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardTabs"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardTabs"], [role="tablist"], .kt-board-tabs)
       [role="tab"][aria-selected="true"] {
       color: #263746 !important;
       font-weight: 700 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardTabs"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardTabs"], [role="tablist"], .kt-board-tabs)
       [role="tab"][aria-selected="true"]
       > span:last-child {
       background: #486A84 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-tab-unread-dot"],
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-unread-dot"] {
       background: #EF5350 !important;
       box-shadow: none !important;
@@ -6605,8 +6611,8 @@
 
     /* 새 글 불러오기 10피스 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardTabs"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardTabs"], [role="tablist"], .kt-board-tabs)
       button[aria-label^="새 글 불러오기"] {
       background: #FFFFFF !important;
       color: #66727D !important;
@@ -6615,8 +6621,8 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardTabs"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardTabs"], [role="tablist"], .kt-board-tabs)
       button[aria-label^="새 글 불러오기"]:hover {
       background: #F7F8FA !important;
       border-color: #CDD4DA !important;
@@ -6624,33 +6630,33 @@
 
     /* ---------- 목록 / 스크롤 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardList"],
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardList"], [data-testid="board-scroll"]),
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-scroll"],
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-pull-content"] {
       background: #FFFFFF !important;
       color: #20242A !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-scroll"] {
       scrollbar-width: thin !important;
       scrollbar-color: #CDD3D9 transparent !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-scroll"]::-webkit-scrollbar {
       width: 5px !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-scroll"]::-webkit-scrollbar-thumb {
       background: #CDD3D9 !important;
       border-radius: 999px !important;
@@ -6658,7 +6664,7 @@
 
     /* 당겨서 새 글 보기 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-pull-indicator"] {
       background: #F7F8FA !important;
       color: #7A848E !important;
@@ -6666,7 +6672,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-pull-spinner"] {
       border-color: #D8DDE2 !important;
       border-top-color: #486A84 !important;
@@ -6674,28 +6680,28 @@
 
     /* ---------- 빈 게시판 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="EmptyBoard"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="EmptyBoard"], .kt-board-empty) {
       background: #FFFFFF !important;
       color: #20242A !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="EmptyBoard"] p:first-of-type {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="EmptyBoard"], .kt-board-empty) p:first-of-type {
       color: #39424C !important;
       font-weight: 700 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="EmptyBoard"] p:last-of-type {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="EmptyBoard"], .kt-board-empty) p:last-of-type {
       color: #8A949E !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="EmptyBoard"] button {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="EmptyBoard"], .kt-board-empty) button {
       background: #486A84 !important;
       color: #FFFFFF !important;
       border: 1px solid #486A84 !important;
@@ -6703,55 +6709,55 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="EmptyBoard"] button:hover {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="EmptyBoard"], .kt-board-empty) button:hover {
       background: #3E5E75 !important;
       border-color: #3E5E75 !important;
     }
 
     /* ---------- 글 목록 카드 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardList"]
-      [data-sentry-component="PostCard"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardList"], [data-testid="board-scroll"])
+      :is([data-sentry-component="PostCard"], .kt-board-post-card) {
       background: #FFFFFF !important;
       color: #20242A !important;
       border-bottom: 1px solid #ECEFF2 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardList"]
-      [data-sentry-component="PostCard"]:hover {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardList"], [data-testid="board-scroll"])
+      :is([data-sentry-component="PostCard"], .kt-board-post-card):hover {
       background: #FAFBFC !important;
     }
 
     /* 익명 아바타 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="AnonymousAvatar"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="AnonymousAvatar"], .kt-board-avatar) {
       background: #EEF1F4 !important;
       color: #89939D !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="AnonymousAvatar"] svg {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="AnonymousAvatar"], .kt-board-avatar) svg {
       color: #89939D !important;
     }
 
     /* 작성자 / 시간 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostCard"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostCard"], .kt-board-post-card)
       > button > div:first-child
       > span:nth-child(2) {
       color: #65717C !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostCard"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostCard"], .kt-board-post-card)
       > button > div:first-child
       > span[class*="ml-auto"] {
       color: #A0A7AE !important;
@@ -6759,52 +6765,52 @@
 
     /* 내가 쓴 글의 작성자 강조색 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostCard"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostCard"], .kt-board-post-card)
       [class*="text-primary-"] {
       color: #355E7A !important;
     }
 
     /* 제목 / 미리보기 본문 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostCard"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostCard"], .kt-board-post-card)
       > button > span[class*="font-semibold"] {
       color: #20242A !important;
       font-weight: 700 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostCard"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostCard"], .kt-board-post-card)
       > button > p {
       color: #6F7983 !important;
     }
 
     /* 좋아요 / 댓글 수 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostStats"],
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostStats"], .kt-board-stats),
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostStats"]
-      [data-sentry-component="Stat"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostStats"], .kt-board-stats)
+      :is([data-sentry-component="Stat"], .kt-board-stat) {
       color: #8A949D !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostStats"] svg {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostStats"], .kt-board-stats) svg {
       color: #8A949D !important;
     }
 
     /* ---------- 투표 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PollOptions"] > button,
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PollOptions"], .kt-board-poll) > button,
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PollOptions"] > div {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PollOptions"], .kt-board-poll) > div {
       background: #FFFFFF !important;
       color: #303840 !important;
       border-color: #DDE2E7 !important;
@@ -6812,44 +6818,44 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PollOptions"] > button:hover {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PollOptions"], .kt-board-poll) > button:hover {
       background: #F7F9FB !important;
       border-color: #C9D2D9 !important;
     }
 
     /* 결과 게이지 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PollOptions"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PollOptions"], .kt-board-poll)
       span[class*="bg-primary-"] {
       background: #E8F0F5 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PollOptions"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PollOptions"], .kt-board-poll)
       > div[class*="border-primary-"] {
       border-color: #5B7A91 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PollOptions"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PollOptions"], .kt-board-poll)
       span[class*="text-primary-"] {
       color: #355E7A !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PollOptions"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PollOptions"], .kt-board-poll)
       + div > span:first-child {
       color: #9099A2 !important;
     }
 
     /* ---------- 글쓰기 플로팅 버튼 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="글쓰기"] {
       background: #486A84 !important;
       color: #FFFFFF !important;
@@ -6858,47 +6864,47 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="글쓰기"]:hover {
       background: #3E5E75 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="글쓰기"] svg {
       color: #FFFFFF !important;
     }
 
     /* ---------- 게시글 상세 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"] {
       background: #FFFFFF !important;
       color: #20242A !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"] h3 {
       color: #20242A !important;
       font-weight: 700 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"] > p {
       color: #3F4851 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"]
       > div:first-child > span:nth-child(2) {
       color: #65717C !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"]
       > div:first-child > span[class*="ml-auto"] {
       color: #A0A7AE !important;
@@ -6906,7 +6912,7 @@
 
     /* 글 / 댓글 사이 구분띠 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"] + div {
       background: #F4F6F8 !important;
       border-top: 1px solid #ECEFF2 !important;
@@ -6915,143 +6921,143 @@
 
     /* ---------- 댓글 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-comments-block"] {
       background: #FFFFFF !important;
       color: #20242A !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-comments-block"] > p:first-child {
       color: #313A43 !important;
       font-weight: 700 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentList"] > li {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentList"], [data-testid="board-comments-block"] ul) > li {
       background: #FFFFFF !important;
       border-bottom: 1px solid #EEF1F3 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentList"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentList"], [data-testid="board-comments-block"] ul)
       > li > div > div:first-child {
       color: #929BA4 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentList"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentList"], [data-testid="board-comments-block"] ul)
       > li > div > div:first-child > span:first-child {
       color: #56636E !important;
       font-weight: 700 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentList"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentList"], [data-testid="board-comments-block"] ul)
       > li > div > div:first-child button {
       color: #7A8791 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentList"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentList"], [data-testid="board-comments-block"] ul)
       > li > div > p {
       color: #343D45 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentList"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentList"], [data-testid="board-comments-block"] ul)
       [class*="text-primary-"] {
       color: #355E7A !important;
     }
 
     /* 상세 하단 입력 바 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is(:is([data-sentry-component="BoardPanel"], .kt-board-content)
       > [data-testid="anonymous-board-safe-area"]
-      > div:last-of-type {
+      > div:last-of-type, .kt-board-footer) {
       border-top-color: #E5E9ED !important;
       background: #FFFFFF !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"] {
       color: #77838D !important;
       background: transparent !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="true"] {
       color: #E0525C !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"] svg {
       color: currentColor !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentComposer"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentComposer"], .kt-board-composer) {
       background: #F1F3F5 !important;
       border: 1px solid #E1E5E8 !important;
       color: #20242A !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentComposer"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentComposer"], .kt-board-composer)
       textarea {
       color: #28313A !important;
       caret-color: #486A84 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentComposer"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentComposer"], .kt-board-composer)
       textarea::placeholder {
       color: #9AA2AA !important;
       opacity: 1 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentComposer"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentComposer"], .kt-board-composer)
       button[aria-label="등록"] {
       color: #486A84 !important;
       background: transparent !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentComposer"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentComposer"], .kt-board-composer)
       button[aria-label="등록"] svg {
       color: #486A84 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentComposer"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentComposer"], .kt-board-composer)
       button[aria-label="등록"]:disabled svg {
       color: #B8C0C7 !important;
     }
 
     /* ---------- 글쓰기 ---------- */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       input[aria-label="제목"],
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       textarea[aria-label="내용을 입력하세요"] {
       background: #FFFFFF !important;
       color: #20242A !important;
@@ -7060,38 +7066,38 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       input[aria-label="제목"]::placeholder,
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       textarea[aria-label="내용을 입력하세요"]::placeholder {
       color: #A0A8B0 !important;
       opacity: 1 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       textarea[aria-label="내용을 입력하세요"] + span {
       color: #9AA2AA !important;
     }
 
     /* 작성자 선택 영역 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       div:has(> [role="radiogroup"][aria-label="작성자"]) {
       border-top-color: #E5E9ED !important;
       background: #FFFFFF !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       div:has(> [role="radiogroup"][aria-label="작성자"])
       > span:first-child {
       color: #7D8790 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [role="radiogroup"][aria-label="작성자"]
       button[role="radio"] {
       border: 1px solid #DDE2E6 !important;
@@ -7101,7 +7107,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [role="radiogroup"][aria-label="작성자"]
       button[role="radio"][aria-checked="true"] {
       background: #486A84 !important;
@@ -7111,8 +7117,8 @@
 
     /* 이름 지정 시 나타나는 추가 입력칸도 흰 커뮤 톤 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardPanel"], .kt-board-content)
       input:not([aria-label="제목"]) {
       background: #FFFFFF !important;
       color: #20242A !important;
@@ -7121,8 +7127,8 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardPanel"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardPanel"], .kt-board-content)
       input:not([aria-label="제목"])::placeholder {
       color: #A0A8B0 !important;
     }
@@ -7211,7 +7217,7 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"] {
       appearance: none !important;
       -webkit-appearance: none !important;
@@ -7225,10 +7231,10 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="false"],
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="false"] svg {
       color: #7B8791 !important;
       fill: none !important;
@@ -7236,17 +7242,17 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="false"] svg path {
       fill: none !important;
       stroke: currentColor !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="true"],
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="true"] svg {
       color: #F04452 !important;
       fill: #F04452 !important;
@@ -7254,7 +7260,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="true"] svg path {
       color: #F04452 !important;
       fill: currentColor !important;
@@ -7262,7 +7268,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"]:hover {
       color: #5F6B75 !important;
       background: #F3F5F7 !important;
@@ -7270,14 +7276,14 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="true"]:hover {
       color: #E73545 !important;
       background: #FFF1F3 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"]:active {
       transform: scale(.90) !important;
     }
@@ -7289,18 +7295,18 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardList"]
-      [data-sentry-component="PostCard"]:has(
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardList"], [data-testid="board-scroll"])
+      :is([data-sentry-component="PostCard"], .kt-board-post-card):has(
         > button > div:first-child > .caption1[class*="text-primary-"]
       ) {
       background: #F5F6F7 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardList"]
-      [data-sentry-component="PostCard"]:has(
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardList"], [data-testid="board-scroll"])
+      :is([data-sentry-component="PostCard"], .kt-board-post-card):has(
         > button > div:first-child > .caption1[class*="text-primary-"]
       ):hover {
       background: #EEF1F3 !important;
@@ -7308,9 +7314,9 @@
 
     /* 내 글 작성자명도 배경 위에서 조금 더 선명하게 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="BoardList"]
-      [data-sentry-component="PostCard"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="BoardList"], [data-testid="board-scroll"])
+      :is([data-sentry-component="PostCard"], .kt-board-post-card)
       > button > div:first-child > .caption1[class*="text-primary-"] {
       color: #355E7A !important;
       font-weight: 700 !important;
@@ -7325,9 +7331,9 @@
 
     /* 하단 공감+댓글 바 자체를 클릭 가능한 최상단 레이어로 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       div:has(> button[aria-label="공감"]):has(
-        [data-sentry-component="CommentComposer"]
+        :is([data-sentry-component="CommentComposer"], .kt-board-composer)
       ) {
       position: relative !important;
       z-index: 20 !important;
@@ -7336,7 +7342,7 @@
 
     /* 공감 버튼 클릭 영역 보장 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"] {
       position: relative !important;
       z-index: 3 !important;
@@ -7361,7 +7367,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"] svg {
       position: relative !important;
       z-index: 1 !important;
@@ -7379,14 +7385,14 @@
       - 채운 하트 path: fill="currentColor"
     */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"] svg path[stroke] {
       fill: none !important;
       stroke: currentColor !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"] svg path[fill="currentColor"] {
       fill: currentColor !important;
       stroke: none !important;
@@ -7394,39 +7400,39 @@
 
     /* 기본: 회색 빈 하트 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"] {
       color: #7B8791 !important;
     }
 
     /* 제타가 눌림 상태로 바꾼 모든 신호를 인정 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="true"],
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"].text-error-light,
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"]:has(svg path[fill="currentColor"]) {
       color: #F04452 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"]:hover {
       background: #F3F5F7 !important;
       border-radius: 999px !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"][aria-pressed="true"]:hover,
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"].text-error-light:hover,
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       button[aria-label="공감"]:has(svg path[fill="currentColor"]):hover {
       background: #FFF1F3 !important;
       color: #E73545 !important;
@@ -7434,8 +7440,8 @@
 
     /* 댓글 입력 폼이 하트 위를 덮지 않도록 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="CommentComposer"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="CommentComposer"], .kt-board-composer) {
       position: relative !important;
       z-index: 1 !important;
     }
@@ -7449,36 +7455,36 @@
 
     /* 일반 통계 하트 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostStats"]
-      [data-sentry-component="Stat"][aria-label^="공감"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostStats"], .kt-board-stats)
+      :is([data-sentry-component="Stat"], .kt-board-stat)[aria-label^="공감"] {
       color: #8A949D !important;
       opacity: 1 !important;
     }
 
     /* 공감 완료 상태: 기존 회색 !important보다 뒤에서 강제 우선 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostStats"]
-      [data-sentry-component="Stat"][aria-label*="내가 공감함"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostStats"], .kt-board-stats)
+      :is([data-sentry-component="Stat"], .kt-board-stat)[aria-label*="내가 공감함"] {
       color: #F04452 !important;
       font-weight: 700 !important;
       opacity: 1 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostStats"]
-      [data-sentry-component="Stat"][aria-label*="내가 공감함"] svg {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostStats"], .kt-board-stats)
+      :is([data-sentry-component="Stat"], .kt-board-stat)[aria-label*="내가 공감함"] svg {
       color: #F04452 !important;
       fill: none !important;
       opacity: 1 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
-      [data-sentry-component="PostStats"]
-      [data-sentry-component="Stat"][aria-label*="내가 공감함"] svg path[fill="currentColor"] {
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
+      :is([data-sentry-component="PostStats"], .kt-board-stats)
+      :is([data-sentry-component="Stat"], .kt-board-stat)[aria-label*="내가 공감함"] svg path[fill="currentColor"] {
       color: #F04452 !important;
       fill: currentColor !important;
       stroke: none !important;
@@ -7486,10 +7492,10 @@
 
     /* 상세 페이지의 상단 공감 통계도 클릭 가능한 것처럼 표시 */
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"]
-      [data-sentry-component="PostStats"]
-      [data-sentry-component="Stat"][aria-label^="공감"] {
+      :is([data-sentry-component="PostStats"], .kt-board-stats)
+      :is([data-sentry-component="Stat"], .kt-board-stat)[aria-label^="공감"] {
       cursor: pointer !important;
       user-select: none !important;
       border-radius: 6px !important;
@@ -7499,18 +7505,18 @@
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"]
-      [data-sentry-component="PostStats"]
-      [data-sentry-component="Stat"][aria-label^="공감"]:hover {
+      :is([data-sentry-component="PostStats"], .kt-board-stats)
+      :is([data-sentry-component="Stat"], .kt-board-stat)[aria-label^="공감"]:hover {
       background: #F2F4F6 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [role="dialog"][aria-label="익명 게시판"]
+      :is([role="dialog"][aria-label="익명 게시판"], .kt-board-panel)
       [data-testid="board-post-block"]
-      [data-sentry-component="PostStats"]
-      [data-sentry-component="Stat"][aria-label*="내가 공감함"]:hover {
+      :is([data-sentry-component="PostStats"], .kt-board-stats)
+      :is([data-sentry-component="Stat"], .kt-board-stat)[aria-label*="내가 공감함"]:hover {
       background: #FFF0F2 !important;
     }
 
@@ -8425,25 +8431,25 @@
        채팅 본문의 꿈 / 엿보기
        밝은 채팅 배경에서도 제목과 버튼이 선명하게 보이도록 보정
     ========================================================= */
-    html.${ACTIVE} [role="log"][aria-label="Chat messages"] [data-sentry-component*="Dream"] {
+    html.${ACTIVE} [role="log"][aria-label="Chat messages"] :is([data-sentry-component*="Dream"], .kt-dream-card, [data-testid*="dream"], [data-slot*="dream"]) {
       color: var(--kt-text) !important;
     }
 
-    html.${ACTIVE} [role="log"][aria-label="Chat messages"] [data-sentry-component*="Dream"] span,
-    html.${ACTIVE} [role="log"][aria-label="Chat messages"] [data-sentry-component*="Dream"] p {
+    html.${ACTIVE} [role="log"][aria-label="Chat messages"] :is([data-sentry-component*="Dream"], .kt-dream-card, [data-testid*="dream"], [data-slot*="dream"]) span,
+    html.${ACTIVE} [role="log"][aria-label="Chat messages"] :is([data-sentry-component*="Dream"], .kt-dream-card, [data-testid*="dream"], [data-slot*="dream"]) p {
       color: var(--kt-chat-text) !important;
       opacity: 1 !important;
     }
 
-    html.${ACTIVE} [role="log"][aria-label="Chat messages"] [data-sentry-component*="Dream"] button {
+    html.${ACTIVE} [role="log"][aria-label="Chat messages"] :is([data-sentry-component*="Dream"], .kt-dream-card, [data-testid*="dream"], [data-slot*="dream"]) button {
       color: var(--kt-chat-text) !important;
       background: var(--kt-chat-glass) !important;
       border: 1px solid var(--kt-chat-line) !important;
       opacity: 1 !important;
     }
 
-    html.${ACTIVE} [role="log"][aria-label="Chat messages"] [data-sentry-component*="Dream"] button span,
-    html.${ACTIVE} [role="log"][aria-label="Chat messages"] [data-sentry-component*="Dream"] button svg {
+    html.${ACTIVE} [role="log"][aria-label="Chat messages"] :is([data-sentry-component*="Dream"], .kt-dream-card, [data-testid*="dream"], [data-slot*="dream"]) button span,
+    html.${ACTIVE} [role="log"][aria-label="Chat messages"] :is([data-sentry-component*="Dream"], .kt-dream-card, [data-testid*="dream"], [data-slot*="dream"]) button svg {
       color: var(--kt-chat-text) !important;
       opacity: 1 !important;
     }
@@ -8460,11 +8466,12 @@
        꿈 엿보기 확인 팝업
        Zeta 플러그인 추가 UI를 카톡 테마의 밝은 팝업으로 통일
     ========================================================= */
-    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"]) {
+    html.${ACTIVE} #portal-container :is([data-sentry-component="Popup"]:has(:is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content)), .kt-dream-confirm-layer) {
       background: rgba(28,36,42,.46) !important;
     }
 
-    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"])
+    html.${ACTIVE} .kt-dream-confirm-surface,
+    html.${ACTIVE} #portal-container :is([data-sentry-component="Popup"]:has(:is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content)), .kt-dream-confirm-layer)
       > div {
       background: var(--kt-white) !important;
       color: var(--kt-text) !important;
@@ -8472,35 +8479,35 @@
       box-shadow: 0 10px 30px rgba(35,48,56,.18) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] > span {
+    html.${ACTIVE} :is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content) > span {
       color: var(--kt-text) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] [role="checkbox"],
-    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] [role="checkbox"] span,
-    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] [role="checkbox"] svg {
+    html.${ACTIVE} :is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content) [role="checkbox"],
+    html.${ACTIVE} :is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content) [role="checkbox"] span,
+    html.${ACTIVE} :is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content) [role="checkbox"] svg {
       color: var(--kt-sub) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DreamConfirmContent"] [role="checkbox"][aria-checked="true"] svg {
+    html.${ACTIVE} :is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content) [role="checkbox"][aria-checked="true"] svg {
       color: var(--kt-user-name) !important;
     }
 
-    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"])
+    html.${ACTIVE} #portal-container :is([data-sentry-component="Popup"]:has(:is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content)), .kt-dream-confirm-layer)
       > div > div:last-child > button:first-child {
       background: var(--kt-soft) !important;
       color: var(--kt-text) !important;
       border: 1px solid var(--kt-line) !important;
     }
 
-    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"])
+    html.${ACTIVE} #portal-container :is([data-sentry-component="Popup"]:has(:is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content)), .kt-dream-confirm-layer)
       > div > div:last-child > button:last-child {
       background: var(--kt-yellow) !important;
       color: var(--kt-text) !important;
       border: 1px solid rgba(0,0,0,.06) !important;
     }
 
-    html.${ACTIVE} #portal-container [data-sentry-component="Popup"]:has([data-sentry-component="DreamConfirmContent"])
+    html.${ACTIVE} #portal-container :is([data-sentry-component="Popup"]:has(:is([data-sentry-component="DreamConfirmContent"], .kt-dream-confirm-content)), .kt-dream-confirm-layer)
       > div > div:last-child > button:last-child:hover {
       background: var(--kt-yellow-hover) !important;
     }
@@ -9904,6 +9911,7 @@
     }
     if (!panel) return;
     panel.classList.add('kt-message-panel');
+    panel.querySelector('header')?.classList.add('kt-message-header');
 
     const input = panel.querySelector('input[aria-label="메시지 입력"], input[placeholder="메시지 입력"]');
     const thread = input && panel.querySelector('[data-sentry-component="ThreadView"], [class*="overflow-y-auto"]');
@@ -9943,6 +9951,7 @@
       const labels = buttons.map(button => normalizeText(button.textContent));
       if (buttons.length !== 2 || !labels.includes('친구') || !labels.includes('채팅')) return;
       el.classList.add('kt-message-tabs');
+      buttons.forEach(button => button.classList.add('kt-message-tab'));
       buttons.forEach(button => button.classList.toggle('kt-message-tab-active',
         normalizeText(button.textContent) === heading
       ));
@@ -10119,6 +10128,93 @@
             btn.classList.toggle('kt-message-action-danger', label === '삭제');
           });
       });
+  }
+
+
+  // Stable plugin controls reconnect the original styles without a new palette.
+  function markPluginSurfaces(scope = document) {
+    const select = selector => [
+      ...(scope instanceof Element && scope.matches(selector) ? [scope] : []),
+      ...scope.querySelectorAll(selector)
+    ];
+    select('[data-testid="anonymous-board-safe-area"]').forEach(safe => {
+      const panel = safe.closest('[role="dialog"]') || safe.parentElement;
+      if (!panel) return;
+      panel.classList.add('kt-board-panel');
+      safe.classList.add('kt-board-content');
+      safe.parentElement?.classList.add('kt-board-content');
+      panel.querySelector('header')?.classList.add('kt-board-header');
+      panel.querySelectorAll('[role="tablist"]').forEach(el => el.classList.add('kt-board-tabs'));
+      const scroll = panel.querySelector('[data-testid="board-scroll"]');
+      const list = scroll?.querySelector('[data-testid="board-pull-content"]') || scroll;
+      list?.querySelectorAll('button').forEach(button => {
+        if (!button.querySelector('p') || !button.querySelector('span.font-semibold, h3')) return;
+        const card = button.parentElement;
+        if (card && card !== list && !card.querySelector('[data-testid="board-comments-block"]')) card.classList.add('kt-board-post-card');
+      });
+      const comments = panel.querySelector('[data-testid="board-comments-block"]');
+      const input = safe.querySelector('textarea');
+      if (input && comments) {
+        let composer = input.closest('form') || input.parentElement;
+        while (composer?.parentElement && composer.parentElement !== safe && !composer.querySelector('button')) composer = composer.parentElement;
+        composer?.classList.add('kt-board-composer');
+        let footer = composer;
+        while (footer?.parentElement && footer.parentElement !== safe) footer = footer.parentElement;
+        if (footer && footer !== safe && !footer.contains(scroll)) footer.classList.add('kt-board-footer');
+      }
+      panel.querySelectorAll('button[aria-label^="공감"], [aria-label*="내가 공감함"], [aria-label^="댓글"]').forEach(stat => {
+        stat.classList.add('kt-board-stat');
+        if (stat.parentElement !== safe && !stat.closest('.kt-board-footer')) stat.parentElement?.classList.add('kt-board-stats');
+      });
+    });
+    select('[data-testid="zetagram-panel"]').forEach(panel => {
+      const feed = panel.querySelector('[data-testid="zetagram-feed"]');
+      if (!feed) return;
+      let surface = feed.parentElement;
+      while (surface && surface !== panel && !surface.querySelector('header, button[aria-label="닫기"], button[aria-label="Close"]')) surface = surface.parentElement;
+      if (!surface) return;
+      surface.classList.add('kt-zetagram-surface');
+      const close = surface.querySelector('button[aria-label="닫기"], button[aria-label="Close"]');
+      let header = close?.parentElement;
+      while (header?.parentElement && header.parentElement !== surface && !header.parentElement.contains(feed)) header = header.parentElement;
+      if (header && !header.contains(feed)) header.classList.add('kt-zetagram-header');
+      Array.from(surface.children).forEach(el => {
+        if (el !== feed && el !== header && !el.contains(feed) && !el.contains(header) && !el.querySelector('img, video') && el !== surface.firstElementChild) el.classList.add('kt-zetagram-footer');
+      });
+    });
+    select('[data-testid="character-diary-safe-area"]').forEach(safe => {
+      const close = safe.querySelector('button[aria-label="닫기"], button[aria-label="Close"], button[aria-label="뒤로"]');
+      let header = close?.parentElement;
+      while (header?.parentElement && header.parentElement !== safe && !header.parentElement.querySelector('[class*="overflow-y"]')) header = header.parentElement;
+      if (header && !header.querySelector('[class*="overflow-y"]')) header.classList.add('kt-plugin-header');
+      safe.querySelectorAll('footer').forEach(el => el.classList.add('kt-plugin-footer'));
+    });
+    select('[role="log"][aria-label="Chat messages"] button').forEach(button => {
+      const label = normalizeText(button.getAttribute('aria-label') || button.textContent);
+      if (!/꿈.*엿보기|꿈 보기|꿈 들여다보기/.test(label)) return;
+      const card = button.closest('[data-testid*="dream"], [data-slot*="dream"]') || button.parentElement;
+      if (card && card !== button.closest('[role="log"]')) card.classList.add('kt-dream-card');
+    });
+    select('#portal-container [role="dialog"], #zeta [role="dialog"], [data-testid="dream-panel"], [data-testid="dream-safe-area"]').forEach(panel => {
+      if (panel.closest('[data-testid="anonymous-board-safe-area"], [data-testid="zetagram-panel"]')) return;
+      const title = normalizeText(panel.querySelector('header, h1, h2, h3')?.textContent).replace(/닫기|Close/g, '').trim();
+      const isDream = /^(?:꿈|꿈 엿보기|.*의 꿈)$/.test(title) || /^dream-(?:panel|safe-area)$/.test(panel.getAttribute('data-testid') || '');
+      if (!isDream) return;
+      const checkbox = panel.querySelector('[role="checkbox"], input[type="checkbox"]');
+      if (checkbox && /엿보기|피스|다시/.test(panel.textContent)) {
+        panel.classList.add('kt-dream-confirm-surface');
+        let layer = panel;
+        const portal = panel.closest('#portal-container');
+        while (layer.parentElement && layer.parentElement !== portal && layer.parentElement !== document.body && !layer.parentElement.contains(document.getElementById('zeta'))) layer = layer.parentElement;
+        layer.classList.add('kt-dream-confirm-layer');
+        (checkbox.closest('label')?.parentElement || checkbox.parentElement)?.classList.add('kt-dream-confirm-content');
+      } else {
+        panel.classList.add('kt-dream-panel');
+        panel.querySelectorAll('header, footer').forEach(el => el.classList.add(el.tagName === 'HEADER' ? 'kt-dream-header' : 'kt-dream-footer'));
+        const first = panel.firstElementChild;
+        if (first && !first.querySelector('[class*="overflow-y"]') && /꿈/.test(first.textContent)) first.classList.add('kt-dream-header');
+      }
+    });
   }
 
   function markThemeDialogs(scope = null) {
@@ -10358,6 +10454,7 @@
       markDeleteMode();
     } finally {
       // Reapply after marker cleanup, exactly once for every screen branch.
+      markPluginSurfaces();
       markThemeDialogs();
       markSnapshotLoading();
     }
@@ -10402,6 +10499,7 @@
       markMessageActionSheet();
     }
     if (touches('[data-testid="action-panel-grid"], [role="dialog"][aria-label="Chat actions"]')) markActionPanel();
+    markPluginSurfaces(document.getElementById('portal-container') || document);
     markMessagePhone();
     if (touches('[data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"]')) markSidebarMenu();
     if (touches('[aria-label="Snapshot archive"], [aria-label="Show or hide snapshot controls"]')) markSnapshotModals();
@@ -10428,7 +10526,7 @@
 
   const PASSIVE_CONTENT = '[data-sentry-component="BodyView"], [role="log"][aria-label="Chat messages"], [data-sentry-component="RoomList"], [data-testid^="room-list-item-"], [testid^="room-list-item-"]';
   const SPECIAL_CONTENT = '[data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="message-phone-backdrop"], [data-testid="message-phone-shell"], [data-sentry-component="DeleteModeHeader"], [role="dialog"], [data-sentry-component="KeyboardAvoidingView"]';
-  const SCREEN_STRUCTURE = '[data-testid="message-phone-backdrop"], [data-testid="message-phone-shell"], [data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="anonymous-board-safe-area"], [data-testid="zetagram-panel"], [data-testid="capture-mode-header-back"], main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
+  const SCREEN_STRUCTURE = 'header, footer, [data-testid="dream-panel"], [data-testid="dream-safe-area"], [data-testid="message-phone-backdrop"], [data-testid="message-phone-shell"], [data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="anonymous-board-safe-area"], [data-testid="zetagram-panel"], [data-testid="capture-mode-header-back"], main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
 
   function isSpecialContent(node) {
     return node instanceof Element && (node.matches(SPECIAL_CONTENT) || !!node.querySelector(SPECIAL_CONTENT));
