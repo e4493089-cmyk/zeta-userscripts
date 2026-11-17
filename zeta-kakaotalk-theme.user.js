@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.79
+// @version      3.50.80
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -9019,6 +9019,12 @@
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
+    }
+    /* 바깥 래퍼에 기본 테두리가 있어도 이중 원이 생기지 않게 한다. */
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-button"]:has([data-testid="action-panel-open-button"]) {
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
     }
     /* 내부 열기 버튼이 따로 있을 때는 안쪽 버튼 하나만 원형 처리 */
     html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-open-button"] {
