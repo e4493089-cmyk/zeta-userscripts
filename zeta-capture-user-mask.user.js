@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.10
+// @version      0.2.11
 // @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분을 글자 수만큼 ■로 가립니다. 네모 색은 원래 글자색을 따릅니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -81,11 +81,13 @@
 
   function collectUserNames() {
     document
-      .querySelectorAll('[data-sentry-component="RightTextContent"] .caption1, [data-key] .items-end:has(> div > .bg-bubble-user) > .caption1')
+      .querySelectorAll('[data-sentry-component="RightTextContent"] .caption1, .items-end:has(> div > .bg-bubble-user) > .caption1')
       .forEach(el => {
-        if (el.closest(`.${MASK_CLASS}, .swiper-slide`)) return;
+        if (el.closest('.swiper-slide')) return;
 
-        const name = normalizeText(el.textContent);
+        const copy = el.cloneNode(true);
+        copy.querySelectorAll('.' + MASK_CLASS).forEach(mask => mask.replaceWith(mask.dataset.zetaCaptureOriginal || ''));
+        const name = normalizeText(copy.textContent);
         if (!name) return;
 
         addUserNameAliases(name);
@@ -287,10 +289,12 @@
         )
       );
       if (captureAppeared) scheduleApply();
+      else if (records.some(record => [...record.addedNodes].some(node => node instanceof Element && (node.matches('.caption1') || node.querySelector('.items-end > .caption1'))))) collectUserNames();
     });
     // 캡처가 닫혀 있을 때 일반 채팅 DOM 변화는 깨우지 않는다.
     observer.observe(document.documentElement, {
       childList: true,
+      characterData: true,
       subtree: true
     });
 
