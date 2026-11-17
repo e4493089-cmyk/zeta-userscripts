@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Zeta Fullscreen
 // @namespace    zeta-fullscreen
-// @version      0.1.26
+// @version      0.1.27
 // @description  스냅샷 버튼이 있으면 바로 위에, 없으면 실제 액션 버튼 자리와 같은 채팅 영역 왼쪽 아래에 전체화면 버튼을 표시합니다.
 // @match        https://zeta-ai.io/*
+// @match        https://frame.pingpong.ai/v1/index.html
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-fullscreen.user.js
 // @run-at       document-idle
@@ -12,12 +13,14 @@
 
 (() => {
   'use strict';
+  const inChatFrame = location.origin === 'https://frame.pingpong.ai';
+  if (inChatFrame && (new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io' || (document.referrer && new URL(document.referrer).origin !== 'https://zeta-ai.io'))) return;
 
   const BUTTON_ID = 'zeta-fullscreen-native-button';
-  const PANEL_SELECTOR = '[data-sentry-component="ActionPanelButton"]';
-  const COMPOSER_SELECTOR = '[data-sentry-component="ChatComposer"]';
+  const PANEL_SELECTOR = '[data-testid="action-panel-button"], [data-sentry-component="ActionPanelButton"]';
+  const COMPOSER_SELECTOR = '[data-testid="composer-input-box"], [data-sentry-component="ChatComposer"]';
   const EXPANDED_EDIT_SELECTOR = '[data-sentry-component="EditModeInputPanelContent"] section[data-expanded="true"]';
-  const isChatRoom = () => /^\/[^/]+\/rooms\/[^/]+\/?$/.test(location.pathname);
+  const isChatRoom = () => inChatFrame || /^\/[^/]+\/rooms\/[^/]+\/?$/.test(location.pathname);
 
   let retryTimer = 0;
   let anchorObserver = null;
