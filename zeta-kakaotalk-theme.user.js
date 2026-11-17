@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.65
+// @version      3.50.66
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
+// @match        https://frame.pingpong.ai/v1/index.html
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-kakaotalk-theme.user.js
 // @run-at       document-start
@@ -38,6 +39,9 @@
 
 (() => {
   'use strict';
+
+  const sceneFrame = location.origin === 'https://frame.pingpong.ai';
+  if (sceneFrame && new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io') return;
 
   const STYLE_ID = 'zeta-kakaotalk-theme-style';
   const ACTIVE = 'kt-chat-theme-active';
@@ -9109,10 +9113,62 @@
       border: 0 !important;
     }
 
-  `;
+  
+    /* Room UI rendered by frame.pingpong.ai. Scope to the scene's chat surfaces. */
+    html.scene-web.${ACTIVE} #zeta > div:has([role="log"]),
+    html.scene-web.${ACTIVE} #zeta .top-0.bg-gray-main,
+    html.scene-web.${ACTIVE} [data-testid="chat-bottom-dock"] {
+      background: var(--kt-chat) !important;
+      color: var(--kt-chat-text) !important;
+    }
+    html.scene-web.${ACTIVE} header:has([data-testid="chat-header-profile"]) {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+    }
+    html.scene-web.${ACTIVE} [role="log"] .message-context-menu-trigger {
+      background: var(--scene-bubble, var(--kt-chat-glass)) !important;
+      color: var(--scene-text, var(--kt-chat-text)) !important;
+    }
+    html.scene-web.${ACTIVE} [role="log"] .bg-bubble-user {
+      --scene-bubble: var(--kt-yellow);
+      --scene-text: var(--kt-user-dialogue);
+      --scene-action: var(--kt-user-action);
+    }
+    html.scene-web.${ACTIVE} [role="log"] .self-start.bg-gray-sub1 {
+      --scene-bubble: var(--kt-white);
+      --scene-text: var(--kt-ai-dialogue);
+      --scene-action: var(--kt-ai-action);
+    }
+    html.scene-web.${ACTIVE} [role="log"] .message-context-menu-trigger :is(.chat, p, strong) {
+      color: var(--scene-text, var(--kt-chat-text)) !important;
+    }
+    html.scene-web.${ACTIVE} [role="log"] .message-context-menu-trigger em {
+      color: var(--scene-action, var(--kt-chat-sub)) !important;
+    }
+    html.scene-web.${ACTIVE} [role="log"] .caption1 {
+      color: var(--kt-chat-sub) !important;
+    }
+    html.scene-web.${ACTIVE} [data-testid="composer-input-box"] {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+      box-shadow: 0 0 0 1px var(--kt-line) !important;
+    }
+    html.scene-web.${ACTIVE} [data-testid="composer-input-box"] textarea {
+      color: var(--kt-text) !important;
+      caret-color: var(--kt-text) !important;
+    }
+    html.scene-web.${ACTIVE} [data-testid="composer-input-box"] textarea::placeholder {
+      color: var(--kt-muted) !important;
+    }
+    html.scene-web.${ACTIVE} [data-testid="chat-send-button"] {
+      background: var(--kt-yellow) !important;
+      color: var(--kt-text) !important;
+    }
+`;
 
   // Resolve known routes from the URL before looking at the outgoing screen's DOM.
   function themeRoute() {
+    if (sceneFrame) return ACTIVE;
     const path = location.pathname.replace(/\/+$/, '');
     if (/^\/[^/]+\/rooms\/[^/]+\/bookmarks$/.test(path)) return BOOKMARK_ACTIVE;
     if (/^\/[^/]+\/rooms\/[^/]+$/.test(path)) return ACTIVE;
