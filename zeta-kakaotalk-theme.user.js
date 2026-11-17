@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.78
+// @version      3.50.79
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -9003,11 +9003,34 @@
       -webkit-text-fill-color: var(--kt-muted) !important;
       opacity: 1 !important;
     }
-    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-button"],
-    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-button"]:hover {
-      background: transparent !important;
-      border: 0 !important;
+    /* 플러그인 보기(+) 버튼: 후속 규칙이 원형 테두리를 지우지 않도록 보정 */
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-button"]:not(:has([data-testid="action-panel-open-button"])),
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-button"]:not(:has([data-testid="action-panel-open-button"])):hover {
+      background: var(--kt-soft2) !important;
+      color: var(--kt-sub) !important;
+      border: 1px solid var(--kt-line) !important;
+      border-radius: 50% !important;
       box-shadow: none !important;
+      width: 36px !important;
+      height: 36px !important;
+      min-width: 36px !important;
+      min-height: 36px !important;
+      padding: 0 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    /* 내부 열기 버튼이 따로 있을 때는 안쪽 버튼 하나만 원형 처리 */
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="action-panel-open-button"] {
+      width: 36px !important;
+      height: 36px !important;
+      min-width: 36px !important;
+      min-height: 36px !important;
+      padding: 0 !important;
+      border-radius: 50% !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
     html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) :is([data-testid="action-panel-open-button"],button[aria-label="Suggested replies"]) {
       background: var(--kt-soft2) !important;
