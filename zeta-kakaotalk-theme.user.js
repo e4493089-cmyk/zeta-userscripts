@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.82
+// @version      3.50.83
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1039,25 +1039,25 @@
     }
 
     /* 피스 잔액 카드 */
-    html.${ACTIVE} [data-sentry-component="SidebarPieceBalance"] {
+    html.${ACTIVE} :is([data-sentry-component="SidebarPieceBalance"], [role="dialog"][aria-label="Chat menu"] > div:first-child > .mx-3.mt-4.rounded-12:has(.heading3)) {
       background: #F3F5F6 !important;
       color: var(--kt-text) !important;
       border: 1px solid #E3E8EB !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="SidebarPieceBalance"] .heading3 {
+    html.${ACTIVE} :is([data-sentry-component="SidebarPieceBalance"], [role="dialog"][aria-label="Chat menu"] > div:first-child > .mx-3.mt-4.rounded-12:has(.heading3)) .heading3 {
       color: #26343C !important;
     }
 
     /* 충전 = 카톡 포인트 */
-    html.${ACTIVE} [data-sentry-component="SidebarPieceBalance"] button {
+    html.${ACTIVE} :is([data-sentry-component="SidebarPieceBalance"], [role="dialog"][aria-label="Chat menu"] > div:first-child > .mx-3.mt-4.rounded-12:has(.heading3)) button {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #E6D000 !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="SidebarPieceBalance"] button:hover {
+    html.${ACTIVE} :is([data-sentry-component="SidebarPieceBalance"], [role="dialog"][aria-label="Chat menu"] > div:first-child > .mx-3.mt-4.rounded-12:has(.heading3)) button:hover {
       background: var(--kt-yellow-hover) !important;
     }
 
@@ -1161,29 +1161,30 @@
 
     /* 하단 '대화방 나가기' 영역 */
     html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
-      .kt-sidebar-footer,
-    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] .kt-sidebar-footer .bg-gray-main,
-    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] .kt-sidebar-footer .bg-gray-sub1 {
+      :is(.kt-sidebar-footer, [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2),
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(.kt-sidebar-footer, [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2) .bg-gray-main,
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(.kt-sidebar-footer, [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2) .bg-gray-sub1 {
       background: #F8F9FA !important;
       border-top: 1px solid #E4E9EC !important;
     }
 
     html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
-      .kt-sidebar-footer button,
-    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] button.kt-sidebar-footer {
+      :is(.kt-sidebar-footer, [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2) button,
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] button:is(.kt-sidebar-footer, [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2) {
       color: #D94B4B !important;
       background: transparent !important;
     }
 
     html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
-      .kt-sidebar-footer button:hover {
+      :is(.kt-sidebar-footer, [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2) button:hover {
       background: #FFF1F1 !important;
     }
 
     html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
-      .kt-sidebar-footer svg,
+      :is(.kt-sidebar-footer, [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2) svg,
     html.${ACTIVE} :is([data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"])
-      .kt-sidebar-footer span {
+      :is(.kt-sidebar-footer, [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2) span,
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] > div:last-child.bg-gray-sub2 > button > div {
       color: #D94B4B !important;
     }
 
