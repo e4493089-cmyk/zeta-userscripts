@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.85
+// @version      3.50.86
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -5910,7 +5910,7 @@
     /* 제타그램 본체 */
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      div:has(> header[data-sentry-component="TopBar"]):has(> [data-testid="zetagram-feed"]) {
+      div:has(> :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header))):has(> [data-testid="zetagram-feed"]) {
       background: #FFFFFF !important;
       color: #262626 !important;
       color-scheme: light !important;
@@ -5922,7 +5922,7 @@
     /* 상단 Instagram식 흰 헤더 */
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      header[data-sentry-component="TopBar"] {
+      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header)) {
       min-height: 50px !important;
       padding: 8px 12px 7px 14px !important;
       background: #FFFFFF !important;
@@ -5932,27 +5932,27 @@
 
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      [data-sentry-component="ZetagramWordmark"] {
+      :is([data-sentry-component="ZetagramWordmark"], header:has(+ [data-testid="zetagram-feed"]) > svg) {
       height: 30px !important;
       color: #000000 !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      header[data-sentry-component="TopBar"] button[aria-label="닫기"] {
+      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header)) button:is([aria-label="닫기"], [aria-label="Close"]) {
       background: transparent !important;
       color: #262626 !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      header[data-sentry-component="TopBar"] button[aria-label="닫기"]:hover {
+      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header)) button:is([aria-label="닫기"], [aria-label="Close"]):hover {
       background: #F2F2F2 !important;
     }
 
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-panel"]
-      header[data-sentry-component="TopBar"] button[aria-label="닫기"] svg {
+      :is(header[data-sentry-component="TopBar"], [data-testid="zetagram-panel"] header:not([data-testid="zetagram-feed"] header)) button:is([aria-label="닫기"], [aria-label="Close"]) svg {
       color: #262626 !important;
     }
 
@@ -6046,7 +6046,7 @@
     /* 게시물 카드 */
     html.${ACTIVE} #portal-container
       [data-testid="zetagram-feed"]
-      [data-sentry-component="PostCard"] {
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img)) {
       padding-bottom: 14px !important;
       background: #FFFFFF !important;
       color: #262626 !important;
@@ -6054,7 +6054,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"] > header {
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img)) > header {
       padding: 10px 12px !important;
       background: #FFFFFF !important;
     }
@@ -6072,29 +6072,29 @@
 
     /* 아이디/표시명 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"] > header
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img)) > header
       > div > span:first-child {
       color: #262626 !important;
       font-weight: 600 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"] > header
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img)) > header
       > div > span:last-child {
       color: #737373 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
       button[aria-label="게시물 메뉴"],
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
       button[aria-label="게시물 메뉴"] svg {
       color: #262626 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
       button[aria-label="게시물 메뉴"]:hover {
       background: #F5F5F5 !important;
       border-radius: 999px !important;
@@ -6102,46 +6102,46 @@
 
     /* 사진 영역 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
       [data-sentry-component="Square"] {
       background: #EFEFEF !important;
     }
 
     /* 좋아요/댓글/공유 아이콘 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"] > div:nth-of-type(2) {
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img)) > div:nth-of-type(2) {
       padding: 9px 12px 7px !important;
       gap: 16px !important;
       background: #FFFFFF !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
-      [data-sentry-component="HeartIcon"],
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
+      :is([data-sentry-component="HeartIcon"], button[aria-label="좋아요"] svg),
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
-      [data-sentry-component="CommentIcon"],
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
+      :is([data-sentry-component="CommentIcon"], button[aria-label="댓글"] svg),
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
-      [data-sentry-component="ShareIcon"],
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
+      :is([data-sentry-component="ShareIcon"], button[aria-label="게시물 공유"] svg),
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
-      [data-sentry-component="ShareSheetIcon"] {
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
+      :is([data-sentry-component="ShareSheetIcon"], button[aria-label="공유"] svg) {
       color: #262626 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
       button[aria-label="좋아요"]:hover svg,
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img))
       button[aria-label="게시물 공유"]:hover svg {
       color: #737373 !important;
     }
 
     /* 좋아요/캡션/댓글 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"] > div:last-of-type {
+      :is([data-sentry-component="PostCard"], [data-testid="zetagram-feed"] article, [data-testid="zetagram-feed"] div:has(> header):has(img)) > div:last-of-type {
       padding-left: 12px !important;
       padding-right: 12px !important;
       gap: 5px !important;
@@ -6149,25 +6149,25 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
-      [class*="text-[#F8F9F9]"] {
+      [data-testid="zetagram-feed"]
+      :is([class*="text-[#F8F9F9]"], .text-white, .text-gray-200) {
       color: #262626 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostCard"]
-      [class*="text-[#B79BFF]"] {
+      [data-testid="zetagram-feed"]
+      :is([class*="text-[#B79BFF]"], .text-primary-200, .text-primary-300) {
       color: #00376B !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostComments"] {
+      :is([data-sentry-component="PostComments"], [data-testid="zetagram-feed"] article ul, [data-testid="zetagram-feed"] div:has(> header):has(img) ul) {
       color: #262626 !important;
       gap: 4px !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="PostComments"] li.pl-7 {
+      :is([data-sentry-component="PostComments"], [data-testid="zetagram-feed"] article ul, [data-testid="zetagram-feed"] div:has(> header):has(img) ul) li.pl-7 {
       padding-left: 18px !important;
       border-left: 2px solid #EFEFEF !important;
       margin-left: 4px !important;
