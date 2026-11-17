@@ -1,19 +1,49 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.7
+// @version      0.3.8
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
+// @match        https://frame.pingpong.ai/v1/index.html
 // @updateURL    https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
 // @downloadURL  https://raw.githubusercontent.com/e4493089-cmyk/zeta-userscripts/main/zeta-chat-search.user.js
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
 
-(() => {
+(async () => {
   'use strict';
 
-  if (window.top !== window.self) return;
+  const inChatFrame = location.origin === 'https://frame.pingpong.ai';
+  let frameRoomId = '';
+  const contextChannel = 'zcs-room-context';
+  if (inChatFrame) {
+    if (new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io' || window.parent === window) return;
+    frameRoomId = await new Promise(resolve => {
+      const receive = event => {
+        if (event.source !== window.parent || event.origin !== 'https://zeta-ai.io' ||
+            event.data?.type !== contextChannel || !/^[A-Za-z0-9_-]{1,100}$/.test(event.data.roomId || '')) return;
+        clearInterval(timer);
+        window.removeEventListener('message', receive);
+        resolve(event.data.roomId);
+      };
+      window.addEventListener('message', receive);
+      const request = () => window.parent.postMessage({ type: contextChannel }, 'https://zeta-ai.io');
+      const timer = setInterval(request, 1000);
+      request();
+    });
+  } else if (location.origin === 'https://zeta-ai.io' && window === window.top) {
+    window.addEventListener('message', event => {
+      const frame = [...document.querySelectorAll('iframe')].find(frame => frame.contentWindow === event.source && frame.src.startsWith('https://frame.pingpong.ai/v1/index.html'));
+      const roomId = location.pathname.match(/\/rooms\/([^/?#]+)/)?.[1];
+      if (frame && roomId && event.origin === 'https://frame.pingpong.ai' && event.data?.type === contextChannel) {
+        event.source.postMessage({ type: contextChannel, roomId }, event.origin);
+      }
+    });
+  }
+
+
+  if (window.top !== window.self && !inChatFrame) return;
 
   const SCRIPT_VERSION = '0.3.7';
   window.__zetaChatSearchVersion = SCRIPT_VERSION;
@@ -24,11 +54,11 @@
   const HIGHLIGHT_CLASS = 'zcs-hit';
 
   const CHAT_SELECTOR = '[role="log"][aria-label="Chat messages"]';
-  const MESSAGE_SELECTOR = '[data-sentry-component="BodyView"]';
+  const MESSAGE_SELECTOR = ':is([data-sentry-component="BodyView"], [role="log"] [data-index][data-key])';
   const TEXT_SECTION_SELECTOR = [
-    '[data-sentry-component="NarratorBubble"]',
-    '[data-sentry-component="LeftTextContent"]',
-    '[data-sentry-component="RightTextContent"]'
+    ':is([data-sentry-component="NarratorBubble"], .message-context-menu-trigger.bg-gray-main)',
+    ':is([data-sentry-component="LeftTextContent"], .message-context-menu-trigger.self-start)',
+    ':is([data-sentry-component="RightTextContent"], .message-context-menu-trigger.bg-bubble-user)'
   ].join(',');
   const NATIVE_STATUS_SELECTOR = '[data-sentry-component="InfoBoxContent"]';
   const STATUS_BLOCK_SELECTOR = 'pre, table,' + NATIVE_STATUS_SELECTOR;
@@ -278,6 +308,7 @@
   // ── 화면에 그려진 대화 읽기 ──────────────────────────────────────────
   // 요청은 보내지 않는다. 제타가 이미 그린 것만 읽는다.
   function currentRoomId() {
+    if (inChatFrame) return frameRoomId;
     const match = location.pathname.match(/\/rooms\/([^/?#]+)/i);
     return match ? match[1] : null;
   }
@@ -287,15 +318,16 @@
   }
 
   function roleOf(body) {
-    if (body.querySelector('[data-sentry-component="RightTextContent"]')) return 'user';
-    if (body.querySelector('[data-sentry-component="LeftTextContent"]')) return 'assistant';
+    if (body.querySelector('.swiper-slide')) return 'assistant';
+    if (body.querySelector(':is([data-sentry-component="RightTextContent"], .message-context-menu-trigger.bg-bubble-user)')) return 'user';
+    if (body.querySelector(':is([data-sentry-component="LeftTextContent"], .message-context-menu-trigger.self-start)')) return 'assistant';
     return 'narrator';
   }
 
   function speakerOf(body, role) {
     const selector = role === 'user'
-      ? '[data-sentry-component="RightTextContent"] .caption1'
-      : '[data-sentry-component="LeftTextContent"] .caption1';
+      ? ':is([data-sentry-component="RightTextContent"], .message-context-menu-trigger.bg-bubble-user) .caption1'
+      : ':is([data-sentry-component="LeftTextContent"], .message-context-menu-trigger.self-start) .caption1';
     return clean(body.querySelector(selector)?.textContent || '')
       .replace(/^@+/, '')
       .replace(/:+$/, '');
@@ -345,6 +377,7 @@
     const sections = body.querySelectorAll(TEXT_SECTION_SELECTOR + ',' + STATUS_BLOCK_SELECTOR);
 
     sections.forEach(section => {
+      if (section.closest(".swiper-slide") && !section.closest(".swiper-slide-active")) return;
       if (section.matches(STATUS_BLOCK_SELECTOR)) {
         // 말풍선 안의 상태창은 아래에서 본문 순서대로 읽는다.
         if (section.parentElement?.closest(TEXT_SECTION_SELECTOR + ',' + STATUS_BLOCK_SELECTOR)) return;
@@ -352,10 +385,10 @@
         pushIndexedPart(parts, 'status', statusBlockText(section), role, speakerOf(body, role));
         return;
       }
-      const forcedNarration = section.matches('[data-sentry-component="NarratorBubble"]');
+      const forcedNarration = section.matches(':is([data-sentry-component="NarratorBubble"], .message-context-menu-trigger.bg-gray-main)');
       const sectionRole = forcedNarration
         ? 'narrator'
-        : section.matches('[data-sentry-component="RightTextContent"]')
+        : !section.closest('.swiper-slide') && section.matches(':is([data-sentry-component="RightTextContent"], .message-context-menu-trigger.bg-bubble-user)')
           ? 'user'
           : 'assistant';
       const sectionSpeaker = sectionRole === 'narrator'
@@ -715,7 +748,7 @@
 
     // 제타 책갈피와 같은 cursor 이동을 먼저 쓴다. 전체 대화를 한 칸씩
     // 훑는 것보다 빠르고, 가상 스크롤에서 메시지가 빠지는 문제도 피한다.
-    const nativeResult = await tryNativeCursor(row, status);
+    const nativeResult = inChatFrame ? null : await tryNativeCursor(row, status);
     if (nativeResult !== null) return nativeResult;
 
     // cursor 이동을 지원하지 않는 화면에서는 기존 스크롤 탐색으로 대체한다.
@@ -1058,7 +1091,14 @@
 
     const anchor = menuAnchor();
     if (!anchor) {
-      document.getElementById(MENU_ROW_ID)?.remove();
+      if (inChatFrame && document.body && !document.getElementById(MENU_ROW_ID)) {
+        const button = document.createElement('button');
+        button.id = MENU_ROW_ID;
+        button.textContent = '대화 검색';
+        button.style.cssText = 'position:fixed;right:12px;top:60px;z-index:9999;padding:8px;border-radius:12px;background:#fff;color:#25333b';
+        button.addEventListener('click', () => void openPanel());
+        document.body.appendChild(button);
+      }
       return;
     }
 
