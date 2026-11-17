@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.77
+// @version      3.50.78
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -92,6 +92,24 @@
     }
 
     
+
+
+    /* Use the existing sidebar scrollbar palette throughout themed scroll areas. */
+    html.${ACTIVE},
+    html.${ACTIVE} :where(*) {
+      scrollbar-color: rgba(70,88,99,.20) transparent !important;
+    }
+    html.${ACTIVE}::-webkit-scrollbar-track,
+    html.${ACTIVE} ::-webkit-scrollbar-track,
+    html.${ACTIVE}::-webkit-scrollbar-corner,
+    html.${ACTIVE} ::-webkit-scrollbar-corner {
+      background: transparent !important;
+    }
+    html.${ACTIVE}::-webkit-scrollbar-thumb,
+    html.${ACTIVE} ::-webkit-scrollbar-thumb {
+      background-color: rgba(70,88,99,.20) !important;
+      border-radius: 999px !important;
+    }
 
     /* 홈 상단 APP 출시 배너 숨김 */
     [data-sentry-component="Home"]
