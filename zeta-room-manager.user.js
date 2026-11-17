@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.98
+// @version      0.23.99
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -41,7 +41,7 @@
 
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.97';
+  const SCRIPT_VERSION = '0.23.99';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
@@ -216,6 +216,15 @@
     }
     plotLookup = null;
     plotLookupDirty = true;
+    // Restore links from previously collected metadata as well as this page's pending data.
+    for (const entry of Object.values(dataIndex)) {
+      if (!entry || entry.type !== 'room') continue;
+      const meta = dataPlotMeta[canonicalPlotId(entry.plotId, entry.originatedId)]
+        || dataPlotMeta[entry.plotId] || dataPlotMeta[entry.originatedId];
+      if (!meta) continue;
+      entry.characterNames = uniqueTexts(entry.characterNames, meta.characterNames);
+      entry.creatorNames = uniqueTexts(entry.creatorNames, meta.creatorNames);
+    }
     // 대화방에서 주운 이름은 같은 플롯을 쓰는 다른 방에도 퍼뜨려야 한다.
     for (const [, meta] of heldMeta) mergeMetaIntoIndex(dataPlotMeta[meta.canonicalId] || meta);
 
@@ -589,7 +598,7 @@
       inspected++;
 
       for (const props of [fiber.pendingProps, fiber.memoizedProps]) {
-        const plot = props && props.plot;
+        const plot = props && (props.plot || props.room?.plot || props.initialRoom?.plot || props.data?.room?.plot);
         if (plot && typeof plot === 'object' && normalizeText(plot.id || plot.plotId)) return plot;
       }
 
@@ -4613,7 +4622,7 @@
     lastChatHarvest = { roomId, at: now };
 
     const anchor = document.querySelector(
-      '[data-sentry-component="ChatMessageList"], [data-sentry-component="BodyView"], main#contents, main'
+      '[data-sentry-component="ChatRoomSceneRun"], [data-sentry-component="WebviewChatRoom"], [data-sentry-component="ChatMessageList"], [data-sentry-component="BodyView"], main#contents, main'
     ) || document.body;
 
     // 화면이 이미 들고 있는 플롯 데이터부터 줍는다(요청 아님).
