@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.68
+// @version      3.50.69
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -110,6 +110,9 @@
     }
 
     html.${ACTIVE} main#contents,
+    html.scene-web.${ACTIVE} #zeta > div:has([role="log"]),
+    html.scene-web.${ACTIVE} #zeta .top-0.bg-gray-main,
+    html.scene-web.${ACTIVE} [data-testid="chat-bottom-dock"] > .bg-linear-to-b,
     html.${ACTIVE} [role="log"][aria-label="Chat messages"] {
       background: var(--kt-chat) !important;
     }
@@ -118,6 +121,7 @@
        중요: nav에는 흰 배경을 주지 않음.
        nav의 py-4가 header 높이 밖으로 넘치기 때문에
        nav까지 흰색이면 아래쪽에 흰 띠가 생김. */
+    html.scene-web.${ACTIVE} header:has([data-testid="chat-header-profile"]),
     html.${ACTIVE} main#contents header {
       background: var(--kt-white) !important;
       color: var(--kt-text) !important;
@@ -171,75 +175,75 @@
     }
 
     /* 상대 / 유저 이름 */
-    html.${ACTIVE} [data-sentry-component="LeftTextContent"] .caption1 {
+    html.${ACTIVE} :is([data-sentry-component="LeftTextContent"] .caption1, .scene-web [role="log"] .flex-col:has(> .relative .self-start.bg-gray-sub1) > .caption1) {
       color: var(--kt-ai-name) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="RightTextContent"] .caption1 {
+    html.${ACTIVE} :is([data-sentry-component="RightTextContent"] .caption1, .scene-web [role="log"] .flex-col:has(> .relative .bg-bubble-user) > .caption1) {
       color: var(--kt-user-name) !important;
     }
 
     /* 상대 말풍선 */
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) {
       background: var(--kt-white) !important;
       color: var(--kt-ai-dialogue) !important;
       border: 0 !important;
       box-shadow: 0 1px 2px rgba(0,0,0,.05) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) p {
       color: var(--kt-ai-dialogue) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) em {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) em {
       color: var(--kt-ai-action) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) em [class*="text-primary-"],
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) em [data-placeholder] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) em [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) em [data-placeholder] {
       color: var(--kt-ai-action) !important;
     }
 
     /* 내 말풍선 */
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) {
       background: var(--kt-yellow) !important;
       color: var(--kt-user-dialogue) !important;
       border: 0 !important;
       box-shadow: 0 1px 2px rgba(0,0,0,.05) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) p {
       color: var(--kt-user-dialogue) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) em {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) em {
       color: var(--kt-user-action) !important;
     }
 
     /* **강조** */
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat strong,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat b,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat .font-bold {
       color: #514A27 !important;
       font-weight: 700 !important;
     }
 
     /* Zeta 기본 보라색 토큰 제거 */
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) [class*="text-primary-"],
     html.${ACTIVE} [data-sentry-component="RightTextContent"] [data-placeholder] {
       color: inherit !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) em [class*="text-primary-"],
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) em [data-placeholder] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) em [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) em [data-placeholder] {
       color: var(--kt-user-action) !important;
     }
 
     /* 내레이션
        긴 내레이터가 화면을 큰 박스로 덮지 않도록 배경/테두리 제거 */
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] > div {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) > div {
       background: transparent !important;
       color: var(--kt-chat-sub) !important;
       border: 0 !important;
@@ -248,23 +252,23 @@
       padding-bottom: 2px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] .chat,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] p,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] em,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] li,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] strong {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) p,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) em,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) li,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) strong {
       color: var(--kt-chat-sub) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] strong {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) strong {
       color: var(--kt-chat-text) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] hr {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) hr {
       border-color: var(--kt-chat-line) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] svg {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) svg {
       color: var(--kt-chat-text) !important;
     }
 
@@ -291,22 +295,22 @@
     }
 
     /* 내레이션 마크다운 요소도 채팅 배경 대비를 그대로 사용 */
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] a,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] del,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] s,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote p {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) code,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) a,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) del,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) s,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote p {
       color: var(--kt-chat-sub) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) code,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote {
       background: transparent !important;
       border-color: var(--kt-chat-line) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote > div:first-child {
       background: var(--kt-chat-muted) !important;
     }
 
@@ -346,20 +350,20 @@
        마크다운 - 상대 말풍선
     ========================================================= */
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat strong,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat b,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat .font-bold {
       color: #30414B !important;
       font-weight: 700 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat code {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat code {
       color: #30414B !important;
       background: #EEF2F4 !important;
       border: 1px solid rgba(48,65,75,.10) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote {
       color: #455B68 !important;
       background: rgba(178,199,217,.20) !important;
       border-radius: 6px !important;
@@ -367,43 +371,43 @@
       padding-bottom: 4px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote p {
       color: #455B68 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote > div:first-child {
       background: #8097A6 !important;
       width: 3px !important;
       border-radius: 999px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat a {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat a {
       color: #35617D !important;
       text-decoration: underline !important;
       text-underline-offset: 2px;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat del,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat s {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat del,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat s {
       color: #87939A !important;
       text-decoration-color: #87939A !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h1,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h2,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h3,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h4,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h5,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h6 {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h1,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h2,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h3,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h4,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h5,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h6 {
       color: #2D3C45 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat hr {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat hr {
       border-color: #CDD6DB !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat li,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, [data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat li > span[aria-hidden="true"] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat li,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat li > span[aria-hidden="true"] {
       color: #3D4E58 !important;
     }
 
@@ -413,20 +417,20 @@
        노란 배경 위에서 명령별 차이가 보이도록 분리
     ========================================================= */
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat strong,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat b,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat .font-bold {
       color: #493D08 !important;
       font-weight: 750 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat code {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat code {
       color: #433A13 !important;
       background: rgba(255,255,255,.52) !important;
       border: 1px solid rgba(73,61,8,.12) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat blockquote {
       color: #584D20 !important;
       background: rgba(255,255,255,.28) !important;
       border-radius: 6px !important;
@@ -434,44 +438,44 @@
       padding-bottom: 4px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat blockquote p {
       color: #584D20 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat blockquote > div:first-child {
       background: #83742D !important;
       width: 3px !important;
       border-radius: 999px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat a {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat a {
       color: #5A4C00 !important;
       text-decoration: underline !important;
       text-underline-offset: 2px;
       font-weight: 600 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat del,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat s {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat del,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat s {
       color: #857A49 !important;
       text-decoration-color: #756A37 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h1,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h2,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h3,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h4,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h5,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat h6 {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h1,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h2,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h3,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h4,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h5,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h6 {
       color: #443900 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat hr {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat hr {
       border-color: rgba(73,61,8,.25) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat li,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, [data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"]) .chat li > span[aria-hidden="true"] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat li,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat li > span[aria-hidden="true"] {
       color: #4D431C !important;
     }
 
@@ -480,13 +484,13 @@
        마크다운 - 내레이터
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] code {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) code {
       color: #40515B !important;
       background: rgba(255,255,255,.46) !important;
       border: 1px solid rgba(64,81,91,.10) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote {
       color: #52636C !important;
       background: rgba(255,255,255,.22) !important;
       border-radius: 6px !important;
@@ -494,19 +498,19 @@
       padding-bottom: 4px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote > div:first-child {
       background: #8197A4 !important;
       width: 3px !important;
       border-radius: 999px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] a {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) a {
       color: #355E78 !important;
       text-decoration: underline !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] del,
-    html.${ACTIVE} [data-sentry-component="NarratorBubble"] s {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) del,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) s {
       color: #859199 !important;
     }
 
@@ -3553,21 +3557,21 @@
     }
 
     /* 내레이터: 박스 제거 + 글씨만 진하게 */
-    html.kt-saved-room-active [data-sentry-component="NarratorBubble"] > div {
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) > div {
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
     }
 
-    html.kt-saved-room-active [data-sentry-component="NarratorBubble"] .chat,
-    html.kt-saved-room-active [data-sentry-component="NarratorBubble"] p,
-    html.kt-saved-room-active [data-sentry-component="NarratorBubble"] em,
-    html.kt-saved-room-active [data-sentry-component="NarratorBubble"] li {
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) p,
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) em,
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) li {
       color: #4E5C64 !important;
     }
 
-    html.kt-saved-room-active [data-sentry-component="NarratorBubble"] strong,
-    html.kt-saved-room-active [data-sentry-component="NarratorBubble"] svg {
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) strong,
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) svg {
       color: #36464F !important;
     }
 
@@ -3894,17 +3898,17 @@
       color: #191919 !important;
     }
 
-    html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="NarratorBubble"] > div,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) > div,
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] {
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
     }
 
-    html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="NarratorBubble"] .chat,
-    html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="NarratorBubble"] p,
-    html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="NarratorBubble"] em,
-    html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="NarratorBubble"] li,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) p,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) em,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) li,
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"],
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] [data-sentry-component="InfoBoxContent"],
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] .chat,
@@ -3912,8 +3916,8 @@
       color: #4B5961 !important;
     }
 
-    html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="NarratorBubble"] strong,
-    html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="NarratorBubble"] svg,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) strong,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) svg,
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] .font-bold,
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] .font-semibold {
       color: #34434C !important;
@@ -8957,7 +8961,7 @@
       background-image: none !important;
       color: var(--kt-text) !important;
     }
-    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="composer-input-box"] {
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="composer-input-box"] {
       background: var(--kt-soft) !important;
       color: var(--kt-text) !important;
       border: 1px solid var(--kt-line) !important;
@@ -8965,13 +8969,13 @@
       box-shadow: none !important;
       min-width: 0 !important;
     }
-    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="composer-input-box"] textarea[name="message"] {
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="composer-input-box"] textarea[name="message"] {
       background: transparent !important;
       color: var(--kt-text) !important;
       -webkit-text-fill-color: var(--kt-text) !important;
       caret-color: var(--kt-text) !important;
     }
-    html.${ACTIVE} [data-sentry-component="ChatComposer"] [data-testid="composer-input-box"] textarea[name="message"]::placeholder {
+    html.${ACTIVE} :is([data-sentry-component="ChatComposer"], .scene-web [data-testid="chat-bottom-dock"]) [data-testid="composer-input-box"] textarea[name="message"]::placeholder {
       color: var(--kt-muted) !important;
       -webkit-text-fill-color: var(--kt-muted) !important;
       opacity: 1 !important;
@@ -9135,58 +9139,6 @@
     }
     html.scene-web.${ACTIVE} [aria-label="Character image thumbnails"] > div:has([aria-current="true"]) {
       border-color: var(--kt-yellow) !important;
-    }
-
-    /* Room UI rendered by frame.pingpong.ai. Scope to the scene's chat surfaces. */
-    html.scene-web.${ACTIVE} #zeta > div:has([role="log"]),
-    html.scene-web.${ACTIVE} #zeta .top-0.bg-gray-main,
-    html.scene-web.${ACTIVE} [data-testid="chat-bottom-dock"],
-    html.scene-web.${ACTIVE} [data-testid="chat-bottom-dock"] > .bg-linear-to-b {
-      background: var(--kt-chat) !important;
-      color: var(--kt-chat-text) !important;
-    }
-    html.scene-web.${ACTIVE} header:has([data-testid="chat-header-profile"]) {
-      background: var(--kt-white) !important;
-      color: var(--kt-text) !important;
-    }
-    html.scene-web.${ACTIVE} [role="log"] .message-context-menu-trigger {
-      background: var(--scene-bubble, var(--kt-chat-glass)) !important;
-      color: var(--scene-text, var(--kt-chat-text)) !important;
-    }
-    html.scene-web.${ACTIVE} [role="log"] .bg-bubble-user {
-      --scene-bubble: var(--kt-yellow);
-      --scene-text: var(--kt-user-dialogue);
-      --scene-action: var(--kt-user-action);
-    }
-    html.scene-web.${ACTIVE} [role="log"] .self-start.bg-gray-sub1 {
-      --scene-bubble: var(--kt-white);
-      --scene-text: var(--kt-ai-dialogue);
-      --scene-action: var(--kt-ai-action);
-    }
-    html.scene-web.${ACTIVE} [role="log"] .message-context-menu-trigger :is(.chat, p, strong) {
-      color: var(--scene-text, var(--kt-chat-text)) !important;
-    }
-    html.scene-web.${ACTIVE} [role="log"] .message-context-menu-trigger em {
-      color: var(--scene-action, var(--kt-chat-sub)) !important;
-    }
-    html.scene-web.${ACTIVE} [role="log"] .caption1 {
-      color: var(--kt-chat-sub) !important;
-    }
-    html.scene-web.${ACTIVE} [data-testid="composer-input-box"] {
-      background: var(--kt-white) !important;
-      color: var(--kt-text) !important;
-      box-shadow: 0 0 0 1px var(--kt-line) !important;
-    }
-    html.scene-web.${ACTIVE} [data-testid="composer-input-box"] textarea {
-      color: var(--kt-text) !important;
-      caret-color: var(--kt-text) !important;
-    }
-    html.scene-web.${ACTIVE} [data-testid="composer-input-box"] textarea::placeholder {
-      color: var(--kt-muted) !important;
-    }
-    html.scene-web.${ACTIVE} [data-testid="chat-send-button"] {
-      background: var(--kt-yellow) !important;
-      color: var(--kt-text) !important;
     }
 
     html.scene-web section:has(> [data-testid="saved-room-messages"]) {
