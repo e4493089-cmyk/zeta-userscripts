@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.83
+// @version      3.50.84
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -95,20 +95,39 @@
 
 
     /* Use the existing sidebar scrollbar palette throughout themed scroll areas. */
-    html.${ACTIVE},
-    html.${ACTIVE} :where(*) {
+    html:is(.${ACTIVE}, .${ROOM_LIST_ACTIVE}),
+    html:is(.${ACTIVE}, .${ROOM_LIST_ACTIVE}) :where(*) {
       scrollbar-color: rgba(70,88,99,.20) transparent !important;
     }
-    html.${ACTIVE}::-webkit-scrollbar-track,
-    html.${ACTIVE} ::-webkit-scrollbar-track,
-    html.${ACTIVE}::-webkit-scrollbar-corner,
-    html.${ACTIVE} ::-webkit-scrollbar-corner {
+    html:is(.${ACTIVE}, .${ROOM_LIST_ACTIVE})::-webkit-scrollbar-track,
+    html:is(.${ACTIVE}, .${ROOM_LIST_ACTIVE}) ::-webkit-scrollbar-track,
+    html:is(.${ACTIVE}, .${ROOM_LIST_ACTIVE})::-webkit-scrollbar-corner,
+    html:is(.${ACTIVE}, .${ROOM_LIST_ACTIVE}) ::-webkit-scrollbar-corner {
       background: transparent !important;
     }
-    html.${ACTIVE}::-webkit-scrollbar-thumb,
-    html.${ACTIVE} ::-webkit-scrollbar-thumb {
+    html:is(.${ACTIVE}, .${ROOM_LIST_ACTIVE})::-webkit-scrollbar-thumb,
+    html:is(.${ACTIVE}, .${ROOM_LIST_ACTIVE}) ::-webkit-scrollbar-thumb {
       background-color: rgba(70,88,99,.20) !important;
       border-radius: 999px !important;
+    }
+
+    html.${ROOM_LIST_ACTIVE},
+    html.${ROOM_LIST_ACTIVE} :where(*) {
+      color-scheme: light !important;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(70,88,99,.20) #F4F5F6 !important;
+    }
+    html.${ROOM_LIST_ACTIVE}::-webkit-scrollbar,
+    html.${ROOM_LIST_ACTIVE} ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+      background: #F4F5F6 !important;
+    }
+    html.${ROOM_LIST_ACTIVE}::-webkit-scrollbar-track,
+    html.${ROOM_LIST_ACTIVE} ::-webkit-scrollbar-track,
+    html.${ROOM_LIST_ACTIVE}::-webkit-scrollbar-corner,
+    html.${ROOM_LIST_ACTIVE} ::-webkit-scrollbar-corner {
+      background: #F4F5F6 !important;
     }
 
     /* 홈 상단 APP 출시 배너 숨김 */
