@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.81
+// @version      3.50.82
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1104,11 +1104,11 @@
     }
 
     /* 일반 메뉴 버튼 */
-    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(button[data-sentry-component="LogRawButton"], button.zeta-menu-action) {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(button:is([data-sentry-component="LogRawButton"], .scene-web button), button.zeta-menu-action) {
       color: #26343C !important;
     }
 
-    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(button[data-sentry-component="LogRawButton"], button.zeta-menu-action):hover {
+    html.${ACTIVE} [role="dialog"][aria-label="Chat menu"] :is(button:is([data-sentry-component="LogRawButton"], .scene-web button), button.zeta-menu-action):hover {
       background: #F6F8F9 !important;
     }
 
@@ -2121,30 +2121,30 @@
 
     /* 추천 프로필 / 내 프로필 카드 */
     html.${ACTIVE} .kt-profile-hub-sheet
-      [data-sentry-component="ChatProfileListItem"] {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) {
       background: #F5F7F8 !important;
       color: #26343C !important;
       border-color: #E5EAED !important;
     }
 
     html.${ACTIVE} .kt-profile-hub-sheet
-      [data-sentry-component="ChatProfileListItem"]:hover {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)):hover {
       background: #F0F3F5 !important;
     }
 
     /* 프로필명 */
     html.${ACTIVE} .kt-profile-hub-sheet
-      [data-sentry-component="ChatProfileListItem"] .body1,
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) .body1,
     html.${ACTIVE} .kt-profile-hub-sheet
-      [data-sentry-component="ChatProfileListItem"] [class*="text-gray-200"] {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) [class*="text-gray-200"] {
       color: #26343C !important;
     }
 
     /* 설명 */
     html.${ACTIVE} .kt-profile-hub-sheet
-      [data-sentry-component="ChatProfileListItem"] .caption1,
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) .caption1,
     html.${ACTIVE} .kt-profile-hub-sheet
-      [data-sentry-component="ChatProfileListItem"] [class*="text-white/50"] {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) [class*="text-white/50"] {
       color: #748188 !important;
     }
 
@@ -2168,14 +2168,14 @@
 
     /* 선택 체크 = 카카오 노랑 */
     html.${ACTIVE} .kt-profile-hub-sheet
-      [data-sentry-component="ChatProfileListItem"] .kt-profile-hub-selected {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) .kt-profile-hub-selected {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       box-shadow: 0 0 0 1px rgba(170,148,0,.12) !important;
     }
 
     html.${ACTIVE} .kt-profile-hub-sheet
-      [data-sentry-component="ChatProfileListItem"] .kt-profile-hub-selected svg {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) .kt-profile-hub-selected svg {
       color: #191919 !important;
     }
 
@@ -2211,14 +2211,14 @@
 
     html.${ACTIVE} .kt-profile-hub-sheet
       [role="group"][aria-label="My chat profiles"]
-      [data-sentry-component="ChatProfileListItem"] {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) {
       background: #FFFFFF !important;
       border-radius: 0 !important;
     }
 
     html.${ACTIVE} .kt-profile-hub-sheet
       [role="group"][aria-label="My chat profiles"]
-      [data-sentry-component="ChatProfileListItem"]:hover {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)):hover {
       background: #F7F9FA !important;
     }
 
@@ -2488,14 +2488,14 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="상태창 보기"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.30) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="상태창 보기"]
       ) > div[class*="bg-gray-sub1"] {
       background: #FFFFFF !important;
@@ -2505,7 +2505,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="상태창 보기"]
       ) > div[class*="bg-gray-sub1"] > div:first-child svg {
       color: #C1CBD0 !important;
@@ -2588,14 +2588,14 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="엔딩 자동 제안"]
       ) > [role="presentation"] {
       background: rgba(31,43,50,.30) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="엔딩 자동 제안"]
       ) > div[class*="bg-gray-sub1"] {
       background: var(--kt-white) !important;
@@ -2605,7 +2605,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="엔딩 자동 제안"]
       ) > div[class*="bg-gray-sub1"] > div:first-child svg {
       color: var(--kt-muted) !important;
@@ -2687,14 +2687,14 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="추천 대화 프로필"]
       ) > [role="presentation"] {
       background: rgba(31,43,50,.30) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="추천 대화 프로필"]
       ) > div[class*="bg-gray-sub1"] {
       background: var(--kt-white) !important;
@@ -2807,14 +2807,14 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="대화 프로필"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.28) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="대화 프로필"]
       ) > div[class*="bg-gray-sub1"] {
       background: #FFFFFF !important;
@@ -2824,14 +2824,14 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="대화 프로필"]
       ) > div[class*="bg-gray-sub1"] > div:first-child svg {
       color: #C1CBD0 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="대화 프로필"]
       ) > div[class*="bg-gray-sub1"] > div:nth-child(2) {
       background: #FFFFFF !important;
@@ -2857,7 +2857,7 @@
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
       [data-sentry-component="ProfileHubHeader"]
-      [data-sentry-component="ChatProfileListItem"] {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) {
       background: #F4F6F7 !important;
       color: #26343C !important;
       border: 1px solid #E4E9EC !important;
@@ -2876,7 +2876,7 @@
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
       [role="group"][aria-label="My chat profiles"]
-      [data-sentry-component="ChatProfileListItem"] {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) {
       background: #FFFFFF !important;
       color: #26343C !important;
       border-radius: 0 !important;
@@ -2885,33 +2885,33 @@
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
       [role="group"][aria-label="My chat profiles"]
-      [data-sentry-component="ChatProfileListItem"]:hover {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)):hover {
       background: #F7F9FA !important;
     }
 
     /* 카드 텍스트 */
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      [data-sentry-component="ChatProfileListItem"] .body1,
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) .body1,
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      [data-sentry-component="ChatProfileListItem"] [class*="text-gray-200"] {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) [class*="text-gray-200"] {
       color: #26343C !important;
     }
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      [data-sentry-component="ChatProfileListItem"] .caption1,
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) .caption1,
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      [data-sentry-component="ChatProfileListItem"] [class*="text-white/50"] {
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) [class*="text-white/50"] {
       color: #748188 !important;
     }
 
     /* 추천 카드 선택 체크: 보라 -> 카카오 노랑 */
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      [data-sentry-component="ChatProfileListItem"]
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button))
       div[class*="bg-primary-400"] {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
@@ -2920,7 +2920,7 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      [data-sentry-component="ChatProfileListItem"]
+      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button))
       div[class*="bg-primary-400"] svg {
       color: #191919 !important;
     }
@@ -2942,7 +2942,7 @@
     /* 대화 프로필 추가 버튼 - 두 번째 섹션의 첫 버튼 */
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:nth-child(2) > button[data-sentry-component="LogRawButton"] {
+      > div:nth-child(2) > button:is([data-sentry-component="LogRawButton"], .scene-web button) {
       background: #F4F6F7 !important;
       color: #26343C !important;
       border: 1px solid #E4E9EC !important;
@@ -2950,17 +2950,17 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:nth-child(2) > button[data-sentry-component="LogRawButton"] > div:first-child {
+      > div:nth-child(2) > button:is([data-sentry-component="LogRawButton"], .scene-web button) > div:first-child {
       background: #E8EDF0 !important;
       color: #50616B !important;
     }
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:nth-child(2) > button[data-sentry-component="LogRawButton"] span,
+      > div:nth-child(2) > button:is([data-sentry-component="LogRawButton"], .scene-web button) span,
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:nth-child(2) > button[data-sentry-component="LogRawButton"] svg {
+      > div:nth-child(2) > button:is([data-sentry-component="LogRawButton"], .scene-web button) svg {
       color: #50616B !important;
     }
 
@@ -2983,14 +2983,14 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="선택지로 플레이하기"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.28) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="선택지로 플레이하기"]
       ) > div[class*="bg-gray-sub1"] {
       background: #FFFFFF !important;
@@ -3000,7 +3000,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="선택지로 플레이하기"]
       ) > div[class*="bg-gray-sub1"] > div:first-child svg {
       color: #C1CBD0 !important;
@@ -3199,14 +3199,14 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.28) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) > div[class*="bg-gray-sub1"] {
       background: #FFFFFF !important;
@@ -3216,7 +3216,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) > div[class*="bg-gray-sub1"] > div:first-child svg {
       color: #C1CBD0 !important;
@@ -3672,14 +3672,14 @@
     }
 
     html:has(#portal-container section[role="dialog"][aria-label="AI 모델 선택"]) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.28) !important;
     }
 
     html:has(#portal-container section[role="dialog"][aria-label="AI 모델 선택"]) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) > div[class*="bg-gray-sub1"] {
       background: #FFFFFF !important;
@@ -3689,7 +3689,7 @@
     }
 
     html:has(#portal-container section[role="dialog"][aria-label="AI 모델 선택"]) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) > div[class*="bg-gray-sub1"] > div:first-child svg {
       color: #C1CBD0 !important;
@@ -4092,21 +4092,21 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) {
       color: #26343C !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.30) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         section[role="dialog"][aria-label="AI 모델 선택"]
       ) > div[class*="bg-gray-sub1"] {
       background: #FFFFFF !important;
@@ -4858,16 +4858,16 @@
     html.${ENDING_ACTIVE},
     html.${ENDING_ACTIVE} body,
     html.${ENDING_ACTIVE} [role="dialog"][aria-label="엔딩"],
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingPanel"],
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingPanel"] > div,
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingHome"] {
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingPanel"], [data-slot="ending-panel"]),
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingPanel"], [data-slot="ending-panel"]) > div,
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingHome"], [data-slot="ending-panel"] [class~="bg-[#0c0c10]"]) {
       background: var(--kt-chat) !important;
       color: var(--kt-text) !important;
       color-scheme: light !important;
     }
 
     /* 상단바 */
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingHome"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingHome"], [data-slot="ending-panel"] [class~="bg-[#0c0c10]"])
       > div:first-child {
       background: var(--kt-white) !important;
       color: var(--kt-text) !important;
@@ -4875,17 +4875,17 @@
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingHome"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingHome"], [data-slot="ending-panel"] [class~="bg-[#0c0c10]"])
       > div:first-child h2,
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingHome"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingHome"], [data-slot="ending-panel"] [class~="bg-[#0c0c10]"])
       > div:first-child button,
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingHome"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingHome"], [data-slot="ending-panel"] [class~="bg-[#0c0c10]"])
       > div:first-child svg {
       color: var(--kt-text) !important;
     }
 
     /* 이야기 마무리하기 */
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingHome"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingHome"], [data-slot="ending-panel"] [class~="bg-[#0c0c10]"])
       > div:nth-child(2) > div:first-child > button {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
@@ -4893,13 +4893,13 @@
       box-shadow: 0 2px 5px rgba(91,82,16,.12) !important;
     }
 
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingHome"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingHome"], [data-slot="ending-panel"] [class~="bg-[#0c0c10]"])
       > div:nth-child(2) > div:first-child > button:hover {
       background: var(--kt-yellow-hover) !important;
     }
 
     /* 엔딩 모음 제목과 보관 수 */
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       > div:first-child {
       margin: 0 16px !important;
       padding-left: 0 !important;
@@ -4907,17 +4907,17 @@
       border-bottom: 1px solid rgba(69,87,97,.12) !important;
     }
 
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"] h3 {
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto) h3 {
       color: #26343C !important;
     }
 
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       > div:first-child > span {
       color: #667780 !important;
     }
 
     /* 빈 상태 */
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       > p:last-child:not(.sr-only) {
       margin: 0 16px 16px !important;
       color: #61727C !important;
@@ -4927,14 +4927,14 @@
     }
 
     /* 엔딩이 생긴 뒤 표시되는 보관 카드도 같은 톤으로 처리 */
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       ul {
       padding: 0 16px 16px !important;
     }
 
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       li > button,
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       a {
       background: rgba(255,255,255,.94) !important;
       color: #26343C !important;
@@ -4942,21 +4942,21 @@
       box-shadow: 0 1px 3px rgba(45,61,71,.07) !important;
     }
 
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       li > button:hover,
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       a:hover {
       background: #FFFFFF !important;
     }
 
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       [class*="text-white"],
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       [class*="text-gray-"] {
       color: #53646D !important;
     }
 
-    html.${ENDING_ACTIVE} [data-sentry-component="EndingArchiveList"]
+    html.${ENDING_ACTIVE} :is([data-sentry-component="EndingArchiveList"], [data-slot="ending-panel"] .overflow-y-auto)
       [class*="text-primary-"] {
       color: #75691D !important;
     }
@@ -5168,14 +5168,14 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       > div.absolute.inset-0 {
       background: rgba(43,57,66,.34) !important;
       backdrop-filter: blur(7px) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       > div[class*="rounded-t-"] {
       background: #FFFFFF !important;
       color: #26343C !important;
@@ -5184,31 +5184,31 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       > div[class*="rounded-t-"] > div:first-child > div:first-child {
       border-bottom-color: #E5EAED !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       h3,
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       h4 {
       color: #26343C !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       button[aria-label="Close"],
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       button[aria-label="Close"] svg {
       color: #53636C !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       button[class*="bg-gray-800"] {
       background: #F1F4F5 !important;
       color: #46545E !important;
@@ -5216,7 +5216,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       button[class*="bg-primary-"] {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
@@ -5224,7 +5224,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       label[data-sentry-component="Input"] {
       background: #F5F7F8 !important;
       color: #26343C !important;
@@ -5232,7 +5232,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       input[name="reason"] {
       background: transparent !important;
       color: #26343C !important;
@@ -5240,20 +5240,20 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
       input[name="reason"]::placeholder {
       color: #929DA3 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
-      button[data-sentry-component="LogRawButton"] {
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
+      button:is([data-sentry-component="LogRawButton"], .scene-web button) {
       color: #716600 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(input[name="reason"])
-      button[data-sentry-component="LogRawButton"]:disabled {
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(input[name="reason"])
+      button:is([data-sentry-component="LogRawButton"], .scene-web button):disabled {
       color: #A8B0B4 !important;
     }
 
@@ -5263,7 +5263,7 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.34) !important;
@@ -5271,7 +5271,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) > div[class*="rounded-t-"] {
       background: #FFFFFF !important;
@@ -5283,7 +5283,7 @@
 
     /* 드래그 손잡이 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) > div[class*="rounded-t-"] > div:first-child svg {
       color: #9AA6AC !important;
@@ -5291,21 +5291,21 @@
 
     /* 제목 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) span.heading1 {
       color: #202124 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) .body2 {
       color: #2E3B42 !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) .caption1 {
       color: #7B888F !important;
@@ -5313,7 +5313,7 @@
 
     /* 문제 선택 행 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) [role="button"]:has(> [role="checkbox"]) {
       margin: 0 -8px !important;
@@ -5324,14 +5324,14 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) [role="button"]:has(> [role="checkbox"]):hover {
       background: #F7F9FA !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) [role="button"]:has(> [role="checkbox"])
       .body2 {
@@ -5339,7 +5339,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) [role="button"]:has(> [role="checkbox"])
       .caption1 {
@@ -5348,7 +5348,7 @@
 
     /* 체크박스 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) [role="checkbox"] {
       width: 20px !important;
@@ -5359,7 +5359,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) [role="checkbox"] svg {
       color: #8C989E !important;
@@ -5368,7 +5368,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) [role="checkbox"][aria-checked="true"] {
       background: var(--kt-yellow) !important;
@@ -5376,7 +5376,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) [role="checkbox"][aria-checked="true"] svg {
       color: #332F18 !important;
@@ -5384,7 +5384,7 @@
 
     /* 기타 직접 입력 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) label[data-sentry-component="Input"] {
       background: #F5F7F8 !important;
@@ -5394,7 +5394,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) label[data-sentry-component="Input"]:focus-within {
       background: #FFFFFF !important;
@@ -5416,11 +5416,11 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) button[type="submit"],
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) button:last-of-type:not([role]) {
       background: var(--kt-yellow) !important;
@@ -5429,7 +5429,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         input[name="message-report-description"]
       ) button:disabled {
       background: #ECEFF1 !important;
@@ -5711,7 +5711,7 @@
        예전 > div:nth-child(2) 규칙은 더 이상 매칭되지 않아 최종 구조로 보정. */
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:first-child > button[data-sentry-component="LogRawButton"]:first-of-type {
+      > div:first-child > button:is([data-sentry-component="LogRawButton"], .scene-web button):first-of-type {
       background: #F4F6F7 !important;
       color: #26343C !important;
       border: 1px solid #E4E9EC !important;
@@ -5720,16 +5720,16 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:first-child > button[data-sentry-component="LogRawButton"]:first-of-type:hover,
+      > div:first-child > button:is([data-sentry-component="LogRawButton"], .scene-web button):first-of-type:hover,
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:first-child > button[data-sentry-component="LogRawButton"]:first-of-type:active {
+      > div:first-child > button:is([data-sentry-component="LogRawButton"], .scene-web button):first-of-type:active {
       background: #EEF2F4 !important;
     }
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:first-child > button[data-sentry-component="LogRawButton"]:first-of-type
+      > div:first-child > button:is([data-sentry-component="LogRawButton"], .scene-web button):first-of-type
       > div:first-child {
       background: #E8EDF0 !important;
       color: #50616B !important;
@@ -5737,11 +5737,11 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:first-child > button[data-sentry-component="LogRawButton"]:first-of-type
+      > div:first-child > button:is([data-sentry-component="LogRawButton"], .scene-web button):first-of-type
       > span,
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      > div:first-child > button[data-sentry-component="LogRawButton"]:first-of-type
+      > div:first-child > button:is([data-sentry-component="LogRawButton"], .scene-web button):first-of-type
       svg {
       color: #50616B !important;
       opacity: 1 !important;
@@ -7583,14 +7583,14 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-component="CharacterImageCarousel"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.28) !important;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-component="CharacterImageCarousel"]
       ) > div[class*="bg-gray-main"] {
       background: var(--kt-chat) !important;
@@ -8020,7 +8020,7 @@
 
     /* 액션 행 */
     html.${ACTIVE} .kt-message-actions-sheet
-      button[data-sentry-component="LogRawButton"] {
+      button:is([data-sentry-component="LogRawButton"], .scene-web button) {
       background: #F6F8F9 !important;
       color: #34434C !important;
       border-color: #E2E7EA !important;
@@ -8028,26 +8028,26 @@
     }
 
     html.${ACTIVE} .kt-message-actions-sheet
-      button[data-sentry-component="LogRawButton"]:hover:not(:disabled),
+      button:is([data-sentry-component="LogRawButton"], .scene-web button):hover:not(:disabled),
     html.${ACTIVE} .kt-message-actions-sheet
-      button[data-sentry-component="LogRawButton"]:active:not(:disabled) {
+      button:is([data-sentry-component="LogRawButton"], .scene-web button):active:not(:disabled) {
       background: #EEF2F4 !important;
     }
 
     html.${ACTIVE} .kt-message-actions-sheet
-      button[data-sentry-component="LogRawButton"] span,
+      button:is([data-sentry-component="LogRawButton"], .scene-web button) span,
     html.${ACTIVE} .kt-message-actions-sheet
-      button[data-sentry-component="LogRawButton"] svg {
+      button:is([data-sentry-component="LogRawButton"], .scene-web button) svg {
       color: #34434C !important;
       opacity: 1 !important;
     }
 
     html.${ACTIVE} .kt-message-actions-sheet
-      button[data-sentry-component="LogRawButton"]:disabled,
+      button:is([data-sentry-component="LogRawButton"], .scene-web button):disabled,
     html.${ACTIVE} .kt-message-actions-sheet
-      button[data-sentry-component="LogRawButton"]:disabled span,
+      button:is([data-sentry-component="LogRawButton"], .scene-web button):disabled span,
     html.${ACTIVE} .kt-message-actions-sheet
-      button[data-sentry-component="LogRawButton"]:disabled svg {
+      button:is([data-sentry-component="LogRawButton"], .scene-web button):disabled svg {
       color: #A5AEB3 !important;
       background-color: #F1F3F4 !important;
       opacity: 1 !important;
@@ -8076,14 +8076,14 @@
     ========================================================= */
 
     html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-component="ChatProfileEditForm"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.28) !important;
     }
 
     html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-component="ChatProfileEditForm"]
       ) > div[class*="bg-gray-main"]:not([role="presentation"]) {
       background: #FFFFFF !important;
@@ -8092,7 +8092,7 @@
     }
 
     html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-component="ChatProfileEditForm"]
       ) > div[class*="bg-gray-main"]:not([role="presentation"]) > div:first-child {
       background: #FFFFFF !important;
@@ -8101,15 +8101,15 @@
     }
 
     html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-component="ChatProfileEditForm"]
       ) > div[class*="bg-gray-main"]:not([role="presentation"]) > div:first-child h3,
     html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-component="ChatProfileEditForm"]
       ) > div[class*="bg-gray-main"]:not([role="presentation"]) > div:first-child button,
     html:is(.${ACTIVE}, .${PROFILE_EDIT_ACTIVE}) #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-component="ChatProfileEditForm"]
       ) > div[class*="bg-gray-main"]:not([role="presentation"]) > div:first-child svg {
       color: #26343C !important;
@@ -8239,7 +8239,7 @@
     ========================================================= */
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) > [role="presentation"] {
       background: rgba(43,57,66,.28) !important;
@@ -8247,7 +8247,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) > div[class*="bg-gray-sub1"] {
       background: #FFFFFF !important;
@@ -8257,7 +8257,7 @@
 
     /* 위쪽 드래그 손잡이 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) > div[class*="bg-gray-sub1"] > div:first-child svg {
       color: #CBD3D8 !important;
@@ -8347,7 +8347,7 @@
 
     /* 스크롤 막대도 밝은 시트에 맞춘다 */
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) div[class*="overflow-y-auto"] {
       scrollbar-width: thin !important;
@@ -8355,21 +8355,21 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) div[class*="overflow-y-auto"]::-webkit-scrollbar {
       width: 8px;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) div[class*="overflow-y-auto"]::-webkit-scrollbar-track {
       background: transparent;
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) div[class*="overflow-y-auto"]::-webkit-scrollbar-thumb {
       border: 2px solid transparent;
@@ -8379,7 +8379,7 @@
     }
 
     html.${ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="PiecePurchaseBottomSheet.tsx"]
       ) div[class*="overflow-y-auto"]::-webkit-scrollbar-thumb:hover {
       background-color: rgba(70,88,99,.42);
@@ -8809,14 +8809,14 @@
 
     /* 길게 누르기 메뉴: 고정/별명 변경/나가기 바텀시트 */
     html.${ROOM_LIST_ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="RoomListItemContextMenu.tsx"]
       ) > [role="presentation"] {
       background: rgba(25,29,32,.38) !important;
     }
 
     html.${ROOM_LIST_ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="RoomListItemContextMenu.tsx"]
       ) > div:nth-child(2) {
       background: #F4F5F6 !important;
@@ -8826,7 +8826,7 @@
 
     /* 상단 드래그 핸들 */
     html.${ROOM_LIST_ACTIVE} #portal-container
-      [data-sentry-component="KeyboardAvoidingView"]:has(
+      :is([data-sentry-component="KeyboardAvoidingView"], .scene-web #portal-container > div):has(
         [data-sentry-source-file="RoomListItemContextMenu.tsx"]
       ) > div:nth-child(2) > div:first-child svg {
       color: #B4BBC0 !important;
@@ -9133,13 +9133,13 @@
 
     /* 스냅샷 실패 상태: 기본 다크 테마의 흰 글자/낮은 불투명도 보정.
        버튼은 실패 이유를 표시하므로 문구와 비활성 상태를 유지한다. */
-    html.${ACTIVE} [data-sentry-component="LastMessageControlBar"] > button[disabled][data-sentry-component="LogRawButton"]:has(> span[class*="text-white/20"]) {
+    html.${ACTIVE} [data-sentry-component="LastMessageControlBar"] > button[disabled]:is([data-sentry-component="LogRawButton"], .scene-web button):has(> span[class*="text-white/20"]) {
       background: var(--kt-soft2) !important;
       border-color: var(--kt-line) !important;
       color: var(--kt-sub) !important;
       opacity: 1 !important;
     }
-    html.${ACTIVE} [data-sentry-component="LastMessageControlBar"] > button[disabled][data-sentry-component="LogRawButton"]:has(> span[class*="text-white/20"]) > :is(span, svg) {
+    html.${ACTIVE} [data-sentry-component="LastMessageControlBar"] > button[disabled]:is([data-sentry-component="LogRawButton"], .scene-web button):has(> span[class*="text-white/20"]) > :is(span, svg) {
       color: var(--kt-sub) !important;
       opacity: 1 !important;
     }
@@ -9305,7 +9305,7 @@
 
   function isEndingOpen() {
     return !!document.querySelector(
-      '[role="dialog"][aria-label="엔딩"] [data-sentry-component="EndingPanel"]'
+      '[data-sentry-component="EndingPanel"], [data-slot="ending-panel"]'
     );
   }
 
@@ -9591,7 +9591,7 @@
 
   function markProfileHub() {
     const dialog = document.querySelector(
-      '#portal-container [role="dialog"][aria-label="대화 프로필"]'
+      '#portal-container [role="dialog"][aria-label="대화 프로필"], #portal-container [role="dialog"]:has([role="group"][aria-label="My chat profiles"])'
     );
 
     if (!dialog) return;
@@ -9623,7 +9623,7 @@
     });
 
     /* 추천 프로필의 선택 체크 배지 */
-    dialog.querySelectorAll('[data-sentry-component="ChatProfileListItem"]')
+    dialog.querySelectorAll('[data-sentry-component="ChatProfileListItem"], [role="group"][aria-label="My chat profiles"] > div:has(> button)')
       .forEach(item => {
         const badge = Array.from(item.querySelectorAll('div')).find(el => {
           const cls = String(el.className || '');
@@ -9769,7 +9769,7 @@
     if (archiveGrid) {
       const panel = archiveGrid.closest(
         'div.relative.flex.max-h-full.max-w-full.flex-col'
-      );
+      ) || archiveGrid.closest('#portal-container .bg-gray-sub1');
 
       if (panel) {
         panel.classList.add('kt-snapshot-archive-modal');
@@ -10384,8 +10384,8 @@
   }
 
   const PASSIVE_CONTENT = '[data-sentry-component="BodyView"], [role="log"][aria-label="Chat messages"], [data-sentry-component="RoomList"], [data-testid^="room-list-item-"], [testid^="room-list-item-"]';
-  const SPECIAL_CONTENT = '[data-testid="message-phone-shell"], [data-sentry-component="DeleteModeHeader"], [role="dialog"], [data-sentry-component="KeyboardAvoidingView"]';
-  const SCREEN_STRUCTURE = 'main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
+  const SPECIAL_CONTENT = '[data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="message-phone-shell"], [data-sentry-component="DeleteModeHeader"], [role="dialog"], [data-sentry-component="KeyboardAvoidingView"]';
+  const SCREEN_STRUCTURE = '[data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="anonymous-board-safe-area"], [data-testid="zetagram-panel"], [data-testid="capture-mode-header-back"], main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
 
   function isSpecialContent(node) {
     return node instanceof Element && (node.matches(SPECIAL_CONTENT) || !!node.querySelector(SPECIAL_CONTENT));
@@ -10419,7 +10419,10 @@
       const target = record.target instanceof Element ? record.target : record.target.parentElement;
       if (!target || target.closest('style, script, link')) continue;
       // Portal text updates can change a button label; handle only that layer.
-      if (queueOverlayLayer(target, record.addedNodes)) continue;
+      if (queueOverlayLayer(target, record.addedNodes)) {
+        if ([...record.addedNodes, ...record.removedNodes].some(node => node instanceof Element && (node.matches(SCREEN_STRUCTURE) || node.querySelector(SCREEN_STRUCTURE)))) scheduleApply();
+        continue;
+      }
       const elements = [...record.addedNodes, ...record.removedNodes].filter(node => node instanceof Element);
       if (target.closest(PASSIVE_CONTENT) && !target.closest(SPECIAL_CONTENT) && !elements.some(isSpecialContent)) continue;
       // Plain text replacements elsewhere do not need screen reconciliation.
