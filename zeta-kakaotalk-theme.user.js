@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.72
+// @version      3.50.73
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -93,7 +93,7 @@
 
 
     /* Embedded chat defaults. Component rules below refine these surfaces. */
-    html.scene-web.${ACTIVE} :where(.bg-gray-main) { background-color: var(--kt-chat) !important; }
+    html.scene-web.${ACTIVE} :where(.bg-gray-main) { background-color: var(--kt-white) !important; }
     html.scene-web.${ACTIVE} :where(.bg-gray-sub1, .bg-gray-900) { background-color: var(--kt-white) !important; }
     html.scene-web.${ACTIVE} :where(.bg-gray-sub2, .bg-gray-800) { background-color: var(--kt-soft) !important; }
     html.scene-web.${ACTIVE} :where(.bg-gray-sub3, .bg-gray-700) { background-color: var(--kt-soft2) !important; }
