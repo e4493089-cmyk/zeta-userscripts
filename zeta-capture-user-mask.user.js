@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Capture User Mask
 // @namespace    zeta-capture-user-mask
-// @version      0.2.11
+// @version      0.2.12
 // @description  Zeta 캡처 모드/캡처 미리보기에서 {{user}} 실제 이름과 한국식 이름의 이름 부분을 글자 수만큼 ■로 가립니다. 네모 색은 원래 글자색을 따릅니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -55,9 +55,9 @@
 
   function isCaptureActive() {
     return !!document.querySelector(
-      ':is([data-sentry-component="CaptureModeHeader"], [data-testid="capture-mode-header-clear"]), ' +
+      ':is([data-sentry-component="CaptureModeHeader"], :is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), ' +
       '[data-sentry-component="CaptureModeBottom"], ' +
-      ':is([data-sentry-component="CapturePreview"], section:has(> header button[aria-label="Save captured image"])), ' +
+      ':is([data-sentry-component="CapturePreview"], div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), div.absolute.inset-0:has(> header button[aria-label="Share captured image"])), ' +
       ':is([data-sentry-component="ChatMessageCaptureSelector"], button[aria-label="Select message to capture"])'
     );
   }
@@ -189,11 +189,12 @@
     const roots = new Set();
 
     document
-      .querySelectorAll(':is([data-sentry-component="CapturePreview"], section:has(> header button[aria-label="Save captured image"]))')
+      .querySelectorAll(':is([data-sentry-component="CapturePreview"], div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))')
       .forEach(el => roots.add(el));
 
     const chatLog = document.querySelector('[role="log"][aria-label="Chat messages"]');
     if (chatLog) roots.add(chatLog);
+    document.querySelectorAll('[data-capture-page]').forEach(page => roots.add(page));
 
     document
       .querySelectorAll(':is([data-sentry-component="ChatMessageCaptureSelector"], button[aria-label="Select message to capture"])')
@@ -264,15 +265,15 @@
     apply();
 
     const captureSelector = [
-      ':is([data-sentry-component="CaptureModeHeader"], [data-testid="capture-mode-header-clear"])',
+      ':is([data-sentry-component="CaptureModeHeader"], :is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))',
       '[data-sentry-component="CaptureModeBottom"]',
-      ':is([data-sentry-component="CapturePreview"], section:has(> header button[aria-label="Save captured image"]))',
+      ':is([data-sentry-component="CapturePreview"], div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))',
       ':is([data-sentry-component="ChatMessageCaptureSelector"], button[aria-label="Select message to capture"])'
     ].join(',');
 
     observer = new MutationObserver(records => {
       if (captureActive) {
-        const contentSelector = ':is([data-sentry-component="CapturePreview"], section:has(> header button[aria-label="Save captured image"])), :is([data-sentry-component="ChatMessageCaptureSelector"], button[aria-label="Select message to capture"]), [role="log"][aria-label="Chat messages"]';
+        const contentSelector = ':is([data-sentry-component="CapturePreview"], div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), div.absolute.inset-0:has(> header button[aria-label="Share captured image"])), :is([data-sentry-component="ChatMessageCaptureSelector"], button[aria-label="Select message to capture"]), [role="log"][aria-label="Chat messages"]';
         for (const record of records) {
           const target = record.target instanceof Element ? record.target : record.target.parentElement;
           if (!target || target.closest('.' + MASK_CLASS)) continue;
@@ -310,9 +311,9 @@
         if (!target) return;
 
         const captureUi = target.closest(
-          ':is([data-sentry-component="CaptureModeHeader"], [data-testid="capture-mode-header-clear"]), ' +
+          ':is([data-sentry-component="CaptureModeHeader"], :is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), ' +
           '[data-sentry-component="CaptureModeBottom"], ' +
-          ':is([data-sentry-component="CapturePreview"], section:has(> header button[aria-label="Save captured image"])), ' +
+          ':is([data-sentry-component="CapturePreview"], div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), div.absolute.inset-0:has(> header button[aria-label="Share captured image"])), ' +
           ':is([data-sentry-component="ChatMessageCaptureSelector"], button[aria-label="Select message to capture"])'
         );
 
