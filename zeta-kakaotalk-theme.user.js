@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.76
+// @version      3.50.77
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -177,11 +177,11 @@
     }
 
     /* 상대 / 유저 이름 */
-    html.${ACTIVE} :is([data-sentry-component="LeftTextContent"] .caption1, .scene-web [role="log"] .flex-col:has(> .relative .self-start.bg-gray-sub1) > .caption1) {
+    html.${ACTIVE} :is([data-sentry-component="LeftTextContent"] .caption1, .scene-web :is([role="log"], [data-capture-page]) .flex-col:has(> .relative .self-start.bg-gray-sub1) > .caption1) {
       color: var(--kt-ai-name) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="RightTextContent"] .caption1, .scene-web [role="log"] .flex-col:has(> .relative .bg-bubble-user) > .caption1) {
+    html.${ACTIVE} :is([data-sentry-component="RightTextContent"] .caption1, .scene-web :is([role="log"], [data-capture-page]) .flex-col:has(> .relative .bg-bubble-user) > .caption1) {
       color: var(--kt-user-name) !important;
     }
 
@@ -193,66 +193,66 @@
     }
 
     /* 상대 말풍선 */
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) {
       background: var(--kt-white) !important;
       color: var(--kt-ai-dialogue) !important;
       border: 0 !important;
       box-shadow: 0 1px 2px rgba(0,0,0,.05) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) p {
       color: var(--kt-ai-dialogue) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) em {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) em {
       color: var(--kt-ai-action) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) em [class*="text-primary-"],
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) em [data-placeholder] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) em [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) em [data-placeholder] {
       color: var(--kt-ai-action) !important;
     }
 
     /* 내 말풍선 */
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) {
       background: var(--kt-yellow) !important;
       color: var(--kt-user-dialogue) !important;
       border: 0 !important;
       box-shadow: 0 1px 2px rgba(0,0,0,.05) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) p {
       color: var(--kt-user-dialogue) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) em {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) em {
       color: var(--kt-user-action) !important;
     }
 
     /* **강조** */
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat strong,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat b,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat .font-bold {
       color: #514A27 !important;
       font-weight: 700 !important;
     }
 
     /* Zeta 기본 보라색 토큰 제거 */
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) [class*="text-primary-"],
     html.${ACTIVE} [data-sentry-component="RightTextContent"] [data-placeholder] {
       color: inherit !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) em [class*="text-primary-"],
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) em [data-placeholder] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) em [class*="text-primary-"],
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) em [data-placeholder] {
       color: var(--kt-user-action) !important;
     }
 
     /* 내레이션
        긴 내레이터가 화면을 큰 박스로 덮지 않도록 배경/테두리 제거 */
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) > div {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) > div {
       background: transparent !important;
       color: var(--kt-chat-sub) !important;
       border: 0 !important;
@@ -261,65 +261,65 @@
       padding-bottom: 2px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) p,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) em,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) li,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) strong {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) p,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) em,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) li,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) strong {
       color: var(--kt-chat-sub) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) strong {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) strong {
       color: var(--kt-chat-text) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) hr {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) hr {
       border-color: var(--kt-chat-line) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) svg {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) svg {
       color: var(--kt-chat-text) !important;
     }
 
     /* 정보박스 */
-    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) {
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web :is([role="log"], [data-capture-page]) .mx-2.my-3.rounded-12.bg-gray-main) {
       background: transparent !important;
       color: var(--kt-chat-sub) !important;
       border: 0 !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) .font-bold,
-    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) .font-semibold {
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web :is([role="log"], [data-capture-page]) .mx-2.my-3.rounded-12.bg-gray-main) .font-bold,
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web :is([role="log"], [data-capture-page]) .mx-2.my-3.rounded-12.bg-gray-main) .font-semibold {
       color: var(--kt-chat-text) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) [class*="text-white"],
-    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) .chat {
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web :is([role="log"], [data-capture-page]) .mx-2.my-3.rounded-12.bg-gray-main) [class*="text-white"],
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web :is([role="log"], [data-capture-page]) .mx-2.my-3.rounded-12.bg-gray-main) .chat {
       color: var(--kt-chat-sub) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web [role="log"] .mx-2.my-3.rounded-12.bg-gray-main) svg {
+    html.${ACTIVE} :is([data-sentry-component="InfoBoxContent"][class*="mx-2"], .scene-web :is([role="log"], [data-capture-page]) .mx-2.my-3.rounded-12.bg-gray-main) svg {
       color: var(--kt-chat-text) !important;
     }
 
     /* 내레이션 마크다운 요소도 채팅 배경 대비를 그대로 사용 */
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) code,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) a,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) del,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) s,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote p {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) code,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) a,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) del,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) s,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote p {
       color: var(--kt-chat-sub) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) code,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) code,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote {
       background: transparent !important;
       border-color: var(--kt-chat-line) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote > div:first-child {
       background: var(--kt-chat-muted) !important;
     }
 
@@ -359,20 +359,20 @@
        마크다운 - 상대 말풍선
     ========================================================= */
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat strong,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat b,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat .font-bold {
       color: #30414B !important;
       font-weight: 700 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat code {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat code {
       color: #30414B !important;
       background: #EEF2F4 !important;
       border: 1px solid rgba(48,65,75,.10) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote {
       color: #455B68 !important;
       background: rgba(178,199,217,.20) !important;
       border-radius: 6px !important;
@@ -380,43 +380,43 @@
       padding-bottom: 4px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote p {
       color: #455B68 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat blockquote > div:first-child {
       background: #8097A6 !important;
       width: 3px !important;
       border-radius: 999px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat a {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat a {
       color: #35617D !important;
       text-decoration: underline !important;
       text-underline-offset: 2px;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat del,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat s {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat del,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat s {
       color: #87939A !important;
       text-decoration-color: #87939A !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h1,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h2,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h3,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h4,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h5,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h6 {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h1,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h2,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h3,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h4,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h5,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat h6 {
       color: #2D3C45 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat hr {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat hr {
       border-color: #CDD6DB !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat li,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat li > span[aria-hidden="true"] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat li,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-other, :is([data-sentry-component="LeftTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.self-start.bg-gray-sub1)) .chat li > span[aria-hidden="true"] {
       color: #3D4E58 !important;
     }
 
@@ -426,20 +426,20 @@
        노란 배경 위에서 명령별 차이가 보이도록 분리
     ========================================================= */
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat strong,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat b,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat .font-bold {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat strong,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat b,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat .font-bold {
       color: #493D08 !important;
       font-weight: 750 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat code {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat code {
       color: #433A13 !important;
       background: rgba(255,255,255,.52) !important;
       border: 1px solid rgba(73,61,8,.12) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat blockquote {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat blockquote {
       color: #584D20 !important;
       background: rgba(255,255,255,.28) !important;
       border-radius: 6px !important;
@@ -447,44 +447,44 @@
       padding-bottom: 4px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat blockquote p {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat blockquote p {
       color: #584D20 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat blockquote > div:first-child {
       background: #83742D !important;
       width: 3px !important;
       border-radius: 999px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat a {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat a {
       color: #5A4C00 !important;
       text-decoration: underline !important;
       text-underline-offset: 2px;
       font-weight: 600 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat del,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat s {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat del,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat s {
       color: #857A49 !important;
       text-decoration-color: #756A37 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h1,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h2,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h3,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h4,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h5,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat h6 {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat h1,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat h2,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat h3,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat h4,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat h5,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat h6 {
       color: #443900 !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat hr {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat hr {
       border-color: rgba(73,61,8,.25) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat li,
-    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web [role="log"] .message-context-menu-trigger.bg-bubble-user)) .chat li > span[aria-hidden="true"] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat li,
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"].kt-me, :is([data-sentry-component="RightTextContent"] [data-sentry-component="ChatBubbleContainer"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger.bg-bubble-user)) .chat li > span[aria-hidden="true"] {
       color: #4D431C !important;
     }
 
@@ -493,13 +493,13 @@
        마크다운 - 내레이터
     ========================================================= */
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) code {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) code {
       color: #40515B !important;
       background: rgba(255,255,255,.46) !important;
       border: 1px solid rgba(64,81,91,.10) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote {
       color: #52636C !important;
       background: rgba(255,255,255,.22) !important;
       border-radius: 6px !important;
@@ -507,19 +507,19 @@
       padding-bottom: 4px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote > div:first-child {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) blockquote > div:first-child {
       background: #8197A4 !important;
       width: 3px !important;
       border-radius: 999px !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) a {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) a {
       color: #355E78 !important;
       text-decoration: underline !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) del,
-    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) s {
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) del,
+    html.${ACTIVE} :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) s {
       color: #859199 !important;
     }
 
@@ -3556,21 +3556,21 @@
     }
 
     /* 내레이터: 박스 제거 + 글씨만 진하게 */
-    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) > div {
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) > div {
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
     }
 
-    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
-    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) p,
-    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) em,
-    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) li {
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) p,
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) em,
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) li {
       color: #4E5C64 !important;
     }
 
-    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) strong,
-    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) svg {
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) strong,
+    html.kt-saved-room-active :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) svg {
       color: #36464F !important;
     }
 
@@ -3897,17 +3897,17 @@
       color: #191919 !important;
     }
 
-    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) > div,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) > div,
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] {
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
     }
 
-    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
-    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) p,
-    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) em,
-    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) li,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) .chat,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) p,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) em,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) li,
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"],
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] [data-sentry-component="InfoBoxContent"],
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] .chat,
@@ -3915,8 +3915,8 @@
       color: #4B5961 !important;
     }
 
-    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) strong,
-    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web [role="log"] div:has(> .message-context-menu-trigger.bg-gray-main)) svg,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) strong,
+    html:has([data-sentry-component="SavedRoomHeader"]) :is([data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) div:has(> .message-context-menu-trigger.bg-gray-main)) svg,
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] .font-bold,
     html:has([data-sentry-component="SavedRoomHeader"]) [data-sentry-component="InfoBoxContentView"] .font-semibold {
       color: #34434C !important;
@@ -7706,28 +7706,28 @@
     ========================================================= */
 
     /* 선택 화면 상단바 */
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])),
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) > header,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) nav {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))),
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) > header,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) nav {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-color: var(--kt-line) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) {
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
     /* Zeta 원본 헤더가 text-white를 쓰므로 제목/선택 해제까지 전부 밝은 헤더용 색으로 고정 */
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) h1,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) h2,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) h3,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) h4,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) button,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) span,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) svg,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) [class*="text-white"] {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) h1,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) h2,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) h3,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) h4,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) button,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) span,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) svg,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) [class*="text-white"] {
       color: #26343C !important;
     }
 
@@ -7781,44 +7781,44 @@
     }
 
     /* 선택 완료 하단바 */
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has([data-testid="capture-mode-header-clear"]) [data-testid="chat-bottom-dock"] > div:has(> button)) {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])) [data-testid="chat-bottom-dock"] > div:has(> button)) {
       background: rgba(255,255,255,.97) !important;
       border-top: 1px solid var(--kt-line) !important;
       box-shadow: 0 -4px 12px rgba(45,61,71,.08) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has([data-testid="capture-mode-header-clear"]) [data-testid="chat-bottom-dock"] > div:has(> button)) > button {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])) [data-testid="chat-bottom-dock"] > div:has(> button)) > button {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #DFC900 !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has([data-testid="capture-mode-header-clear"]) [data-testid="chat-bottom-dock"] > div:has(> button)) > button:hover {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])) [data-testid="chat-bottom-dock"] > div:has(> button)) > button:hover {
       background: var(--kt-yellow-hover) !important;
     }
 
     /* 완성된 캡처 미리보기 */
-    html.${ACTIVE} [data-sentry-component="CapturePreview"] {
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) {
       background: var(--kt-chat) !important;
       color: var(--kt-text) !important;
       color-scheme: light !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CapturePreview"] > header {
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) > header {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CapturePreview"] > header h3,
-    html.${ACTIVE} [data-sentry-component="CapturePreview"] > header button,
-    html.${ACTIVE} [data-sentry-component="CapturePreview"] > header svg {
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) > header h3,
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) > header button,
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) > header svg {
       color: #26343C !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CapturePreview"]
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))
       > div[class*="overflow-y-auto"] {
       background: var(--kt-chat) !important;
       scrollbar-width: thin !important;
@@ -7826,20 +7826,20 @@
     }
 
     /* 캡처 페이지 사이에 래퍼가 추가되어도 저장 대상 배경에 직접 적용한다. */
-    html.${ACTIVE} [data-sentry-component="CapturePreview"] [data-capture-page="true"],
-    html.${ACTIVE} [data-sentry-component="CapturePreview"]
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) [data-capture-page="true"],
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))
       > div[class*="overflow-y-auto"] > div
       > div[class*="bg-gray-main"] {
       background: var(--kt-chat) !important;
       color: var(--kt-chat-text) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CapturePreview"]
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))
       > div:last-child:not([class*="overflow-y-auto"]) {
       color: var(--kt-chat-text) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CapturePreview"]
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))
       > div:last-child:not([class*="overflow-y-auto"]) > span {
       color: var(--kt-chat-text) !important;
     }
