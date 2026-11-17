@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.67
+// @version      3.50.68
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1776,32 +1776,32 @@
       border-color: #E6EBEE !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) {
       background: var(--kt-chat) !important;
       border-bottom: 0 !important;
       backdrop-filter: none !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] > header {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) > header {
       background: var(--kt-white) !important;
       border-bottom: 1px solid var(--kt-line) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] nav {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) nav {
       background: transparent !important;
       border-color: transparent !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h1,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h2,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h3,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] span,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] button {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h1,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h2,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h3,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) span,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) button {
       color: var(--kt-text) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] button svg {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) button svg {
       color: var(--kt-text) !important;
     }
 
@@ -1852,7 +1852,7 @@
     }
 
     html.${ACTIVE} .kt-delete-mode-button-row,
-    html.${ACTIVE} [data-sentry-component="DeleteModeBottom"] {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeBottom"], #zeta:has([data-testid="delete-mode-header-clear"]) [data-testid="chat-bottom-dock"] > div:has(> button)) {
       background: var(--kt-chat) !important;
       border-top: 0 !important;
       box-shadow: none !important;
@@ -3332,43 +3332,43 @@
       color: #26343C !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"],
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"]
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"])),
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"]))
       [data-sentry-component="WrappedDiv"] {
       background: #FFFFFF !important;
       color: #26343C !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListHeader"] {
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListHeader"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"]) > header) {
       background: #FAFBFB !important;
       color: #7A878E !important;
       border-bottom-color: #E7EBEE !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"] a {
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"])) a {
       background: #FFFFFF !important;
       border-color: #E7EBEE !important;
       border-radius: 10px !important;
       color: #26343C !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"]
+    :is(html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"], html.scene-web [data-testid="saved-room-list-scroll"])
       .text-gray-50 {
       color: #28363E !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"]
+    :is(html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"], html.scene-web [data-testid="saved-room-list-scroll"])
       [class*="text-white/50"] {
       color: #7B888F !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"]
+    :is(html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"], html.scene-web [data-testid="saved-room-list-scroll"])
       [class*="text-white/[16%]"] {
       color: #C0C7CB !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"] a > button,
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"] a > button svg {
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"])) a > button,
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"])) a > button svg {
       color: #66757D !important;
     }
 
@@ -4172,8 +4172,8 @@
     }
 
     html.kt-saved-rooms-active main,
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"],
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"]
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"])),
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"]))
       [data-sentry-component="WrappedDiv"] {
       background: #FFFFFF !important;
       color: #26343C !important;
@@ -4191,35 +4191,35 @@
       color: #26343C !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListHeader"] {
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListHeader"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"]) > header) {
       background: #FAFBFB !important;
       color: #7A878E !important;
       border-bottom: 1px solid #E6EBEE !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"] a {
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"])) a {
       background: #FFFFFF !important;
       color: #26343C !important;
       border-color: #E7EBEE !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"] a:hover {
+    :is(html.kt-saved-rooms-active [data-sentry-component="SavedRoomListPage"], html.scene-web section:has(> [data-testid="saved-room-list-scroll"])) a:hover {
       background: #F6F8F9 !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"]
+    :is(html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"], html.scene-web [data-testid="saved-room-list-scroll"])
       .text-gray-50 {
       color: #2C3940 !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"]
+    :is(html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"], html.scene-web [data-testid="saved-room-list-scroll"])
       [class*="text-white/50"] {
       color: #77858C !important;
     }
 
-    html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"]
+    :is(html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"], html.scene-web [data-testid="saved-room-list-scroll"])
       button,
-    html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"]
+    :is(html.kt-saved-rooms-active [data-sentry-source-file="SavedRoomItem.tsx"], html.scene-web [data-testid="saved-room-list-scroll"])
       button svg {
       color: #69777F !important;
       background: transparent !important;
@@ -7697,28 +7697,28 @@
     ========================================================= */
 
     /* 선택 화면 상단바 */
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"],
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] > header,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] nav {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])),
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) > header,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) nav {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-color: var(--kt-line) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) {
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
     /* Zeta 원본 헤더가 text-white를 쓰므로 제목/선택 해제까지 전부 밝은 헤더용 색으로 고정 */
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] h1,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] h2,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] h3,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] h4,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] button,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] span,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] svg,
-    html.${ACTIVE} [data-sentry-component="CaptureModeHeader"] [class*="text-white"] {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) h1,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) h2,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) h3,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) h4,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) button,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) span,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) svg,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has([data-testid="capture-mode-header-clear"])) [class*="text-white"] {
       color: #26343C !important;
     }
 
@@ -7772,20 +7772,20 @@
     }
 
     /* 선택 완료 하단바 */
-    html.${ACTIVE} [data-sentry-component="CaptureModeBottom"] {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has([data-testid="capture-mode-header-clear"]) [data-testid="chat-bottom-dock"] > div:has(> button)) {
       background: rgba(255,255,255,.97) !important;
       border-top: 1px solid var(--kt-line) !important;
       box-shadow: 0 -4px 12px rgba(45,61,71,.08) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CaptureModeBottom"] > button {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has([data-testid="capture-mode-header-clear"]) [data-testid="chat-bottom-dock"] > div:has(> button)) > button {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #DFC900 !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CaptureModeBottom"] > button:hover {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has([data-testid="capture-mode-header-clear"]) [data-testid="chat-bottom-dock"] > div:has(> button)) > button:hover {
       background: var(--kt-yellow-hover) !important;
     }
 
@@ -7841,28 +7841,28 @@
     ========================================================= */
 
     /* 삭제 선택 상단바 = 캡처 선택 상단바 */
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"],
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] > header,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] nav {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])),
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) > header,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) nav {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-color: var(--kt-line) !important;
       backdrop-filter: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) {
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h1,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h2,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h3,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] h4,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] button,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] span,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] svg,
-    html.${ACTIVE} [data-sentry-component="DeleteModeHeader"] [class*="text-white"] {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h1,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h2,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h3,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h4,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) button,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) span,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) svg,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) [class*="text-white"] {
       color: #26343C !important;
     }
 
@@ -9187,6 +9187,20 @@
     html.scene-web.${ACTIVE} [data-testid="chat-send-button"] {
       background: var(--kt-yellow) !important;
       color: var(--kt-text) !important;
+    }
+
+    html.scene-web section:has(> [data-testid="saved-room-messages"]) {
+      background: var(--kt-white) !important;
+      color: var(--kt-text) !important;
+    }
+    html.scene-web section:has([data-testid="saved-room-messages"]) > button:last-child,
+    html.scene-web #zeta:has([data-testid="delete-mode-header-clear"]) [data-testid="chat-bottom-dock"] button.bg-primary-400 {
+      background: var(--kt-yellow) !important;
+      color: var(--kt-text) !important;
+    }
+    html.scene-web button:is([aria-label="Select message to capture"], [aria-label="Select delete start point"]).border-primary-400 {
+      border-color: var(--kt-yellow) !important;
+      background-color: rgba(254,229,0,.09) !important;
     }
 `;
 
