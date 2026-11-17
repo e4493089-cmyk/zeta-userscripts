@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Chat Search
 // @namespace    zeta-chat-search
-// @version      0.3.8
+// @version      0.3.9
 // @description  대화창 안에서 지난 대화를 검색합니다. 읽은 대화는 브라우저에 색인해 두고 다음부터는 다시 훑지 않습니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1091,14 +1091,7 @@
 
     const anchor = menuAnchor();
     if (!anchor) {
-      if (inChatFrame && document.body && !document.getElementById(MENU_ROW_ID)) {
-        const button = document.createElement('button');
-        button.id = MENU_ROW_ID;
-        button.textContent = '대화 검색';
-        button.style.cssText = 'position:fixed;right:12px;top:60px;z-index:9999;padding:8px;border-radius:12px;background:#fff;color:#25333b';
-        button.addEventListener('click', () => void openPanel());
-        document.body.appendChild(button);
-      }
+      document.getElementById(MENU_ROW_ID)?.remove();
       return;
     }
 
@@ -1116,6 +1109,7 @@
     }
 
     // 제타가 메뉴 항목에 쓰는 모양을 그대로 따른다.
+    row.removeAttribute('style');
     row.className = anchor.className + ' zcs-menu-row';
     if (anchor.nextElementSibling !== row) anchor.after(row);
   }
@@ -1141,7 +1135,10 @@
       #${PANEL_ID} .zcs-card {
         display: flex;
         flex-direction: column;
+        box-sizing: border-box;
+        min-width: 0;
         width: min(440px, 100%);
+        max-width: 100%;
         max-height: min(78vh, 640px);
         border-radius: 20px;
         background: var(--kt-white, #1c1c20);
