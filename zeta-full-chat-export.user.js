@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.15
+// @version      0.3.16
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -114,7 +114,7 @@
   const STYLE_ID = APP + '-style';
   const MESSAGE_BODY_SELECTOR = ':is([data-sentry-component="BodyView"], [role="log"] [data-index][data-key])';
   const MESSAGE_SELECTOR = MESSAGE_BODY_SELECTOR;
-  const CHAT_SELECTOR = '[role="log"][aria-label="Chat messages"]';
+  const CHAT_SELECTOR = '[role="log"][aria-label="Chat messages"], .scene-web [role="log"], #zeta [role="log"], [role="log"]:has([data-index][data-key])';
 
   let running = false;
   let cancelled = false;
@@ -140,7 +140,8 @@
   }
 
   function findChatLog() {
-    return document.querySelector(CHAT_SELECTOR);
+    const logs = Array.from(document.querySelectorAll(CHAT_SELECTOR));
+    return logs.find(log => log.getBoundingClientRect().height > 0) || logs[0] || null;
   }
 
   function visibleChatPage() {
@@ -914,11 +915,19 @@
 
   async function exportAll(format = 'markdown', range = null) {
     if (running) return;
-    const log = findChatLog();
+    let log = findChatLog();
+    // 화면 전환 직후 잠시 사라진 메시지 목록이 다시 붙을 시간을 준다.
+    if (!log && (inChatFrame || currentRoomId())) {
+      for (let attempt = 0; attempt < 20 && !log; attempt++) {
+        await wait(100);
+        log = findChatLog();
+      }
+    }
     if (!log) {
-      alert('Zeta 채팅방 안에서 실행해줘.');
+      alert('현재 화면의 대화 목록을 찾지 못했어요. 대화가 보이는 상태에서 다시 눌러 주세요.');
       return;
     }
+    if (running) return;
 
     running = true;
     cancelled = false;
