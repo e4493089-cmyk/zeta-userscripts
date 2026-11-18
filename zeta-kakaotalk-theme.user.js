@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.88
+// @version      3.50.89
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1637,6 +1637,7 @@
       color: #191919 !important;
     }
 
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], .scene-web #zeta:not(:has([data-testid="delete-mode-header-back"])) [data-testid="chat-bottom-dock"] > div.flex.bg-gray-main.px-4[class~="py-[14px]"]:has(> button.w-full)) > button:disabled,
     html.${ACTIVE} .kt-message-panel
       :is([data-sentry-component="Composer"], .kt-message-composer) button:is([aria-label="보내기"], .kt-message-send):disabled {
       background: #E7EAEC !important;
@@ -7752,28 +7753,28 @@
     ========================================================= */
 
     /* 선택 화면 상단바 */
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))),
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) > header,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) nav {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])),
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) > header,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) nav {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-color: var(--kt-line) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) {
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
     /* Zeta 원본 헤더가 text-white를 쓰므로 제목/선택 해제까지 전부 밝은 헤더용 색으로 고정 */
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) h1,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) h2,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) h3,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) h4,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) button,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) span,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) svg,
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"]))) [class*="text-white"] {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) h1,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) h2,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) h3,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) h4,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) button,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) span,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) svg,
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeHeader"], header:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])), .scene-web #zeta div.absolute.inset-x-0.top-0:has([data-testid="capture-mode-header-back"])) [class*="text-white"] {
       color: #26343C !important;
     }
 
@@ -7827,20 +7828,20 @@
     }
 
     /* 선택 완료 하단바 */
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])) [data-testid="chat-bottom-dock"] > div:has(> button)) {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], .scene-web #zeta:not(:has([data-testid="delete-mode-header-back"])) [data-testid="chat-bottom-dock"] > div.flex.bg-gray-main.px-4[class~="py-[14px]"]:has(> button.w-full)) {
       background: rgba(255,255,255,.97) !important;
       border-top: 1px solid var(--kt-line) !important;
       box-shadow: 0 -4px 12px rgba(45,61,71,.08) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])) [data-testid="chat-bottom-dock"] > div:has(> button)) > button {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], .scene-web #zeta:not(:has([data-testid="delete-mode-header-back"])) [data-testid="chat-bottom-dock"] > div.flex.bg-gray-main.px-4[class~="py-[14px]"]:has(> button.w-full)) > button:not(:disabled) {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #DFC900 !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], #zeta:has(:is([data-testid="capture-mode-header-clear"], [data-testid="capture-mode-header-back"])) [data-testid="chat-bottom-dock"] > div:has(> button)) > button:hover {
+    html.${ACTIVE} :is([data-sentry-component="CaptureModeBottom"], .scene-web #zeta:not(:has([data-testid="delete-mode-header-back"])) [data-testid="chat-bottom-dock"] > div.flex.bg-gray-main.px-4[class~="py-[14px]"]:has(> button.w-full)) > button:not(:disabled):hover {
       background: var(--kt-yellow-hover) !important;
     }
 
