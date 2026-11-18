@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.89
+// @version      3.50.90
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -7846,26 +7846,26 @@
     }
 
     /* 완성된 캡처 미리보기 */
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) {
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) {
       background: var(--kt-chat) !important;
       color: var(--kt-text) !important;
       color-scheme: light !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) > header {
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header)) {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) > header h3,
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) > header button,
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) > header svg {
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header)) h3,
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header)) button,
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header)) svg {
       color: #26343C !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"]))
       > div[class*="overflow-y-auto"] {
       background: var(--kt-chat) !important;
       scrollbar-width: thin !important;
@@ -7873,22 +7873,24 @@
     }
 
     /* 캡처 페이지 사이에 래퍼가 추가되어도 저장 대상 배경에 직접 적용한다. */
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"])) [data-capture-page="true"],
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) [data-capture-page="true"],
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"]))
       > div[class*="overflow-y-auto"] > div
       > div[class*="bg-gray-main"] {
       background: var(--kt-chat) !important;
       color: var(--kt-chat-text) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"]))
       > div:last-child:not([class*="overflow-y-auto"]) {
-      color: var(--kt-chat-text) !important;
+      background: #FFFFFF !important;
+      color: var(--kt-text) !important;
+      border-top: 1px solid var(--kt-line) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has(> header button[aria-label="Save captured image"]), .scene-web div.absolute.inset-0:has(> header button[aria-label="Share captured image"]))
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"]))
       > div:last-child:not([class*="overflow-y-auto"]) > span {
-      color: var(--kt-chat-text) !important;
+      color: var(--kt-text) !important;
     }
 
 
