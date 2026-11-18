@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Room Manager (Android/PC)
 // @namespace    zeta-room-manager
-// @version      0.23.99
+// @version      0.23.100
 // @description  Android/PC용. 별명과 플롯명·캐릭터명·제작자명 검색, 화면/네이티브 로드 데이터 기반 수동 전체 수집.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -13,35 +13,9 @@
 
 (() => {
   'use strict';
-  if (location.origin === 'https://frame.pingpong.ai') {
-    if (new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io') return;
-    const mount = () => {
-      const anchor = [...document.querySelectorAll('button')].find(button => button.textContent.trim() === '대화 캡처');
-      if (!anchor || document.getElementById('zrm-frame-rename')) return;
-      const button = document.createElement('button');
-      button.id = 'zrm-frame-rename';
-      button.className = anchor.className;
-      button.textContent = '대화방 별명';
-      button.addEventListener('click', () => window.parent.postMessage({ type: 'zrm-rename-current-room' }, 'https://zeta-ai.io'));
-      anchor.after(button);
-    };
-    new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
-    mount();
-    return;
-  }
-  window.addEventListener('message', event => {
-    if (event.origin !== 'https://frame.pingpong.ai' || event.data?.type !== 'zrm-rename-current-room') return;
-    const frame = [...document.querySelectorAll('iframe')].find(frame => frame.contentWindow === event.source && frame.src.startsWith('https://frame.pingpong.ai/v1/index.html'));
-    const id = currentRoomId();
-    if (!frame || !id) return;
-    const key = keyOf('room', id);
-    const saved = peekEntry(key) || {};
-    openRenameModal({ key, type: 'room', id, original: normalizeText(saved.original) || '이 대화방' });
-  });
-
   if (window.top !== window.self) return;
 
-  const SCRIPT_VERSION = '0.23.99';
+  const SCRIPT_VERSION = '0.23.100';
   window.__zrmRoomManagerVersion = SCRIPT_VERSION;
 
   const STORAGE_KEY = 'zeta-room-manager:v1';
