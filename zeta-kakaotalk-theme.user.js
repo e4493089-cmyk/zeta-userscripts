@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.87
+// @version      3.50.88
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -565,32 +565,32 @@
        프로필 선택 화면
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="PlayerCharacterSelect"] {
+    html.${ACTIVE} :is([data-sentry-component="PlayerCharacterSelect"], .kt-profile-picker) {
       background: transparent !important;
       color: var(--kt-text) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlayerCharacterSelect"] > h4 {
+    html.${ACTIVE} :is([data-sentry-component="PlayerCharacterSelect"], .kt-profile-picker) > h4 {
       color: #26343C !important;
     }
 
     /* 가로 프로필 캐러셀 스크롤바 */
-    html.${ACTIVE} [data-sentry-component="PlayerCharacterSelect"] > div[class*="overflow-x-auto"] {
+    html.${ACTIVE} :is([data-sentry-component="PlayerCharacterSelect"], .kt-profile-picker) > div[class*="overflow-x-auto"] {
       scrollbar-width: thin !important;
       scrollbar-color: rgba(67,85,96,.20) transparent !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlayerCharacterSelect"] > div[class*="overflow-x-auto"]::-webkit-scrollbar {
+    html.${ACTIVE} :is([data-sentry-component="PlayerCharacterSelect"], .kt-profile-picker) > div[class*="overflow-x-auto"]::-webkit-scrollbar {
       height: 5px !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlayerCharacterSelect"] > div[class*="overflow-x-auto"]::-webkit-scrollbar-thumb {
+    html.${ACTIVE} :is([data-sentry-component="PlayerCharacterSelect"], .kt-profile-picker) > div[class*="overflow-x-auto"]::-webkit-scrollbar-thumb {
       background: rgba(67,85,96,.20) !important;
       border-radius: 999px !important;
     }
 
     /* 현재 선택/미리보기 카드 */
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-color: #D8E0E5 !important;
@@ -598,41 +598,41 @@
     }
 
     /* 다크용 블러 배경 + 검은 오버레이 제거 */
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] > div.absolute.inset-0 {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) > div.absolute.inset-0 {
       display: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] h4 {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) h4 {
       color: #26343C !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .body16,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .caption1 {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .body16,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .caption1 {
       color: #687780 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] button[aria-label="Edit chat profile"] {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) button[aria-label="Edit chat profile"] {
       background: #F0F2F3 !important;
       color: #53636C !important;
       border: 1px solid #E0E5E8 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] button[aria-label="Edit chat profile"] svg {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) button[aria-label="Edit chat profile"] svg {
       color: #53636C !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .kt-profile-select-button {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .kt-profile-select-button {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #E7D000 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .kt-profile-select-button:hover {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .kt-profile-select-button:hover {
       background: var(--kt-yellow-hover) !important;
     }
 
     /* 내 프로필 목록 카드 */
-    html.${ACTIVE} [data-sentry-component="PlayerCharacterSelect"]
+    html.${ACTIVE} :is([data-sentry-component="PlayerCharacterSelect"], .kt-profile-picker)
       div:has(> [role="group"][aria-label="My chat profiles"]) {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
@@ -831,13 +831,13 @@
        Zeta가 View image 버튼에 inline mask를 넣으므로 강제로 해제
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"]
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card)
       button[aria-label="View image"] {
       mask: none !important;
       -webkit-mask: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"]
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card)
       button[aria-label="View image"] img {
       mask: none !important;
       -webkit-mask: none !important;
@@ -873,7 +873,7 @@
        Zeta 원래 mask를 그대로 되살림
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"]
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card)
       button[aria-label="View image"] {
       mask: linear-gradient(
         rgb(255,255,255) 0%,
@@ -1648,7 +1648,7 @@
        추천 답변 패널
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="QuickReplyPanel"] {
+    html.${ACTIVE} :is([data-sentry-component="QuickReplyPanel"], .scene-web [data-testid="bottom-panel-slot"] > div) {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-top: 1px solid #DEE5E9 !important;
@@ -1656,54 +1656,54 @@
     }
 
     /* 추천 답변 카드 */
-    html.${ACTIVE} [data-sentry-component="QuickReplySetSlide"] > button {
+    html.${ACTIVE} :is([data-sentry-component="QuickReplySetSlide"], .scene-web [data-testid="bottom-panel-slot"] [data-paused].overflow-y-auto) > button {
       background: #F4F6F7 !important;
       color: #191919 !important;
       border: 1px solid #E4E9EC !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="QuickReplySetSlide"] > button:hover {
+    html.${ACTIVE} :is([data-sentry-component="QuickReplySetSlide"], .scene-web [data-testid="bottom-panel-slot"] [data-paused].overflow-y-auto) > button:hover {
       background: #FFF9C8 !important;
       border-color: #E8D85B !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="QuickReplySetSlide"] > button .body14,
-    html.${ACTIVE} [data-sentry-component="QuickReplySetSlide"] > button p {
+    html.${ACTIVE} :is([data-sentry-component="QuickReplySetSlide"], .scene-web [data-testid="bottom-panel-slot"] [data-paused].overflow-y-auto) > button .body14,
+    html.${ACTIVE} :is([data-sentry-component="QuickReplySetSlide"], .scene-web [data-testid="bottom-panel-slot"] [data-paused].overflow-y-auto) > button p {
       color: #202124 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="QuickReplySetSlide"] > button em {
+    html.${ACTIVE} :is([data-sentry-component="QuickReplySetSlide"], .scene-web [data-testid="bottom-panel-slot"] [data-paused].overflow-y-auto) > button em {
       color: #68777F !important;
     }
 
     /* 로딩 카드 */
-    html.${ACTIVE} [data-sentry-component="QuickReplySetSlide"]
+    html.${ACTIVE} :is([data-sentry-component="QuickReplySetSlide"], .scene-web [data-testid="bottom-panel-slot"] [data-paused].overflow-y-auto)
       [aria-label="Loading suggestions"] {
       background: #F4F6F7 !important;
       border: 1px solid #E4E9EC !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="QuickReplySetSlide"]
+    html.${ACTIVE} :is([data-sentry-component="QuickReplySetSlide"], .scene-web [data-testid="bottom-panel-slot"] [data-paused].overflow-y-auto)
       [aria-label="Loading suggestions"] svg {
       color: #7B898F !important;
     }
 
     /* 하단 사용량/재생성 바 */
-    html.${ACTIVE} [data-sentry-component="QuickReplyRegenControlBar"] {
+    html.${ACTIVE} :is([data-sentry-component="QuickReplyRegenControlBar"], .scene-web [data-testid="bottom-panel-slot"] div:has(> [data-remain-count])) {
       background: #FFFFFF !important;
       border-top-color: #E3E8EB !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="QuickReplyQuota"] {
+    html.${ACTIVE} :is([data-sentry-component="QuickReplyQuota"], .scene-web [data-testid="bottom-panel-slot"] [data-remain-count]) {
       color: #7B878D !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="QuickReplyQuota"] > span {
+    html.${ACTIVE} :is([data-sentry-component="QuickReplyQuota"], .scene-web [data-testid="bottom-panel-slot"] [data-remain-count]) > span {
       color: #7B878D !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="QuickReplyQuota"]
+    html.${ACTIVE} :is([data-sentry-component="QuickReplyQuota"], .scene-web [data-testid="bottom-panel-slot"] [data-remain-count])
       [data-sentry-component="renderWhite"] {
       color: #26343C !important;
     }
@@ -1818,32 +1818,32 @@
       border-color: #E6EBEE !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) {
       background: var(--kt-chat) !important;
       border-bottom: 0 !important;
       backdrop-filter: none !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) > header {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) > header {
       background: var(--kt-white) !important;
       border-bottom: 1px solid var(--kt-line) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) nav {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) nav {
       background: transparent !important;
       border-color: transparent !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h1,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h2,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h3,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) span,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) button {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) h1,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) h2,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) h3,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) span,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) button {
       color: var(--kt-text) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) button svg {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) button svg {
       color: var(--kt-text) !important;
     }
 
@@ -2754,7 +2754,7 @@
     /* 프로필 카드 */
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="추천 대화 프로필"]
-      [data-sentry-component="PlotProfileCard"] {
+      :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) {
       background: var(--kt-white) !important;
       color: var(--kt-text) !important;
       border-color: var(--kt-line) !important;
@@ -2763,13 +2763,13 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="추천 대화 프로필"]
-      [data-sentry-component="PlotProfileCard"] h4 {
+      :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) h4 {
       color: var(--kt-text) !important;
     }
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="추천 대화 프로필"]
-      [data-sentry-component="PlotProfileCard"] .body16 {
+      :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .body16 {
       color: var(--kt-sub) !important;
     }
 
@@ -2801,7 +2801,7 @@
     /* 마지막 선택 버튼은 현재 테마 메인색 */
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="추천 대화 프로필"]
-      [data-sentry-component="PlotProfileCard"]
+      :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card)
       > div:last-child > div:last-child > button:last-child {
       background: var(--kt-yellow) !important;
       color: var(--kt-user-dialogue) !important;
@@ -2811,11 +2811,11 @@
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="추천 대화 프로필"]
-      [data-sentry-component="PlotProfileCard"]
+      :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card)
       > div:last-child > div:last-child > button:last-child:hover,
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="추천 대화 프로필"]
-      [data-sentry-component="PlotProfileCard"]
+      :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card)
       > div:last-child > div:last-child > button:last-child:active {
       background: var(--kt-yellow-hover) !important;
     }
@@ -4279,14 +4279,15 @@
        원래 343px 레이아웃/패딩은 절대 건드리지 않음
     ========================================================= */
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"] {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup) {
       background: rgba(43,57,66,.34) !important;
       backdrop-filter: blur(8px) !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"] > div[data-sentry-source-file="Popup.tsx"] {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container .kt-saved-title-surface,
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup) > :is(div[data-sentry-source-file="Popup.tsx"], .kt-saved-title-surface) {
       background: #FFFFFF !important;
       color: #26343C !important;
       border-color: #E1E6E9 !important;
@@ -4294,76 +4295,76 @@
       box-sizing: border-box !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"] h5 {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup) h5 {
       color: #202124 !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
-      label[data-sentry-component="Input"] {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
+      label:is([data-sentry-component="Input"], :has(input)) {
       background: #F5F7F8 !important;
       color: #202124 !important;
       border: 1px solid #DCE3E7 !important;
       box-shadow: none !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
-      label[data-sentry-component="Input"]:focus-within {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
+      label:is([data-sentry-component="Input"], :has(input)):focus-within {
       background: #FFFFFF !important;
       border-color: #D2C24C !important;
       box-shadow: 0 0 0 3px rgba(254,229,0,.18) !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
-      input[data-sentry-component="Input"] {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
+      input {
       background: transparent !important;
       color: #202124 !important;
       caret-color: #3D474C !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
-      input[data-sentry-component="Input"]::placeholder {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
+      input::placeholder {
       color: #98A1A6 !important;
       opacity: 1 !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
-      label[data-sentry-component="Input"] > button {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
+      label:is([data-sentry-component="Input"], :has(input)) > button {
       background: #DCE1E4 !important;
       color: #65747C !important;
       border: 0 !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
-      label[data-sentry-component="Input"] > button svg {
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
+      label:is([data-sentry-component="Input"], :has(input)) > button svg {
       color: #65747C !important;
     }
 
     /* 팝업 하단 취소/완료 */
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
       button.kt-saved-title-cancel {
       background: #ECEFF1 !important;
       color: #46545E !important;
       border: 1px solid #E0E5E8 !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
       button.kt-saved-title-submit {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #E4CF00 !important;
     }
 
-    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active) #portal-container
-      [data-sentry-component="Popup"]
+    html:is(.kt-saved-rooms-active, .kt-saved-room-active, .kt-bookmark-active, .${ACTIVE}:has([data-testid="saved-room-list-scroll"]), .${ACTIVE}:has([data-testid="saved-room-messages"]), .${ACTIVE}:has([data-testid^="bookmark-item-"])) #portal-container
+      :is([data-sentry-component="Popup"], .kt-saved-title-popup)
       button.kt-saved-title-submit:hover {
       background: var(--kt-yellow-hover) !important;
     }
@@ -5017,32 +5018,32 @@
     }
 
     /* 개별 선택지 */
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"] {
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"])) {
       background: #FFF8BF !important;
       color: #302D1B !important;
       border: 1px solid #DFCA31 !important;
       box-shadow: 0 2px 6px rgba(91,82,16,.14) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"]:hover {
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"])):hover {
       background: #FFF3A0 !important;
       border-color: #CBB622 !important;
       box-shadow: 0 3px 8px rgba(91,82,16,.18) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"]
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"]))
       .chat,
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"]
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"]))
       .chat p,
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"]
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"]))
       .chat span,
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"]
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"]))
       .chat em {
       color: #302D1B !important;
     }
 
     /* 선택지 편집 */
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"]
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"]))
       button[aria-label="Edit choice"] {
       min-width: 30px !important;
       min-height: 30px !important;
@@ -5052,12 +5053,12 @@
       color: #665B16 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"]
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"]))
       button[aria-label="Edit choice"]:hover {
       background: rgba(206,183,22,.30) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="CyoaChoiceItem"]
+    html.${ACTIVE} :is([data-sentry-component="CyoaChoiceItem"], .scene-web div.rounded-12:has(> button[aria-label="Edit choice"]))
       button[aria-label="Edit choice"] svg {
       color: #665B16 !important;
       opacity: 1 !important;
@@ -5469,15 +5470,15 @@
        메시지 수정 화면
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"],
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"])),
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       > section {
       background: var(--kt-chat) !important;
       color: var(--kt-text) !important;
     }
 
     /* 본문 편집지 */
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       > section > div:first-child {
       background: rgba(255,255,255,.97) !important;
       color: #26343C !important;
@@ -5485,12 +5486,12 @@
       box-shadow: 0 -6px 18px rgba(45,61,71,.12) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Resize edit area"] > div {
       background: #98A4AA !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       textarea[name="message"] {
       background: transparent !important;
       color: #26343C !important;
@@ -5500,44 +5501,44 @@
       opacity: 1 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       textarea[name="message"]::placeholder {
       color: #929DA3 !important;
       opacity: 1 !important;
     }
 
     /* 하단 수정 도구 */
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       > section > div:last-child {
       background: rgba(255,255,255,.97) !important;
       border-color: rgba(69,87,97,.14) !important;
       box-shadow: 0 -1px 5px rgba(45,61,71,.07) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Cancel editing"],
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Insert asterisk"] {
       background: #E9EDF0 !important;
       color: #53636C !important;
       border: 1px solid #DDE4E8 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Cancel editing"]:hover,
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Insert asterisk"]:hover {
       background: #DFE5E8 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Cancel editing"] svg,
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Insert asterisk"] svg {
       color: #53636C !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Save edit"] {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
@@ -5545,17 +5546,17 @@
       box-shadow: 0 1px 3px rgba(91,82,16,.14) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Save edit"]:hover {
       background: var(--kt-yellow-hover) !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Save edit"] svg {
       color: #191919 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="EditModeInputPanelContent"]
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
       button[aria-label="Save edit"]:disabled {
       background: #E8EBED !important;
       color: #A2AAAE !important;
@@ -6409,46 +6410,46 @@
        흰 카드 위에 남아 있던 Zeta 다크용 text-white 계열 제거
     ========================================================= */
 
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) {
       color: #26343C !important;
     }
 
     /* 카드의 주 텍스트 */
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] h1,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] h2,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] h3,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] h4,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] h5,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] strong,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .body1,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .body14,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .body16,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] [class*="text-white"]:not(button):not(svg) {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) h1,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) h2,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) h3,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) h4,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) h5,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) strong,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .body1,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .body14,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .body16,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) [class*="text-white"]:not(button):not(svg) {
       color: #26343C !important;
       opacity: 1 !important;
     }
 
     /* 카드 설명 / 메타데이터 */
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .caption1,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .caption2,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .body12,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] [class*="text-gray-"],
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] [class*="opacity-"] {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .caption1,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .caption2,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .body12,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) [class*="text-gray-"],
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) [class*="opacity-"] {
       color: #63737C !important;
       opacity: 1 !important;
     }
 
     /* 선택 버튼 안 글씨는 기존 카카오 노랑 버튼 색 유지 */
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .kt-profile-select-button,
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"] .kt-profile-select-button span {
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .kt-profile-select-button,
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card) .kt-profile-select-button span {
       color: #191919 !important;
       opacity: 1 !important;
     }
 
     /* 수정 아이콘 */
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"]
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card)
       button[aria-label="Edit chat profile"],
-    html.${ACTIVE} [data-sentry-component="PlotProfileCard"]
+    html.${ACTIVE} :is([data-sentry-component="PlotProfileCard"], .kt-plot-profile-card)
       button[aria-label="Edit chat profile"] svg {
       color: #53636C !important;
       opacity: 1 !important;
@@ -7895,28 +7896,28 @@
     ========================================================= */
 
     /* 삭제 선택 상단바 = 캡처 선택 상단바 */
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])),
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) > header,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) nav {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))),
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) > header,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) nav {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-color: var(--kt-line) !important;
       backdrop-filter: none !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) {
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h1,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h2,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h3,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) h4,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) button,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) span,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) svg,
-    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], header:has([data-testid="delete-mode-header-clear"])) [class*="text-white"] {
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) h1,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) h2,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) h3,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) h4,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) button,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) span,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) svg,
+    html.${ACTIVE} :is([data-sentry-component="DeleteModeHeader"], :is(header:has([data-testid="delete-mode-header-clear"]), .scene-web div.absolute.inset-x-0.top-0:has([data-testid="delete-mode-header-back"]))) [class*="text-white"] {
       color: #26343C !important;
     }
 
@@ -9431,7 +9432,8 @@
     const isTitlePopupPage =
       isSavedRoomsPage() ||
       isSavedRoomPage() ||
-      isBookmarkPage();
+      isBookmarkPage() ||
+      (sceneFrame && !!document.querySelector('[data-testid="saved-room-list-scroll"], [data-testid="saved-room-messages"], [data-testid^="bookmark-item-"]'));
 
     if (!isTitlePopupPage) {
       clearSavedTitlePopupMarkers();
@@ -9439,14 +9441,23 @@
     }
 
     document.querySelectorAll(
-      '#portal-container [data-sentry-component="Popup"]'
+      '#portal-container [data-sentry-component="Popup"], #portal-container > *'
     ).forEach(popup => {
       const text = (popup.textContent || '').replace(/\s+/g, ' ').trim();
       const isTitlePopup =
         text.includes('저장된 대화의 제목을 입력해주세요') ||
         text.includes('책갈피의 제목을 입력해주세요');
 
-      if (!isTitlePopup) return;
+      if (!isTitlePopup) {
+        popup.classList.remove('kt-saved-title-popup');
+        popup.querySelectorAll('.kt-saved-title-surface').forEach(el => el.classList.remove('kt-saved-title-surface'));
+        return;
+      }
+      popup.classList.add('kt-saved-title-popup');
+      const input = popup.querySelector('input');
+      let surface = input?.closest('[role="dialog"]') || input?.parentElement;
+      while (surface?.parentElement && surface.parentElement !== popup && !surface.querySelector('button')) surface = surface.parentElement;
+      surface?.classList.add('kt-saved-title-surface');
 
       popup.querySelectorAll('button').forEach(btn => {
         const label = (btn.textContent || '').replace(/\s+/g, ' ').trim();
@@ -9598,24 +9609,39 @@
   }
 
   function markProfileSelect() {
-    const root = document.querySelector(
-      '[data-sentry-component="PlayerCharacterSelect"]'
-    );
-
-    if (!root) return;
-
-    root.querySelectorAll(
-      '[data-sentry-component="PlotProfileCard"] button'
-    ).forEach(btn => {
-      const text = (btn.textContent || '').replace(/\s+/g, ' ').trim();
-
-      if (text === '선택') {
-        btn.classList.add('kt-profile-select-button');
+    const candidates = new Set(document.querySelectorAll('[data-sentry-component="PlayerCharacterSelect"]'));
+    document.querySelectorAll('[role="group"][aria-label="My chat profiles"]').forEach(group => {
+      // Only the pre-chat picker has a sibling horizontal profile carousel.
+      let parent = group.parentElement;
+      while (parent && parent !== document.body && !parent.matches('#zeta, #portal-container')) {
+        if (parent.querySelector('[class*="overflow-x-auto"]')) { candidates.add(parent); break; }
+        if (parent.matches('[role="dialog"]')) break;
+        parent = parent.parentElement;
       }
     });
+    if (sceneFrame) {
+      document.querySelectorAll('#zeta [class*="overflow-x-auto"]').forEach(carousel => {
+        if (carousel.closest('[role="log"], #portal-container')) return;
+        if (Array.from(carousel.querySelectorAll('button')).some(button =>
+          normalizeText(button.textContent) === '선택')) {
+          if (carousel.parentElement && !carousel.parentElement.matches('#zeta')) candidates.add(carousel.parentElement);
+        }
+      });
+    }
+    candidates.forEach(root => {
+      root.classList.add('kt-profile-picker');
+      root.querySelectorAll('button').forEach(button => {
+        if (normalizeText(button.textContent) !== '선택') return;
+        const carousel = button.closest('[class*="overflow-x-auto"]');
+        let card = button.closest('[data-sentry-component="PlotProfileCard"]') || button.parentElement;
+        while (carousel && card?.parentElement && card.parentElement !== carousel &&
+          !card.querySelector('h4, h3')) card = card.parentElement;
+        if (!card || card === root || card === carousel) return;
+        card.classList.add('kt-plot-profile-card');
+        button.classList.add('kt-profile-select-button');
+      });
+    });
   }
-
-
 
   function markProfileHub() {
     const dialog = document.querySelector(
@@ -9627,7 +9653,7 @@
     let sheet = dialog.parentElement;
     while (sheet && sheet.id !== 'portal-container') {
       const cls = String(sheet.className || '');
-      if (cls.includes('rounded-t-[20px]') || cls.includes('bg-gray-sub1')) {
+      if (cls.includes('rounded-t-') || cls.includes('bg-gray-sub1')) {
         sheet.classList.add('kt-profile-hub-sheet');
 
         const parent = sheet.parentElement;
@@ -9664,10 +9690,10 @@
   function markProfileImageMenu() {
     /* 프로필 사진 클릭 메뉴는 role/aria-label이 없어 버튼 문구로 해당 시트만 식별 */
     document.querySelectorAll(
-      '#portal-container [data-sentry-component="KeyboardAvoidingView"]'
+      '#portal-container [data-sentry-component="KeyboardAvoidingView"], #portal-container > *'
     ).forEach(root => {
       const buttons = Array.from(
-        root.querySelectorAll('button[data-sentry-component="LogRawButton"]')
+        root.querySelectorAll('button')
       );
 
       const labels = buttons.map(btn =>
@@ -9693,7 +9719,7 @@
       while (sheet && sheet !== root) {
         const cls = String(sheet.className || '');
         if (
-          cls.includes('rounded-t-[20px]') ||
+          cls.includes('rounded-t-') ||
           cls.includes('bg-gray-sub1')
         ) {
           sheet.classList.add('kt-profile-image-sheet');
@@ -9734,7 +9760,7 @@
       const cls = String(sheet.className || '');
 
       if (
-        cls.includes('rounded-t-[20px]') ||
+        cls.includes('rounded-t-') ||
         cls.includes('bg-gray-sub1')
       ) {
         sheet.classList.add('kt-action-sheet');
@@ -9902,7 +9928,7 @@
           sibling.tagName === 'BUTTON' && normalizeText(sibling.textContent) === '채팅'
         );
       });
-      const input = document.querySelector('input[aria-label="메시지 입력"], input[placeholder="메시지 입력"]');
+      const input = document.querySelector('input[aria-label="메시지 입력"], input[placeholder="메시지 입력"], textarea[aria-label="메시지 입력"], textarea[placeholder="메시지 입력"]');
       for (let node = (tab || input)?.parentElement; node && node !== document.body; node = node.parentElement) {
         if (!String(node.className).includes('rounded-')) continue;
         const close = node.querySelector('button[aria-label="Close"], button[aria-label="닫기"]');
@@ -9913,7 +9939,7 @@
     panel.classList.add('kt-message-panel');
     panel.querySelector('header')?.classList.add('kt-message-header');
 
-    const input = panel.querySelector('input[aria-label="메시지 입력"], input[placeholder="메시지 입력"]');
+    const input = panel.querySelector('input[aria-label="메시지 입력"], input[placeholder="메시지 입력"], textarea[aria-label="메시지 입력"], textarea[placeholder="메시지 입력"]');
     const thread = input && panel.querySelector('[data-sentry-component="ThreadView"], [class*="overflow-y-auto"]');
     if (thread) {
       thread.classList.add('kt-message-thread');
@@ -10051,20 +10077,20 @@
   }
 
   function markDeleteMode() {
-    const main = document.querySelector('main#contents');
+    const main = document.querySelector('main#contents') || (sceneFrame && document.getElementById('zeta'));
     if (!main) return;
 
-    const header = document.querySelector('[data-sentry-component="DeleteModeHeader"]');
+    const header = document.querySelector('[data-sentry-component="DeleteModeHeader"], [data-testid="delete-mode-header-back"]');
     const text = normalizeText(main.textContent);
     const isDeleteMode = !!header || (text.includes('선택 해제') && text.includes('대화 삭제'));
     if (!isDeleteMode) return;
 
     main.classList.add('kt-delete-mode-screen');
 
-    Array.from(document.querySelectorAll('main#contents button')).forEach(btn => {
+    Array.from(main.querySelectorAll('button')).forEach(btn => {
       const txt = normalizeText(btn.textContent);
       if (txt !== '대화 삭제') return;
-      if (btn.closest('[data-sentry-component="DeleteModeHeader"]')) return;
+      if (btn.closest('[data-sentry-component="DeleteModeHeader"]') || btn.matches('[data-testid^="delete-mode-header-"]')) return;
 
       btn.classList.add('kt-delete-mode-button');
       btn.parentElement?.classList.add('kt-delete-mode-button-row');
@@ -10088,7 +10114,7 @@
     const portal = document.getElementById('portal-container');
     if (!portal) return;
 
-    portal.querySelectorAll('[data-sentry-component="KeyboardAvoidingView"]')
+    portal.querySelectorAll('[data-sentry-component="KeyboardAvoidingView"], :scope > *')
       .forEach(layer => {
         /* 신고 입력 폼 자체가 아니라, 메시지 액션 목록 바텀시트만 잡는다. */
         if (layer.querySelector('input[name="message-report-description"]')) return;
@@ -10122,7 +10148,7 @@
         if (!sheet) return;
         sheet.classList.add('kt-message-actions-sheet');
 
-        sheet.querySelectorAll('button[data-sentry-component="LogRawButton"]')
+        sheet.querySelectorAll('button')
           .forEach(btn => {
             const label = normalizeText(btn.textContent);
             btn.classList.toggle('kt-message-action-danger', label === '삭제');
@@ -10162,7 +10188,7 @@
         while (footer?.parentElement && footer.parentElement !== safe) footer = footer.parentElement;
         if (footer && footer !== safe && !footer.contains(scroll)) footer.classList.add('kt-board-footer');
       }
-      panel.querySelectorAll('button[aria-label^="공감"], [aria-label*="내가 공감함"], [aria-label^="댓글"]').forEach(stat => {
+      panel.querySelectorAll('[aria-label^="공감"], [aria-label*="내가 공감함"], [aria-label^="댓글"]').forEach(stat => {
         stat.classList.add('kt-board-stat');
         if (stat.parentElement !== safe && !stat.closest('.kt-board-footer')) stat.parentElement?.classList.add('kt-board-stats');
       });
@@ -10222,9 +10248,7 @@
     if (!portal) return;
 
     // 신고 완료 화면은 확인 팝업과 달리 한 개 버튼을 가진 하단 시트다.
-    [portal, ...portal.querySelectorAll('[data-sentry-component="KeyboardAvoidingView"]')].filter(el =>
-      el.matches('[data-sentry-component="KeyboardAvoidingView"]')
-    ).forEach(view => {
+    [portal, ...portal.children, ...portal.querySelectorAll('[data-sentry-component="KeyboardAvoidingView"]')].forEach(view => {
       const sheet = Array.from(view.children).find(el =>
         String(el.className).includes('rounded-t-') &&
         normalizeText(el.querySelector('h3')?.textContent) === '이미지 신고 완료' &&
@@ -10455,6 +10479,7 @@
     } finally {
       // Reapply after marker cleanup, exactly once for every screen branch.
       markPluginSurfaces();
+      markSavedTitlePopup();
       markThemeDialogs();
       markSnapshotLoading();
     }
@@ -10492,18 +10517,16 @@
     document.documentElement.classList.toggle(ENDING_ACTIVE, isEndingOpen());
     const touches = selector => layers.some(layer => layer.isConnected &&
       (layer.matches(selector) || !!layer.querySelector(selector)));
-    if (touches('[data-sentry-component="PlayerCharacterSelect"]')) markProfileSelect();
-    if (touches('[role="dialog"][aria-label="대화 프로필"]')) markProfileHub();
-    if (touches('[data-sentry-component="KeyboardAvoidingView"]')) {
-      markProfileImageMenu();
-      markMessageActionSheet();
-    }
+    markProfileSelect();
+    if (touches('[role="dialog"][aria-label="대화 프로필"], [role="group"][aria-label="My chat profiles"]')) markProfileHub();
+    markProfileImageMenu();
+    markMessageActionSheet();
     if (touches('[data-testid="action-panel-grid"], [role="dialog"][aria-label="Chat actions"]')) markActionPanel();
     markPluginSurfaces(document.getElementById('portal-container') || document);
     markMessagePhone();
     if (touches('[data-sentry-component="ChatSidebar"], [role="dialog"][aria-label="Chat menu"]')) markSidebarMenu();
     if (touches('[aria-label="Snapshot archive"], [aria-label="Show or hide snapshot controls"]')) markSnapshotModals();
-    if (touches('[data-sentry-component="Popup"]')) markSavedTitlePopup();
+    markSavedTitlePopup();
   }
 
   function queueOverlayLayer(target, addedNodes = []) {
@@ -10526,7 +10549,7 @@
 
   const PASSIVE_CONTENT = '[data-sentry-component="BodyView"], [role="log"][aria-label="Chat messages"], [data-sentry-component="RoomList"], [data-testid^="room-list-item-"], [testid^="room-list-item-"]';
   const SPECIAL_CONTENT = '[data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="message-phone-backdrop"], [data-testid="message-phone-shell"], [data-sentry-component="DeleteModeHeader"], [role="dialog"], [data-sentry-component="KeyboardAvoidingView"]';
-  const SCREEN_STRUCTURE = 'header, footer, [data-testid="dream-panel"], [data-testid="dream-safe-area"], [data-testid="message-phone-backdrop"], [data-testid="message-phone-shell"], [data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="anonymous-board-safe-area"], [data-testid="zetagram-panel"], [data-testid="capture-mode-header-back"], main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
+  const SCREEN_STRUCTURE = '[role="group"][aria-label="My chat profiles"], [data-testid^="delete-mode-header-"], [data-testid="bottom-panel-slot"], [data-expanded], header, footer, [data-testid="dream-panel"], [data-testid="dream-safe-area"], [data-testid="message-phone-backdrop"], [data-testid="message-phone-shell"], [data-testid="character-diary-safe-area"], [data-slot="ending-panel"], [data-testid="phone-peek-panel"], [data-testid="anonymous-board-safe-area"], [data-testid="zetagram-panel"], [data-testid="capture-mode-header-back"], main#contents, #portal-container, header[data-sentry-component="Header"], [data-sentry-component="RoomList"], [data-sentry-component="ChatProfileForm"], [data-sentry-component="BookmarkList"], [data-sentry-component="SavedRoomListPage"], [data-sentry-component="SavedRoomHeader"]';
 
   function isSpecialContent(node) {
     return node instanceof Element && (node.matches(SPECIAL_CONTENT) || !!node.querySelector(SPECIAL_CONTENT));
@@ -10603,25 +10626,39 @@
     if (document.documentElement.dataset.ktBoardReactionProxy === '1') return;
     document.documentElement.dataset.ktBoardReactionProxy = '1';
 
+    let forwarding = false;
     document.addEventListener('click', event => {
+      if (forwarding || event.defaultPrevented) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target) return;
 
-      const stat = target.closest(
-        '[data-testid="board-post-block"] [data-sentry-component="PostStats"] ' +
-        '[data-sentry-component="Stat"][aria-label^="공감"]'
-      );
-      if (!stat) return;
+      // Detail statistics lost the old Sentry component attributes.
+      // Only the non-interactive statistic needs forwarding to the native button.
+      const post = target.closest('[data-testid="board-post-block"]');
+      if (!post) return;
+      const stat = target.closest('[aria-label^="공감"], [aria-label*="내가 공감함"]');
+      if (!stat || !post.contains(stat)) return;
+      if (target.closest('button, [role="button"], a, input')) return;
 
-      const dialog = stat.closest('[role="dialog"][aria-label="익명 게시판"]');
-      if (!dialog) return;
+      const panel = post.closest('[role="dialog"]') ||
+        post.closest('[data-testid="anonymous-board-safe-area"]');
+      if (!panel || !(panel.matches('[aria-label="익명 게시판"], .kt-board-panel, [data-testid="anonymous-board-safe-area"]') ||
+        panel.querySelector('[data-testid="anonymous-board-safe-area"]'))) return;
 
-      const reactionButton = dialog.querySelector('button[aria-label="공감"]');
-      if (!reactionButton || reactionButton.disabled) return;
+      const reactionButton = Array.from(panel.querySelectorAll(
+        'button[aria-label="공감"], button[aria-label="공감하기"], button[aria-label="공감 취소"]'
+      )).find(button => !post.contains(button));
+      if (!reactionButton || reactionButton.disabled ||
+        reactionButton.getAttribute('aria-disabled') === 'true') return;
 
       event.preventDefault();
       event.stopPropagation();
-      reactionButton.click();
+      forwarding = true;
+      try {
+        reactionButton.click();
+      } finally {
+        forwarding = false;
+      }
     }, true);
   }
 
