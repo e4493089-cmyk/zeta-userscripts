@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.91
+// @version      3.50.92
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -198,23 +198,28 @@
       border: 1px solid var(--kt-line) !important;
     }
 
-    html.${ACTIVE} [data-testid="chat-header-model"] svg {
+    html.${ACTIVE} [data-testid="chat-header-model"] :is(svg, span) {
       color: var(--kt-sub) !important;
     }
 
-    /* 안내 문구 */
-    html.${ACTIVE} [data-sentry-component="FirstGuide"] > div {
-      background: var(--kt-chat-glass) !important;
-      color: var(--kt-chat-sub) !important;
-      border: 1px solid var(--kt-chat-line) !important;
+    html.${ACTIVE} [data-testid="chat-header-model"] img {
+      filter: brightness(0) !important;
+      opacity: .85 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="FirstGuide"] svg {
-      color: var(--kt-chat-sub) !important;
+    /* 안내 문구 */
+    html.${ACTIVE} :is([data-sentry-component="FirstGuide"] > div, .scene-web [data-key="first-guide"] .rounded-full) {
+      background: var(--kt-soft2) !important;
+      color: var(--kt-text) !important;
+      border: 1px solid var(--kt-line) !important;
+    }
+
+    html.${ACTIVE} :is([data-sentry-component="FirstGuide"], .scene-web [data-key="first-guide"]) svg {
+      color: var(--kt-text) !important;
     }
 
     /* 상대 / 유저 이름 */
-    html.${ACTIVE} :is([data-sentry-component="LeftTextContent"] .caption1, .scene-web :is([role="log"], [data-capture-page]) .flex-col:has(> .relative .self-start.bg-gray-sub1) > .caption1) {
+    html.${ACTIVE} :is([data-sentry-component="LeftTextContent"] .caption1, .scene-web :is([role="log"], [data-capture-page]) .flex-col:has(> .relative .self-start.bg-gray-sub1) > .caption1, .scene-web :is([role="log"], [data-capture-page]) .flex-col:has(> .relative .self-start.bg-gray-sub1) > .flex-row > .caption1) {
       color: var(--kt-ai-name) !important;
     }
 
