@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.95
+// @version      3.50.96
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -5568,6 +5568,71 @@
       color: #A2AAAE !important;
       border-color: #DDE2E5 !important;
       box-shadow: none !important;
+    }
+
+
+    /* =========================================================
+       메시지 요술봉/수정 입력창: 어두운 배경 + 어두운 글씨 충돌 보완
+       Zeta의 내부 래퍼 구조가 바뀌어도 textarea와 편집 버튼으로 한정
+    ========================================================= */
+
+    /* 변경된 래퍼의 기본 다크 배경을 기존 테마의 흰 편집지로 교체 */
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      :is(div,section)[class*="bg-gray-sub"],
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      :is(div,section)[class*="bg-gray-main"],
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      :is(div,section)[class*="bg-black"],
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      :is(div,section)[class*="bg-neutral"] {
+      background: #FFFFFF !important;
+      color: #26343C !important;
+    }
+
+    /* 편집 영역이 section > div가 아닌 다른 깊이에 있을 때도 대응 */
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      :is(div,section):has(> textarea[name="message"]),
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      :is(div,section)[class*="rounded"]:has(textarea[name="message"]):not([class*="rounded-full"]) {
+      background: #FFFFFF !important;
+      color: #26343C !important;
+    }
+
+    /* 본문 자체를 밝게: 상위 카드색이 바뀌어도 글자가 보이도록 */
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      textarea[name="message"] {
+      background: #FFFFFF !important;
+      color: #26343C !important;
+      -webkit-text-fill-color: #26343C !important;
+      caret-color: #5C5425 !important;
+      opacity: 1 !important;
+    }
+
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      textarea[name="message"]::placeholder {
+      color: #929DA3 !important;
+      -webkit-text-fill-color: #929DA3 !important;
+      opacity: 1 !important;
+    }
+
+    /* 취소/별표/확인 버튼은 원래 카카오톡 회색·노랑 유지 */
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      button:is([aria-label="Cancel editing"],[aria-label="Insert asterisk"]) {
+      background: #E9EDF0 !important;
+      color: #53636C !important;
+      border: 1px solid #DDE4E8 !important;
+    }
+
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      button[aria-label="Save edit"]:not(:disabled) {
+      background: var(--kt-yellow) !important;
+      color: #191919 !important;
+      border: 1px solid #E2CB00 !important;
+    }
+
+    html.${ACTIVE} :is([data-sentry-component="EditModeInputPanelContent"], .scene-web section[data-expanded]:has(textarea[name="message"]))
+      button[aria-label="Save edit"]:not(:disabled) svg {
+      color: #191919 !important;
     }
 
 
