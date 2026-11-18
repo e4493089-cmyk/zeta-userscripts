@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.19
+// @version      0.3.20
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1300,11 +1300,142 @@
     }
   }
 
+
+  /* 플로팅 버튼: 마우스/터치 드래그, 화면 가장자리 제한, 위치 기억 */
+  const BUTTON_POSITION_KEY = APP + ':button-position:v1';
+  const BUTTON_MARGIN = 8;
+  let buttonPosition = null;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(BUTTON_POSITION_KEY) || 'null');
+    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) &&
+        saved.x >= 0 && saved.x <= 1 && saved.y >= 0 && saved.y <= 1) {
+      buttonPosition = saved;
+    }
+  } catch (_) {}
+
+  function clampPosition(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function buttonLimits(button) {
+    return {
+      left: BUTTON_MARGIN,
+      top: BUTTON_MARGIN,
+      right: Math.max(BUTTON_MARGIN, window.innerWidth - button.offsetWidth - BUTTON_MARGIN),
+      bottom: Math.max(BUTTON_MARGIN, window.innerHeight - button.offsetHeight - BUTTON_MARGIN)
+    };
+  }
+
+  function placeExportMenu() {
+    const button = document.getElementById(BUTTON_ID);
+    const menu = document.getElementById(MENU_ID);
+    if (!button || !menu || menu.hidden) return;
+    const rect = button.getBoundingClientRect();
+    const width = menu.offsetWidth;
+    const height = menu.offsetHeight;
+    const left = clampPosition(rect.right - width, BUTTON_MARGIN,
+      Math.max(BUTTON_MARGIN, window.innerWidth - width - BUTTON_MARGIN));
+    const preferredTop = rect.top - height - 8 >= BUTTON_MARGIN
+      ? rect.top - height - 8 : rect.bottom + 8;
+    const top = clampPosition(preferredTop, BUTTON_MARGIN,
+      Math.max(BUTTON_MARGIN, window.innerHeight - height - BUTTON_MARGIN));
+    menu.style.setProperty('left', left + 'px');
+    menu.style.setProperty('top', top + 'px');
+    menu.style.setProperty('right', 'auto');
+    menu.style.setProperty('bottom', 'auto');
+  }
+
+  function placeExportButton(button, left, top) {
+    const limits = buttonLimits(button);
+    button.style.setProperty('left', clampPosition(left, limits.left, limits.right) + 'px');
+    button.style.setProperty('top', clampPosition(top, limits.top, limits.bottom) + 'px');
+    button.style.setProperty('right', 'auto');
+    button.style.setProperty('bottom', 'auto');
+    button.dataset.zfceViewport = window.innerWidth + 'x' + window.innerHeight;
+    placeExportMenu();
+  }
+
+  function restoreExportButton(button) {
+    if (!buttonPosition) return;
+    const limits = buttonLimits(button);
+    placeExportButton(button,
+      limits.left + (limits.right - limits.left) * buttonPosition.x,
+      limits.top + (limits.bottom - limits.top) * buttonPosition.y);
+  }
+
+  function rememberExportButton(button) {
+    const limits = buttonLimits(button);
+    const rect = button.getBoundingClientRect();
+    buttonPosition = {
+      x: (rect.left - limits.left) / (limits.right - limits.left || 1),
+      y: (rect.top - limits.top) / (limits.bottom - limits.top || 1)
+    };
+    buttonPosition.x = clampPosition(buttonPosition.x, 0, 1);
+    buttonPosition.y = clampPosition(buttonPosition.y, 0, 1);
+    try { localStorage.setItem(BUTTON_POSITION_KEY, JSON.stringify(buttonPosition)); } catch (_) {}
+  }
+
+  function enableExportButtonDrag(button) {
+    let drag = null;
+    let suppressClickUntil = 0;
+    button.title = '눌러서 내보내기 · 드래그해서 이동';
+
+    button.addEventListener('pointerdown', event => {
+      if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      const rect = button.getBoundingClientRect();
+      drag = { id: event.pointerId, x: event.clientX, y: event.clientY,
+        left: rect.left, top: rect.top, moved: false };
+      try { button.setPointerCapture(event.pointerId); } catch (_) {}
+    });
+
+    button.addEventListener('pointermove', event => {
+      if (!drag || event.pointerId !== drag.id) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+      if (!drag.moved) {
+        drag.moved = true;
+        button.classList.add('zfce-dragging');
+        const menu = document.getElementById(MENU_ID);
+        if (menu) menu.hidden = true;
+      }
+      event.preventDefault();
+      placeExportButton(button, drag.left + dx, drag.top + dy);
+    });
+
+    const finish = event => {
+      if (!drag || event.pointerId !== drag.id) return;
+      if (drag.moved) {
+        suppressClickUntil = performance.now() + 450;
+        rememberExportButton(button);
+      }
+      drag = null;
+      button.classList.remove('zfce-dragging');
+      try { if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId); } catch (_) {}
+    };
+    button.addEventListener('pointerup', finish);
+    button.addEventListener('pointercancel', finish);
+    button.addEventListener('lostpointercapture', finish);
+
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      if (performance.now() < suppressClickUntil) {
+        event.preventDefault();
+        return;
+      }
+      const menu = document.getElementById(MENU_ID);
+      if (!menu) return;
+      menu.hidden = !menu.hidden;
+      placeExportMenu();
+    });
+  }
+
   function installUi() {
     if (!document.getElementById(STYLE_ID)) {
       const style = document.createElement('style');
       style.id = STYLE_ID;
-      style.textContent = `#${BUTTON_ID}{position:fixed;right:14px;bottom:142px;z-index:2147483643;border:0;border-radius:999px;padding:11px 15px;background:var(--kt-yellow,#6d48ff);color:var(--kt-user-dialogue,var(--kt-text,#fff));font:800 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 5px 18px rgba(0,0,0,.24)}#${BUTTON_ID}[hidden],#${MENU_ID}[hidden],#${PANEL_ID}[hidden],#${RANGE_ID}[hidden],#${RANGE_ID} [hidden]{display:none!important}#${MENU_ID}{position:fixed;right:14px;bottom:186px;z-index:2147483644;display:grid;min-width:190px;padding:7px;border:1px solid var(--kt-line,rgba(0,0,0,.08));border-radius:14px;background:var(--kt-white,#fff);color:var(--kt-text,#263238);box-shadow:0 9px 28px rgba(0,0,0,.24);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${MENU_ID} button{border:0;border-radius:9px;padding:11px 13px;background:transparent;color:var(--kt-text,#263238);font-size:13px;font-weight:800;text-align:left}#${MENU_ID} button:active{background:var(--kt-soft,#f0edff)}#${MENU_ID} .zfce-range-open{margin-top:4px;border-top:1px solid var(--kt-line,#eceff1);border-radius:0 0 9px 9px;padding-top:13px;color:var(--kt-user-action,var(--kt-text,#6d48ff))}#${PANEL_ID},#${RANGE_ID}{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.58);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${PANEL_ID} .zfce-card,#${RANGE_ID} .zfce-card{width:min(390px,100%);padding:20px;border-radius:17px;background:var(--kt-white,#fff);color:var(--kt-text,#263238);box-shadow:0 18px 50px rgba(0,0,0,.35)}#${PANEL_ID} .zfce-card{text-align:center}#${PANEL_ID} .zfce-status{font-weight:850;font-size:16px}#${PANEL_ID} .zfce-detail{margin:8px 0 15px;color:var(--kt-sub,#78858c);font-size:12px}#${PANEL_ID} .zfce-card>button,#${RANGE_ID} button{border:0;border-radius:10px;background:var(--kt-soft2,#eceff1);color:var(--kt-sub,#45545c);padding:10px 14px;font-weight:800}#${RANGE_ID} h3{margin:0 0 6px;font-size:17px}#${RANGE_ID} .zfce-range-state{margin-bottom:15px;color:var(--kt-sub,#78858c);font-size:12px}#${RANGE_ID} label{display:block;margin:11px 0 6px;font-size:12px;font-weight:800}#${RANGE_ID} select{display:block;width:100%;height:43px;border:1px solid var(--kt-line,#dfe4e7);border-radius:10px;background:var(--kt-soft,#f7f9fa);color:var(--kt-text,#263238);padding:0 10px}#${RANGE_ID} .zfce-range-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}#${RANGE_ID} .zfce-range-actions button{background:var(--kt-yellow,#6d48ff);color:var(--kt-user-dialogue,var(--kt-text,#fff))}#${RANGE_ID} .zfce-range-close{float:right;margin:-6px -6px 0 8px;background:transparent;color:var(--kt-sub,#45545c);padding:7px}`;
+      style.textContent = `#${BUTTON_ID}{position:fixed;right:14px;bottom:142px;z-index:2147483643;border:0;border-radius:999px;padding:11px 15px;background:var(--kt-yellow,#6d48ff);color:var(--kt-user-dialogue,var(--kt-text,#fff));font:800 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 5px 18px rgba(0,0,0,.24);touch-action:none;-webkit-user-select:none;user-select:none;cursor:grab}#${BUTTON_ID}.zfce-dragging{cursor:grabbing}#${BUTTON_ID}[hidden],#${MENU_ID}[hidden],#${PANEL_ID}[hidden],#${RANGE_ID}[hidden],#${RANGE_ID} [hidden]{display:none!important}#${MENU_ID}{position:fixed;right:14px;bottom:186px;z-index:2147483644;display:grid;min-width:190px;padding:7px;border:1px solid var(--kt-line,rgba(0,0,0,.08));border-radius:14px;background:var(--kt-white,#fff);color:var(--kt-text,#263238);box-shadow:0 9px 28px rgba(0,0,0,.24);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${MENU_ID} button{border:0;border-radius:9px;padding:11px 13px;background:transparent;color:var(--kt-text,#263238);font-size:13px;font-weight:800;text-align:left}#${MENU_ID} button:active{background:var(--kt-soft,#f0edff)}#${MENU_ID} .zfce-range-open{margin-top:4px;border-top:1px solid var(--kt-line,#eceff1);border-radius:0 0 9px 9px;padding-top:13px;color:var(--kt-user-action,var(--kt-text,#6d48ff))}#${PANEL_ID},#${RANGE_ID}{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.58);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#${PANEL_ID} .zfce-card,#${RANGE_ID} .zfce-card{width:min(390px,100%);padding:20px;border-radius:17px;background:var(--kt-white,#fff);color:var(--kt-text,#263238);box-shadow:0 18px 50px rgba(0,0,0,.35)}#${PANEL_ID} .zfce-card{text-align:center}#${PANEL_ID} .zfce-status{font-weight:850;font-size:16px}#${PANEL_ID} .zfce-detail{margin:8px 0 15px;color:var(--kt-sub,#78858c);font-size:12px}#${PANEL_ID} .zfce-card>button,#${RANGE_ID} button{border:0;border-radius:10px;background:var(--kt-soft2,#eceff1);color:var(--kt-sub,#45545c);padding:10px 14px;font-weight:800}#${RANGE_ID} h3{margin:0 0 6px;font-size:17px}#${RANGE_ID} .zfce-range-state{margin-bottom:15px;color:var(--kt-sub,#78858c);font-size:12px}#${RANGE_ID} label{display:block;margin:11px 0 6px;font-size:12px;font-weight:800}#${RANGE_ID} select{display:block;width:100%;height:43px;border:1px solid var(--kt-line,#dfe4e7);border-radius:10px;background:var(--kt-soft,#f7f9fa);color:var(--kt-text,#263238);padding:0 10px}#${RANGE_ID} .zfce-range-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}#${RANGE_ID} .zfce-range-actions button{background:var(--kt-yellow,#6d48ff);color:var(--kt-user-dialogue,var(--kt-text,#fff))}#${RANGE_ID} .zfce-range-close{float:right;margin:-6px -6px 0 8px;background:transparent;color:var(--kt-sub,#45545c);padding:7px}`;
       document.head.appendChild(style);
     }
 
@@ -1313,12 +1444,9 @@
       button.id = BUTTON_ID;
       button.type = 'button';
       button.textContent = '대화 내보내기';
-      button.addEventListener('click', event => {
-        event.stopPropagation();
-        const menu = document.getElementById(MENU_ID);
-        menu.hidden = !menu.hidden;
-      });
       document.body.appendChild(button);
+      enableExportButtonDrag(button);
+      restoreExportButton(button);
     }
 
     if (!document.getElementById(MENU_ID)) {
@@ -1377,8 +1505,14 @@
     }
 
     const hidden = !visibleChatPage();
-    document.getElementById(BUTTON_ID).hidden = hidden;
+    const exportButton = document.getElementById(BUTTON_ID);
+    exportButton.hidden = hidden;
+    if (buttonPosition && !exportButton.classList.contains('zfce-dragging') &&
+        exportButton.dataset.zfceViewport !== window.innerWidth + 'x' + window.innerHeight) {
+      restoreExportButton(exportButton);
+    }
     if (hidden) document.getElementById(MENU_ID).hidden = true;
+    else placeExportMenu();
   }
 
   document.addEventListener('click', () => {
