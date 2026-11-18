@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.16
+// @version      0.3.17
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -262,6 +262,12 @@
       parts: extractParts(body),
       images: extractImages(body)
     };
+  }
+
+  function isMessageMounted(id, root = document) {
+    if (!id) return false;
+    return Array.from(root.querySelectorAll(MESSAGE_SELECTOR))
+      .some(body => (body.id || body.dataset.key) === id);
   }
 
   function messageNumber(id) {
@@ -1045,6 +1051,7 @@
       let chronologicalOrder = [];
       let stableAtBottom = 0;
       let stalledAwayFromLatest = 0;
+      let lastCaptureProgressAt = Date.now();
       chronologicalOrder = capture(messages, chronologicalOrder);
       updatePanel('처음부터 순서대로 확인 중…', `${messages.size}개 수집`);
 
@@ -1057,16 +1064,19 @@
         await wait(90);
         chronologicalOrder = capture(messages, chronologicalOrder);
 
-        /* 처음 기준점을 잡은 뒤 더 최신 DOM이 나타나면 완료 기준도 함께 갱신한다. */
-        const newestCapturedId = newestMessageId(messages, chronologicalOrder);
-        if (newestCapturedId) latestAnchorId = newestCapturedId;
+        // 시작 시 실제 최신 화면에서 수집한 기준점을 유지한다.
+        // 과거 화면의 가상 목록 순서로 최신 기준점을 덮어쓰지 않는다.
 
         const moved = Math.abs(log.scrollTop - beforeTop) > 2;
         const grew = messages.size > beforeCount;
         const atBottom = reverse
           ? Math.abs(log.scrollTop) < 3
           : log.scrollTop + log.clientHeight >= log.scrollHeight - 3;
-        const latestVisible = !latestAnchorId || !!document.getElementById(latestAnchorId);
+        const latestVisible = !!latestAnchorId && isMessageMounted(latestAnchorId);
+        if (grew) lastCaptureProgressAt = Date.now();
+        if (Date.now() - lastCaptureProgressAt > 45000) {
+          throw new Error('45초 동안 추가 대화를 읽지 못해 중단했어요. 최신 대화 기준점을 확인하지 못했으므로 파일을 저장하지 않았어요.');
+        }
 
         /*
          * 가상 스크롤이 중간에서 scrollTop을 0으로 재설정할 수 있다.
