@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.14
+// @version      0.3.15
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -19,19 +19,25 @@
   const contextChannel = 'zfce-room-context';
   if (inChatFrame) {
     if (new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io' || window.parent === window) return;
-    frameRoomId = await new Promise(resolve => {
+    void new Promise(resolve => {
       const receive = event => {
         if (event.source !== window.parent || event.origin !== 'https://zeta-ai.io' ||
             event.data?.type !== contextChannel || !/^[A-Za-z0-9_-]{1,100}$/.test(event.data.roomId || '')) return;
         clearInterval(timer);
+        clearTimeout(timeout);
         window.removeEventListener('message', receive);
         resolve(event.data.roomId);
       };
       window.addEventListener('message', receive);
       const request = () => window.parent.postMessage({ type: contextChannel }, 'https://zeta-ai.io');
       const timer = setInterval(request, 1000);
+      const timeout = setTimeout(() => {
+        clearInterval(timer);
+        window.removeEventListener('message', receive);
+        resolve('');
+      }, 30000);
       request();
-    });
+    }).then(roomId => { frameRoomId = roomId; });
   } else if (location.origin === 'https://zeta-ai.io' && window === window.top) {
     window.addEventListener('message', event => {
       const frame = [...document.querySelectorAll('iframe')].find(frame => frame.contentWindow === event.source && frame.src.startsWith('https://frame.pingpong.ai/v1/index.html'));
@@ -1293,9 +1299,29 @@
 
   function start() {
     installUi();
-    // UI는 document.body 직속이라 React 채팅 DOM이 바뀔 때마다 재설치할 필요가 없다.
-    // SPA 경로가 실제로 바뀔 때만 표시 여부를 갱신한다.
     patchRouteSync();
+    // 채팅 DOM은 초기 실행과 경로 변경보다 늦게 나타날 수 있다.
+    let pendingUiSync = false;
+    let observedLog = null;
+    const resizeObserver = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => scheduleUiSync()) : null;
+    function scheduleUiSync() {
+      if (pendingUiSync) return;
+      pendingUiSync = true;
+      setTimeout(() => {
+        pendingUiSync = false;
+        installUi();
+        const log = findChatLog();
+        if (log !== observedLog) {
+          resizeObserver?.disconnect();
+          observedLog = log;
+          if (log) resizeObserver?.observe(log);
+        }
+      }, 100);
+    }
+    new MutationObserver(scheduleUiSync).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', scheduleUiSync);
+    scheduleUiSync();
   }
 
   if (document.readyState === 'loading') {
