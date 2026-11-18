@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.18
+// @version      0.3.19
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -15,38 +15,62 @@
   'use strict';
 
   function offerDownload(name, content, type) {
-    document.getElementById('zfce-download-ready')?.remove();
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const panel = document.createElement('div');
+    document.getElementById('zfce-download-ready')?.dispatchEvent(new Event('zfce-close'));
+    const url = URL.createObjectURL(new Blob([content], { type }));
+    const previousFocus = document.activeElement;
+    const make = (tag, css, text) => {
+      const node = document.createElement(tag);
+      node.style.cssText = 'box-sizing:border-box!important;' + css.split(';').filter(Boolean).map(rule => rule + '!important').join(';');
+      if (text) node.textContent = text;
+      return node;
+    };
+    const panel = make('div', 'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:20px');
     panel.id = 'zfce-download-ready';
-    panel.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0008;display:grid;place-items:center;padding:20px';
-    const card = document.createElement('div');
-    card.style.cssText = 'background:#fff;color:#263238;padding:24px;border-radius:16px;max-width:360px;font:14px/1.5 sans-serif;overflow-wrap:anywhere';
-    const title = document.createElement('strong');
-    title.textContent = '대화 파일 준비 완료';
-    const description = document.createElement('p');
-    description.textContent = name;
-    const link = document.createElement('a');
+    const card = make('div', 'width:100%;max-width:360px;max-height:calc(100dvh - 40px);overflow:auto;padding:24px;border:1px solid var(--kt-line,#e7e7e7);border-radius:16px;background:var(--kt-white,#fff);color:var(--kt-text,#191919);box-shadow:0 12px 40px #0003;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:left');
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-labelledby', 'zfce-download-title');
+    const title = make('h2', 'margin:0;font:700 17px/1.4 inherit;color:inherit', '대화 내보내기');
+    title.style.setProperty('font', '700 17px/1.4 sans-serif', 'important');
+    title.id = 'zfce-download-title';
+    const note = make('p', 'margin:8px 0 18px;font-size:13px;line-height:1.5;color:var(--kt-sub,#666)', '파일이 준비됐어요. 아래 버튼을 눌러 저장해 주세요.');
+    note.setAttribute('aria-live', 'polite');
+    const file = make('div', 'padding:14px 16px;margin:0 0 22px;border:1px solid var(--kt-line,#e7e7e7);border-radius:10px;background:var(--kt-soft,#f5f5f5)');
+    const label = make('div', 'margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--kt-sub,#666)', /\.txt$/i.test(name) ? 'TXT 파일' : 'MARKDOWN 파일');
+    const description = make('p', 'margin:0;font-size:12px;line-height:1.6;color:var(--kt-text,#191919);overflow-wrap:anywhere', name);
+    file.append(label, description);
+    const actions = make('div', 'display:grid;grid-template-columns:1fr 1.6fr;gap:8px');
+    const buttonCss = 'display:flex;align-items:center;justify-content:center;min-height:44px;margin:0;padding:11px 14px;border:0;border-radius:9px;font:600 14px/1.4 sans-serif;text-decoration:none;cursor:pointer';
+    const close = make('button', buttonCss + ';background:var(--kt-soft2,#efefef);color:var(--kt-text,#191919)', '닫기');
+    close.type = 'button';
+    const link = make('a', buttonCss + ';background:var(--kt-yellow,#fee500);color:var(--kt-user-dialogue,#191919)', '파일 저장');
     link.href = url;
     link.download = name;
-    link.textContent = '파일 저장';
-    link.style.cssText = 'display:block;padding:12px;background:#fee500;color:#191919;border-radius:8px;text-align:center;text-decoration:none;font-weight:bold';
-    const note = document.createElement('p');
-    note.textContent = '파일 저장을 눌러 다운로드해 주세요.';
     link.addEventListener('click', () => {
-      note.textContent = '다운로드 목록을 확인해 주세요. 저장되지 않았다면 다시 누를 수 있어요.';
+      note.textContent = '다운로드 목록을 확인해 주세요. 다시 저장할 수도 있어요.';
     });
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.textContent = '닫기';
-    close.addEventListener('click', () => {
+    let closed = false;
+    const dismiss = () => {
+      if (closed) return;
+      closed = true;
       panel.remove();
+      if (previousFocus?.isConnected) previousFocus.focus();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+    close.addEventListener('click', dismiss);
+    panel.addEventListener('zfce-close', dismiss);
+    panel.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); dismiss(); }
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        (document.activeElement === close ? link : close).focus();
+      }
     });
-    card.append(title, description, link, note, close);
+    actions.append(close, link);
+    card.append(title, note, file, actions);
     panel.appendChild(card);
     document.body.appendChild(panel);
+    link.focus();
   }
 
   if (location.origin === 'https://zeta-ai.io' && window === window.top) {
