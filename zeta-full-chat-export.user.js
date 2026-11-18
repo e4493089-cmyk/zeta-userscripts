@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.17
+// @version      0.3.18
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -13,6 +13,60 @@
 
 (async () => {
   'use strict';
+
+  function offerDownload(name, content, type) {
+    document.getElementById('zfce-download-ready')?.remove();
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const panel = document.createElement('div');
+    panel.id = 'zfce-download-ready';
+    panel.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0008;display:grid;place-items:center;padding:20px';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fff;color:#263238;padding:24px;border-radius:16px;max-width:360px;font:14px/1.5 sans-serif;overflow-wrap:anywhere';
+    const title = document.createElement('strong');
+    title.textContent = '대화 파일 준비 완료';
+    const description = document.createElement('p');
+    description.textContent = name;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.textContent = '파일 저장';
+    link.style.cssText = 'display:block;padding:12px;background:#fee500;color:#191919;border-radius:8px;text-align:center;text-decoration:none;font-weight:bold';
+    const note = document.createElement('p');
+    note.textContent = '파일 저장을 눌러 다운로드해 주세요.';
+    link.addEventListener('click', () => {
+      note.textContent = '다운로드 목록을 확인해 주세요. 저장되지 않았다면 다시 누를 수 있어요.';
+    });
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = '닫기';
+    close.addEventListener('click', () => {
+      panel.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    });
+    card.append(title, description, link, note, close);
+    panel.appendChild(card);
+    document.body.appendChild(panel);
+  }
+
+  if (location.origin === 'https://zeta-ai.io' && window === window.top) {
+    window.addEventListener('message', event => {
+      if (event.origin !== 'https://frame.pingpong.ai' || event.data?.type !== 'zfce-download-file') return;
+      const frame = [...document.querySelectorAll('iframe')].find(node =>
+        node.contentWindow === event.source && node.src.startsWith('https://frame.pingpong.ai/v1/index.html'));
+      const port = event.ports[0];
+      const data = event.data;
+      if (!frame || !port || typeof data.content !== 'string' ||
+          typeof data.name !== 'string' || !/\.(txt|md)$/.test(data.name) ||
+          !['text/plain;charset=utf-8', 'text/markdown;charset=utf-8'].includes(data.mime)) return;
+      try {
+        offerDownload(data.name, data.content, data.mime);
+        port.postMessage({ ok: true });
+      } catch (error) {
+        port.postMessage({ ok: false, error: String(error.message || error) });
+      } finally { port.close(); }
+    });
+  }
 
   const inChatFrame = location.origin === 'https://frame.pingpong.ai';
   let frameRoomId = '';
@@ -672,16 +726,26 @@
     panel.querySelector('.zfce-detail').textContent = detail;
   }
 
-  function download(name, content, type = 'text/markdown;charset=utf-8') {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  async function download(name, content, type = 'text/markdown;charset=utf-8') {
+    if (!inChatFrame) {
+      offerDownload(name, content, type);
+      return;
+    }
+    await new Promise((resolve, reject) => {
+      const channel = new MessageChannel();
+      const timer = setTimeout(() => {
+        channel.port1.close();
+        reject(new Error('제타 페이지에 저장 창을 연결하지 못했어요. 스크립트 업데이트 후 페이지 전체를 새로고침해 주세요.'));
+      }, 5000);
+      channel.port1.onmessage = event => {
+        clearTimeout(timer);
+        channel.port1.close();
+        if (event.data?.ok) resolve();
+        else reject(new Error(event.data?.error || '파일 저장 창을 열지 못했어요.'));
+      };
+      window.parent.postMessage({ type: 'zfce-download-file', name, content, mime: type },
+        'https://zeta-ai.io', [channel.port2]);
+    });
   }
 
   function markdownText(value) {
@@ -899,11 +963,11 @@
       };
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       if (format === 'text') {
-        download(`${safeFileName(meta.title)}-책갈피구간-${stamp}.txt`, buildText(meta, items), 'text/plain;charset=utf-8');
+        await download(`${safeFileName(meta.title)}-책갈피구간-${stamp}.txt`, buildText(meta, items), 'text/plain;charset=utf-8');
       } else {
-        download(`${safeFileName(meta.title)}-책갈피구간-${stamp}.md`, buildMarkdown(meta, items));
+        await download(`${safeFileName(meta.title)}-책갈피구간-${stamp}.md`, buildMarkdown(meta, items));
       }
-      updatePanel('저장 완료', `${items.length}개 메시지를 ${format === 'text' ? 'TXT' : 'MD'}로 저장했어요.`);
+      updatePanel('파일 준비 완료', `${items.length}개 메시지를 ${format === 'text' ? 'TXT' : 'MD'} 파일의 저장 버튼을 눌러 주세요.`);
       await wait(1200);
     } catch (error) {
       if (error?.name !== 'AbortError') {
@@ -1148,15 +1212,15 @@
       };
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       if (format === 'text') {
-        download(
+        await download(
           `${safeFileName(meta.title)}-${fileScope}-${stamp}.txt`,
           buildText(meta, items),
           'text/plain;charset=utf-8'
         );
       } else {
-        download(`${safeFileName(meta.title)}-${fileScope}-${stamp}.md`, buildMarkdown(meta, items));
+        await download(`${safeFileName(meta.title)}-${fileScope}-${stamp}.md`, buildMarkdown(meta, items));
       }
-      updatePanel('저장 완료', `${items.length}개 메시지를 ${format === 'text' ? 'TXT' : 'MD'}로 저장했어요.`);
+      updatePanel('파일 준비 완료', `${items.length}개 메시지를 ${format === 'text' ? 'TXT' : 'MD'} 파일의 저장 버튼을 눌러 주세요.`);
       await wait(1200);
       document.getElementById(PANEL_ID).hidden = true;
     } catch (error) {
