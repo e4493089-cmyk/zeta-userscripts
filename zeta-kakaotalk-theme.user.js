@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.92
+// @version      3.50.93
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -10269,8 +10269,10 @@
        제타그램 패널이 열린 상태에서는 이 추가 규칙을 적용하지 않는다. */
     const isChatDeleteConfirm = text =>
       !document.querySelector('[data-testid="zetagram-panel"]') &&
-      text.includes('정말로 삭제하시겠어요?') &&
-      text.includes('삭제한 대화는 되돌릴 수 없어요');
+      ((text.includes('정말로 삭제하시겠어요?') &&
+        text.includes('삭제한 대화는 되돌릴 수 없어요')) ||
+       (text.includes('대화 삭제') &&
+        text.includes('이번 턴에 열어본 내용이 사라질 수 있어요')));
 
     const isTargetDialog = text => {
       return (
