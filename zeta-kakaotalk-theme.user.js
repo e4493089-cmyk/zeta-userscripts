@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.93
+// @version      3.50.94
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -8036,74 +8036,85 @@
       color: #A4ADB2 !important;
     }
 
-    /* 메시지 길게누르기/메뉴 바텀시트 */
-    html.${ACTIVE} .kt-message-actions-backdrop {
+    /* 메시지 길게누르기/메뉴 바텀시트 (책갈피 설정/해제 공통) */
+    html.${ACTIVE} #portal-container .kt-message-actions-backdrop {
       background: rgba(43,57,66,.34) !important;
       backdrop-filter: blur(7px) !important;
     }
 
-    html.${ACTIVE} .kt-message-actions-sheet {
+    /* 바깥 시트: 기존 카카오톡 테마의 흰 배경 */
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet {
       background: #FFFFFF !important;
       color: #26343C !important;
       border-top: 1px solid #DDE4E8 !important;
       box-shadow: 0 -10px 30px rgba(38,52,61,.18) !important;
+      color-scheme: light !important;
     }
 
-    /* 드래그 손잡이 */
-    html.${ACTIVE} .kt-message-actions-sheet > div:first-child svg {
+    /* 위쪽 드래그 손잡이는 SVG가 아닌 일반 막대일 수도 있다. */
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet > div:first-child svg {
       color: #AAB4BA !important;
     }
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet > div:first-child
+      :is([class*="bg-gray"],[class*="bg-white"]) {
+      background: #B8C2C8 !important;
+    }
 
-    /* 액션 행 */
-    html.${ACTIVE} .kt-message-actions-sheet
-      button:is([data-sentry-component="LogRawButton"], .scene-web button) {
+    /* 어두운 제타 기본색으로 남던 메뉴 그룹/행의 배경 */
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      :is(div,section,ul)[class*="bg-gray-sub"],
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      :is(div,section,ul)[class*="bg-gray-main"] {
+      background: #F6F8F9 !important;
+      color: #26343C !important;
+    }
+
+    /* 기본 메뉴 버튼은 Sentry 속성이 제거된 버전에서도 적용 */
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      button:not(#zeta-full-chat-export-button) {
       background: #F6F8F9 !important;
       color: #34434C !important;
       border-color: #E2E7EA !important;
       box-shadow: none !important;
     }
 
-    html.${ACTIVE} .kt-message-actions-sheet
-      button:is([data-sentry-component="LogRawButton"], .scene-web button):hover:not(:disabled),
-    html.${ACTIVE} .kt-message-actions-sheet
-      button:is([data-sentry-component="LogRawButton"], .scene-web button):active:not(:disabled) {
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      button:not(#zeta-full-chat-export-button):is(:hover,:active):not(:disabled) {
       background: #EEF2F4 !important;
     }
 
-    html.${ACTIVE} .kt-message-actions-sheet
-      button:is([data-sentry-component="LogRawButton"], .scene-web button) span,
-    html.${ACTIVE} .kt-message-actions-sheet
-      button:is([data-sentry-component="LogRawButton"], .scene-web button) svg {
-      color: #34434C !important;
+    /* 진한 글씨/아이콘: 기존 .text-white 유틸리티까지 덮는다. */
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      button:not(#zeta-full-chat-export-button) :is(span,p,svg) {
+      color: inherit !important;
       opacity: 1 !important;
     }
 
-    html.${ACTIVE} .kt-message-actions-sheet
-      button:is([data-sentry-component="LogRawButton"], .scene-web button):disabled,
-    html.${ACTIVE} .kt-message-actions-sheet
-      button:is([data-sentry-component="LogRawButton"], .scene-web button):disabled span,
-    html.${ACTIVE} .kt-message-actions-sheet
-      button:is([data-sentry-component="LogRawButton"], .scene-web button):disabled svg {
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      button:not(#zeta-full-chat-export-button):disabled {
       color: #A5AEB3 !important;
-      background-color: #F1F3F4 !important;
-      opacity: 1 !important;
+      background: #F1F3F4 !important;
     }
 
-    /* 삭제만 의미색 유지. 배경은 다른 메뉴와 동일하게 */
-    html.${ACTIVE} .kt-message-actions-sheet
-      button.kt-message-action-danger,
-    html.${ACTIVE} .kt-message-actions-sheet
-      button.kt-message-action-danger span,
-    html.${ACTIVE} .kt-message-actions-sheet
-      button.kt-message-action-danger svg {
+    /* 그룹 내부 구분선 */
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      :is([class*="border-white/"],[class*="border-gray"],[class*="divide-white/"]) {
+      border-color: #E2E7EA !important;
+    }
+
+    /* 삭제만 경고색. 별도 내보내기 버튼의 카카오 노랑은 유지한다. */
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      button.kt-message-action-danger {
+      color: #D94B4B !important;
+      background: #FFF4F4 !important;
+    }
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      button.kt-message-action-danger :is(span,p,svg) {
       color: #D94B4B !important;
     }
-
-    html.${ACTIVE} .kt-message-actions-sheet
-      button.kt-message-action-danger:hover:not(:disabled),
-    html.${ACTIVE} .kt-message-actions-sheet
-      button.kt-message-action-danger:active:not(:disabled) {
-      background: #FFF1F1 !important;
+    html.${ACTIVE} #portal-container .kt-message-actions-sheet
+      button.kt-message-action-danger:is(:hover,:active):not(:disabled) {
+      background: #FFEAEA !important;
     }
 
     /* =========================================================
@@ -10132,7 +10143,7 @@
            공통으로 항상 존재하는 나머지 액션들로 판별한다. */
         const isMessageActionSheet =
           text.includes('신고 및 오류제보') &&
-          text.includes('책갈피 설정') &&
+          (text.includes('책갈피 설정') || text.includes('책갈피 해제')) &&
           text.includes('여기서부터 새로하기') &&
           text.includes('복사') &&
           text.includes('캡처') &&
@@ -10150,7 +10161,7 @@
         const sheet = Array.from(layer.children).find(el => {
           if (el === backdrop) return false;
           const cls = String(el.className || '');
-          return cls.includes('rounded-t-') || cls.includes('bg-gray-sub1');
+          return cls.includes('rounded-t-') || cls.includes('bg-gray-sub1') || cls.includes('bg-gray-main');
         });
 
         if (!sheet) return;
