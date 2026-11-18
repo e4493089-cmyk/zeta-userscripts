@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.94
+// @version      3.50.95
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -8055,11 +8055,6 @@
     html.${ACTIVE} #portal-container .kt-message-actions-sheet > div:first-child svg {
       color: #AAB4BA !important;
     }
-    html.${ACTIVE} #portal-container .kt-message-actions-sheet > div:first-child
-      :is([class*="bg-gray"],[class*="bg-white"]) {
-      background: #B8C2C8 !important;
-    }
-
     /* 어두운 제타 기본색으로 남던 메뉴 그룹/행의 배경 */
     html.${ACTIVE} #portal-container .kt-message-actions-sheet
       :is(div,section,ul)[class*="bg-gray-sub"],
@@ -8085,7 +8080,7 @@
 
     /* 진한 글씨/아이콘: 기존 .text-white 유틸리티까지 덮는다. */
     html.${ACTIVE} #portal-container .kt-message-actions-sheet
-      button:not(#zeta-full-chat-export-button) :is(span,p,svg) {
+      button:not(#zeta-full-chat-export-button) :is(div,span,p,svg) {
       color: inherit !important;
       opacity: 1 !important;
     }
@@ -8109,7 +8104,7 @@
       background: #FFF4F4 !important;
     }
     html.${ACTIVE} #portal-container .kt-message-actions-sheet
-      button.kt-message-action-danger :is(span,p,svg) {
+      button.kt-message-action-danger :is(div,span,p,svg) {
       color: #D94B4B !important;
     }
     html.${ACTIVE} #portal-container .kt-message-actions-sheet
