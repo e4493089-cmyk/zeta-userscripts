@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.90
+// @version      3.50.91
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -7852,16 +7852,16 @@
       color-scheme: light !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header)) {
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header), div.flex.flex-row.justify-between:has(h3):has(button)) {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-bottom: 1px solid var(--kt-line) !important;
       box-shadow: 0 1px 3px rgba(45,61,71,.06) !important;
     }
 
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header)) h3,
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header)) button,
-    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header)) svg {
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header), div.flex.flex-row.justify-between:has(h3):has(button)) h3,
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header), div.flex.flex-row.justify-between:has(h3):has(button)) button,
+    html.${ACTIVE} :is([data-sentry-component="CapturePreview"], .scene-web div.absolute.inset-0:has([data-capture-page="true"])) > :is(header, div:has(> header), div.flex.flex-row.justify-between:has(h3):has(button)) svg {
       color: #26343C !important;
     }
 
