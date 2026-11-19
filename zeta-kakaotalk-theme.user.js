@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.103
+// @version      3.50.104
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -48,7 +48,7 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.103';
+  const version = '3.50.104';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   const recordError = (error, stage) => {
@@ -2486,116 +2486,113 @@ function installThemeReports() {
        /my-plot-chat-profile/.../.../edit
     ========================================================= */
 
-    html.kt-profile-edit-active {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) {
       background: var(--kt-chat) !important;
       color-scheme: light !important;
     }
 
-    html.kt-profile-edit-active body {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) body {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
     }
 
-    html.kt-profile-edit-active header {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) header {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
       border-bottom-color: #E7EAEC !important;
     }
 
-    html.kt-profile-edit-active header h3 {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) header h3 {
       color: #202124 !important;
     }
 
-    html.kt-profile-edit-active header button {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) header button {
       color: #26343C !important;
       background: transparent !important;
     }
 
-    html.kt-profile-edit-active header button svg {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) header button svg {
       color: #26343C !important;
     }
 
-    html.kt-profile-edit-active main#contents,
-    html.kt-profile-edit-active
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) main#contents,
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
       [data-sentry-component="MyPlotChatProfileEditPage"],
-    html.kt-profile-edit-active
-      [data-sentry-component="MyPlotChatProfileEdit"] {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      [data-sentry-component="MyPlotChatProfileEdit"],
+    html.${ACTIVE} .kt-profile-edit-modal {
       background: #FFFFFF !important;
       color: var(--kt-text) !important;
     }
 
     /* 프로필 미리보기 */
-    html.kt-profile-edit-active
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
       [data-sentry-component="MyPlotChatProfileEdit"]
       [data-sentry-source-file="ChatProfilePreview.tsx"] {
       color: var(--kt-text) !important;
     }
 
-    html.kt-profile-edit-active
-      [data-sentry-component="MyPlotChatProfileEdit"]
-      .title18 {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      :is([data-sentry-component="MyPlotChatProfileEdit"], .kt-profile-edit-modal) .title18 {
       color: #202124 !important;
     }
 
-    html.kt-profile-edit-active .kt-profile-edit-badge {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) .kt-profile-edit-badge {
       background: var(--kt-yellow) !important;
       color: #303030 !important;
       border: 2px solid #FFFFFF !important;
       box-shadow: 0 1px 3px rgba(0,0,0,.12) !important;
     }
 
-    html.kt-profile-edit-active .kt-profile-edit-badge svg {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) .kt-profile-edit-badge svg {
       color: #303030 !important;
     }
 
     /* 섹션 제목 / 설명 */
-    html.kt-profile-edit-active
-      [data-sentry-component="EditFormSectionContainer"]
-      .heading3,
-    html.kt-profile-edit-active
-      [data-sentry-component="EditFormSectionContainer"]
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      :is(.heading3, .title18),
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
       .body16 {
       color: #2B3439 !important;
     }
 
-    html.kt-profile-edit-active
-      [data-sentry-component="EditFormSectionContainer"]
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
       .body12 {
       color: #858F94 !important;
     }
 
     /* 이름 입력칸 */
-    html.kt-profile-edit-active
-      label[data-sentry-component="Input"] {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      :is(label[data-sentry-component="Input"], label:has(input[name="name"])) {
       background: #F5F6F7 !important;
       color: #202124 !important;
       border-color: #DFE4E7 !important;
       box-shadow: none !important;
     }
 
-    html.kt-profile-edit-active
-      label[data-sentry-component="Input"]:focus-within {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      :is(label[data-sentry-component="Input"], label:has(input[name="name"])):focus-within {
       background: #FFFFFF !important;
       border-color: #C7CED2 !important;
       box-shadow: 0 0 0 3px rgba(254,229,0,.20) !important;
     }
 
-    html.kt-profile-edit-active
-      input[data-sentry-component="Input"] {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      :is(input[data-sentry-component="Input"], input[name="name"]) {
       background: transparent !important;
       color: #202124 !important;
       caret-color: #4A4A4A !important;
     }
 
-    html.kt-profile-edit-active
-      input[data-sentry-component="Input"]::placeholder {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      :is(input[data-sentry-component="Input"], input[name="name"])::placeholder {
       color: #9AA2A6 !important;
       opacity: 1 !important;
     }
 
     /* 설명 입력칸 */
-    html.kt-profile-edit-active
-      textarea[data-sentry-component="Textarea"] {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      textarea {
       background: #F5F6F7 !important;
       color: #202124 !important;
       caret-color: #4A4A4A !important;
@@ -2605,59 +2602,59 @@ function installThemeReports() {
       scrollbar-color: rgba(75,90,100,.22) transparent !important;
     }
 
-    html.kt-profile-edit-active
-      textarea[data-sentry-component="Textarea"]:focus {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      textarea:focus {
       background: #FFFFFF !important;
       border-color: #C7CED2 !important;
       box-shadow: 0 0 0 3px rgba(254,229,0,.20) !important;
     }
 
-    html.kt-profile-edit-active
-      textarea[data-sentry-component="Textarea"]::placeholder {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      textarea::placeholder {
       color: #9AA2A6 !important;
       opacity: 1 !important;
     }
 
-    html.kt-profile-edit-active
-      textarea[data-sentry-component="Textarea"]::-webkit-scrollbar {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      textarea::-webkit-scrollbar {
       width: 5px !important;
     }
 
-    html.kt-profile-edit-active
-      textarea[data-sentry-component="Textarea"]::-webkit-scrollbar-thumb {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      textarea::-webkit-scrollbar-thumb {
       background: rgba(75,90,100,.22) !important;
       border-radius: 999px !important;
     }
 
     /* 글자 수 - 보라색 제거 */
-    html.kt-profile-edit-active
-      [data-sentry-component="TextareaField"] .text-primary-300,
-    html.kt-profile-edit-active
-      [data-sentry-component="TextareaField"] .caption12 {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      .text-primary-300,
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal)
+      .caption12 {
       color: #6F7D84 !important;
     }
 
     /* 하단 선택 버튼 */
-    html.kt-profile-edit-active .kt-profile-edit-footer {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) .kt-profile-edit-footer {
       background: rgba(255,255,255,.97) !important;
     }
 
-    html.kt-profile-edit-active .kt-profile-edit-submit {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) .kt-profile-edit-submit {
       background: var(--kt-yellow) !important;
       color: #191919 !important;
       border: 1px solid #E4CF00 !important;
       box-shadow: none !important;
     }
 
-    html.kt-profile-edit-active .kt-profile-edit-submit:hover {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) .kt-profile-edit-submit:hover {
       background: var(--kt-yellow-hover) !important;
     }
 
-    html.kt-profile-edit-active .kt-profile-edit-submit:active {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) .kt-profile-edit-submit:active {
       background: #EED800 !important;
     }
 
-    html.kt-profile-edit-active .kt-profile-edit-submit:disabled {
+    :is(html.kt-profile-edit-active, html.${ACTIVE} .kt-profile-edit-modal) .kt-profile-edit-submit:disabled {
       background: #E8EAEB !important;
       border-color: #E0E3E5 !important;
       color: #A0A7AB !important;
@@ -9872,12 +9869,14 @@ function installThemeReports() {
   }
 
   function markProfileEditPage() {
-    if (!isProfileEditPage()) {
+    const modal = document.querySelector('#portal-container .relative.max-h-full:has(input[name="name"]):has(textarea)');
+    modal?.classList.add('kt-profile-edit-modal');
+    if (!modal && !isProfileEditPage()) {
       clearProfileEditMarkers();
       return;
     }
 
-    const root = document.querySelector(
+    const root = modal || document.querySelector(
       '[data-sentry-component="MyPlotChatProfileEdit"], ' +
       '[data-sentry-component="ChatProfileCreatePage"], ' +
       '[data-sentry-component="ChatProfileEditForm"], ' +
@@ -9887,7 +9886,7 @@ function installThemeReports() {
     if (root) {
       const profileButton = root.querySelector(
         '[data-sentry-source-file="ChatProfilePreview.tsx"] button, ' +
-        '[data-sentry-component="Preview"] button'
+        '[data-sentry-component="Preview"] button, button:has(> div.absolute.right-0.bottom-0)'
       );
 
       const badge = profileButton?.querySelector(
@@ -9897,7 +9896,7 @@ function installThemeReports() {
       badge?.classList.add('kt-profile-edit-badge');
     }
 
-    document.querySelectorAll('#portal-container button').forEach(btn => {
+    (modal || document.getElementById('portal-container') || document).querySelectorAll('button').forEach(btn => {
       const label = (btn.textContent || '').replace(/\s+/g, ' ').trim();
 
       if (
@@ -9969,7 +9968,7 @@ function installThemeReports() {
       root.querySelectorAll('button').forEach(button => {
         if (normalizeText(button.textContent) !== '선택') return;
         const carousel = button.closest('[class*="overflow-x-auto"]');
-        let card = button.closest('[data-sentry-component="PlotProfileCard"]') || button.parentElement;
+        let card = button.closest('[data-sentry-component="PlotProfileCard"], .relative.isolate.snap-center') || button.parentElement;
         while (carousel && card?.parentElement && card.parentElement !== carousel &&
           !card.querySelector('h4, h3')) card = card.parentElement;
         if (!card || card === root || card === carousel) return;
@@ -10823,6 +10822,7 @@ function installThemeReports() {
       markDeleteMode();
     } finally {
       // Reapply after marker cleanup, exactly once for every screen branch.
+      markProfileEditPage();
       markPluginSurfaces();
       markSavedTitlePopup();
       markThemeDialogs();
@@ -10863,6 +10863,7 @@ function installThemeReports() {
     const touches = selector => layers.some(layer => layer.isConnected &&
       (layer.matches(selector) || !!layer.querySelector(selector)));
     markProfileSelect();
+    markProfileEditPage();
     if (touches('[role="dialog"][aria-label="대화 프로필"], [role="group"][aria-label="My chat profiles"]')) markProfileHub();
     markProfileImageMenu();
     markMessageActionSheet();
