@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.99
+// @version      3.50.100
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -48,7 +48,7 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.99';
+  const version = '3.50.100';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   const recordError = (error, stage) => {
@@ -58,30 +58,36 @@ function installThemeReports() {
   };
   window.__ktRecordThemeError = recordError;
   const sample = () => {
+    const check = (stage, read, fallback = 'unavailable') => {
+      try { return read(); } catch(error) { recordError(error, 'diagnostic-' + stage); return fallback; }
+    };
     const root = document.documentElement;
     const custom = !!document.getElementById('zeta-custom-theme-style');
     const style = custom || !!document.getElementById('zeta-kakaotalk-theme-style');
     const probe = document.createElement('span');
     probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none';
-    root.appendChild(probe);
+    check('probe', () => root.appendChild(probe));
     const color = (el, property) => {
-      const v = getComputedStyle(el)[property];
+      return check(property, () => {
+      const v = String(getComputedStyle(el)[property] || '');
       const parts = v.match(/[\d.]+/g);
       if (!v.startsWith('rgb') || !parts || parts.length < 3) return 'unavailable';
       return parts.map(Number).join('-');
+      });
     };
     const expected = (name) => {
       probe.style.setProperty('color','var('+name+')','important');
       return color(probe,'color');
     };
     try {
-      const input = [...document.querySelectorAll('textarea[name="message"],textarea[aria-label="내용 입력하기"],textarea[placeholder="내용 입력하기"]')].find(el=>el.getBoundingClientRect().height>0);
+      const input = check('input', () => [...document.querySelectorAll('textarea[name="message"],textarea[aria-label="내용 입력하기"],textarea[placeholder="내용 입력하기"]')].find(el=>el.getBoundingClientRect().height>0), null);
       const active = root.classList.contains('kt-chat-theme-active');
       const bg = color(document.body || root,'backgroundColor'), bgExpected=expected('--kt-chat');
       const text = color(document.body || root,'color'), textExpected=expected('--kt-text');
       const inputColor = input ? color(input,'color') : 'not-found';
       const inputBg = input ? color(input,'backgroundColor') : 'not-found';
       const compare = (actual,wanted) => !active||!style ? 'inactive' : actual==='unavailable'||wanted==='unavailable' ? 'unavailable' : actual===wanted ? 'match' : 'mismatch';
+      const selectorSupport = check('selector', () => typeof window.CSS?.supports === 'function' ? (window.CSS.supports('selector(:has(*))') ? 'yes' : 'no') : 'unavailable');
       return {themeVersion:version,themeKind:custom?'custom':'kakao',frameStatus:'responded',
         styleStatus:style?'present':'missing',backgroundStatus:compare(bg,bgExpected),
         textStatus:compare(text,textExpected),inputStatus:input?'found':'not-found',
@@ -91,8 +97,8 @@ function installThemeReports() {
         initializationStatus:state.phase,applyCount:String(state.applyCount),
         errorCount:String(state.errorCount),errorType:state.errorType,errorStage:state.errorStage,
         documentState:document.readyState,themeActive:active?'yes':'no',
-        hasSelectorSupport:CSS.supports('selector(:has(*))')?'yes':'no'};
-    } finally { probe.remove(); }
+        hasSelectorSupport:selectorSupport};
+    } finally { check('cleanup', () => probe.remove()); }
   };
   window.__ktReportSample = sample;
   if (window.__ktReportsInstalled) return;
@@ -102,8 +108,8 @@ function installThemeReports() {
       if (event.origin !== hostOrigin || event.source !== parent || event.data?.type !== messageType ||
           event.data?.action !== 'probe' || typeof event.data.id !== 'string') return;
       try { parent.postMessage({type:messageType, action:'result', id:event.data.id, report:window.__ktReportSample()}, hostOrigin); }
-      catch { parent.postMessage({type:messageType, action:'result', id:event.data.id,
-        report:{themeVersion:version,frameStatus:'diagnostic-error'}}, hostOrigin); }
+      catch(error) { recordError(error, 'diagnostic-sample'); parent.postMessage({type:messageType, action:'result', id:event.data.id,
+        report:{themeVersion:version,frameStatus:'diagnostic-error',initializationStatus:state.phase,applyCount:String(state.applyCount),errorCount:String(state.errorCount),errorType:state.errorType,errorStage:state.errorStage}}, hostOrigin); }
     });
     return;
   }
