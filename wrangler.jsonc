@@ -12,5 +12,8 @@
         "period": 60
       }
     }
-  ]
+  ],
+  "vars": {
+    "REPORT_FROM": "onboarding@resend.dev"
+  }
 }
