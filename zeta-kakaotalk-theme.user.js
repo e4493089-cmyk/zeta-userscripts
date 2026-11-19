@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.98
+// @version      3.50.99
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -48,23 +48,51 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.98';
+  const version = '3.50.99';
   const messageType = 'zeta-theme-report-v1';
+  const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
+  const recordError = (error, stage) => {
+    state.errorCount++;
+    state.errorType = ['TypeError','ReferenceError','SyntaxError','RangeError','SecurityError'].includes(error?.name) ? error.name : 'Error';
+    state.errorStage = stage;
+  };
+  window.__ktRecordThemeError = recordError;
   const sample = () => {
     const root = document.documentElement;
     const custom = !!document.getElementById('zeta-custom-theme-style');
     const style = custom || !!document.getElementById('zeta-kakaotalk-theme-style');
-    const bg = getComputedStyle(document.body || root).backgroundColor;
     const probe = document.createElement('span');
-    probe.style.cssText = 'position:fixed;visibility:hidden;background:var(--kt-chat);pointer-events:none';
+    probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none';
     root.appendChild(probe);
-    const expected = getComputedStyle(probe).backgroundColor;
-    probe.remove();
-    const input = document.querySelector('textarea[name="message"],textarea[placeholder="내용 입력하기"]');
-    return {themeVersion:version, themeKind:custom ? 'custom' : 'kakao', frameStatus:'responded',
-      styleStatus:style ? 'present' : 'missing',
-      backgroundStatus:style && root.classList.contains('kt-chat-theme-active') ? (bg === expected ? 'match' : 'mismatch') : 'not-checked',
-      textStatus:'not-checked', inputStatus:input ? 'found-not-checked' : 'not-found'};
+    const color = (el, property) => {
+      const v = getComputedStyle(el)[property];
+      const parts = v.match(/[\d.]+/g);
+      if (!v.startsWith('rgb') || !parts || parts.length < 3) return 'unavailable';
+      return parts.map(Number).join('-');
+    };
+    const expected = (name) => {
+      probe.style.setProperty('color','var('+name+')','important');
+      return color(probe,'color');
+    };
+    try {
+      const input = [...document.querySelectorAll('textarea[name="message"],textarea[aria-label="내용 입력하기"],textarea[placeholder="내용 입력하기"]')].find(el=>el.getBoundingClientRect().height>0);
+      const active = root.classList.contains('kt-chat-theme-active');
+      const bg = color(document.body || root,'backgroundColor'), bgExpected=expected('--kt-chat');
+      const text = color(document.body || root,'color'), textExpected=expected('--kt-text');
+      const inputColor = input ? color(input,'color') : 'not-found';
+      const inputBg = input ? color(input,'backgroundColor') : 'not-found';
+      const compare = (actual,wanted) => !active||!style ? 'inactive' : actual==='unavailable'||wanted==='unavailable' ? 'unavailable' : actual===wanted ? 'match' : 'mismatch';
+      return {themeVersion:version,themeKind:custom?'custom':'kakao',frameStatus:'responded',
+        styleStatus:style?'present':'missing',backgroundStatus:compare(bg,bgExpected),
+        textStatus:compare(text,textExpected),inputStatus:input?'found':'not-found',
+        backgroundColor:bg,expectedBackgroundColor:bgExpected,textColor:text,expectedTextColor:textExpected,
+        inputTextColor:inputColor,inputBackgroundColor:inputBg,
+        inputTextStatus:input?compare(inputColor,textExpected):'not-found',
+        initializationStatus:state.phase,applyCount:String(state.applyCount),
+        errorCount:String(state.errorCount),errorType:state.errorType,errorStage:state.errorStage,
+        documentState:document.readyState,themeActive:active?'yes':'no',
+        hasSelectorSupport:CSS.supports('selector(:has(*))')?'yes':'no'};
+    } finally { probe.remove(); }
   };
   window.__ktReportSample = sample;
   if (window.__ktReportsInstalled) return;
@@ -176,12 +204,16 @@ function installThemeReports() {
         const report = await collect();
         // Whitelist only these diagnostic fields; never forward arbitrary frame data.
         const payload = {};
-        for (const key of ['themeVersion','themeKind','frameStatus','styleStatus','backgroundStatus','textStatus','inputStatus']) {
+        for (const key of ["themeVersion","themeKind","frameStatus","styleStatus","backgroundStatus","textStatus","inputStatus","backgroundColor","expectedBackgroundColor","textColor","expectedTextColor","inputTextColor","inputBackgroundColor","inputTextStatus","initializationStatus","applyCount","errorCount","errorType","errorStage","documentState","themeActive","hasSelectorSupport"]) {
           if (typeof report?.[key] === 'string') payload[key] = report[key];
         }
         const ua = navigator.userAgent;
         payload.browserFamily = /Firefox|FxiOS/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome|CriOS/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':'Other';
         payload.osFamily = /iPhone|iPad|iPod/.test(ua)||(/Mac/.test(ua)&&navigator.maxTouchPoints>1)?'iOS':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac/.test(ua)?'macOS':'Other';
+        const browserMatch=ua.match(/(?:EdgA?|EdgiOS|Firefox|FxiOS|Chrome|CriOS|Version)\/([0-9.]+)/g);
+        const browserToken = payload.browserFamily==='Edge' ? /(?:EdgA?|EdgiOS)\/([0-9.]+)/ : payload.browserFamily==='Firefox' ? /(?:Firefox|FxiOS)\/([0-9.]+)/ : payload.browserFamily==='Chrome' ? /(?:Chrome|CriOS)\/([0-9.]+)/ : /Version\/([0-9.]+)/;
+        payload.browserVersion=ua.match(browserToken)?.[1] || 'unknown';
+        payload.osVersion=ua.match(/(?:CPU (?:iPhone )?OS|Android|Windows NT|Mac OS X)[ /]([0-9_.]+)/)?.[1]?.replaceAll('_','.') || 'unknown';
         status.textContent='전송 중…';
         const controller = new AbortController(); const timeout = setTimeout(()=>controller.abort(),20000);
         let result;
@@ -10652,6 +10684,13 @@ function installThemeReports() {
   }
 
   function apply() {
+    const state = window.__ktReportState;
+    if (state) state.phase = 'applying';
+    try { applyThemeOnce(); if(state){state.phase='applied';state.applyCount++;} }
+    catch(error) { if(state)state.phase='apply-error';window.__ktRecordThemeError?.(error,'apply');throw error; }
+  }
+
+  function applyThemeOnce() {
     setActiveState();
     try {
       if (isProfileEditPage()) {
@@ -10940,7 +10979,7 @@ function installThemeReports() {
     installStyle();
     setActiveState();
   };
-  installStyle();
+  try { installStyle(); } catch(error) { window.__ktRecordThemeError?.(error,'install-style'); throw error; }
 
   /* 기본 테마와 커스텀 테마가 함께 실행되면 마지막으로 실행된 테마만 유지한다. */
   [
@@ -10956,5 +10995,5 @@ function installThemeReports() {
   if (document.documentElement.dataset.ktThemeRuntime === '1') return;
   document.documentElement.dataset.ktThemeRuntime = '1';
 
-  start();
+  try { start(); } catch(error) { window.__ktRecordThemeError?.(error,'start'); throw error; }
 })();
