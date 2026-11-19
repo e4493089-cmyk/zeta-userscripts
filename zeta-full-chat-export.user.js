@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.20
+// @version      0.3.21
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -127,7 +127,148 @@
   }
 
 
-  const API_FRAME_PREFIX = 'zfce-api-jump:';
+  // Use the authenticated request function already supplied to Zeta's scene host.
+  // Tokens stay in the parent page; the child can request only this room's read APIs.
+  function findSceneRequest(roomId) {
+    for (const frame of document.querySelectorAll('iframe[src^="https://frame.pingpong.ai/v1/index.html"]')) {
+      for (let node = frame; node; node = node.parentElement) {
+        const key = Object.keys(node).find(key => key.startsWith('__reactFiber$'));
+        for (let fiber = key && node[key], depth = 0; fiber && depth < 80; fiber = fiber.return, depth++) {
+          const props = fiber.memoizedProps;
+          if (props?.roomId === roomId && typeof props.request === 'function' && typeof props.src === 'string' && props.src.startsWith('https://frame.pingpong.ai/')) return props.request;
+        }
+      }
+    }
+    throw new Error('제타 API 연결을 찾지 못했어요. 채팅방을 새로고침한 뒤 다시 시도해 주세요.');
+  }
+
+  async function requestRoomApi(roomId, resource, cursor = '') {
+    if (!['bookmarks', 'messages'].includes(resource) || !/^[A-Za-z0-9_-]{1,100}$/.test(roomId)) throw new Error('잘못된 내보내기 요청이에요.');
+    const query = new URLSearchParams({limit:'50'});
+    if (cursor) query.set('cursor',cursor);
+    const controller = new AbortController();
+    const timeout = setTimeout(()=>controller.abort(),20000);
+    try {
+      const request = findSceneRequest(roomId);
+      const response = await request({path:'/v1/rooms/'+roomId+'/'+resource+'?'+query,method:'GET',headers:{Accept:'application/json'}},{signal:controller.signal,redirect:'error'});
+      if (!response.ok) throw new Error('제타 '+resource+' API 응답 오류 ('+response.status+').');
+      return await response.json();
+    } finally { clearTimeout(timeout); }
+  }
+
+  if (!inChatFrame && window === top && location.origin === 'https://zeta-ai.io') {
+    window.addEventListener('message', async event => {
+      if (event.origin !== 'https://frame.pingpong.ai' || event.data?.type !== 'zfce-read-api') return;
+      const port = event.ports[0];
+      const frame = [...document.querySelectorAll('iframe')].find(el => el.contentWindow === event.source && el.src.startsWith('https://frame.pingpong.ai/v1/index.html'));
+      const roomId = currentRoomId();
+      const {resource,cursor} = event.data;
+      if (!port || !frame || event.data.roomId !== roomId || !roomId || !['bookmarks','messages'].includes(resource) || typeof cursor !== 'string' || cursor.length > 2048) { port?.close(); return; }
+      try {
+        const data = await requestRoomApi(roomId,resource,cursor);
+        if (currentRoomId() !== roomId) throw new Error('대화방이 바뀌어 내보내기를 중단했어요.');
+        port.postMessage({ok:true,data});
+      } catch(error) { port.postMessage({ok:false,error:error.message || 'API 요청 실패'}); }
+      finally { port.close(); }
+    });
+  }
+
+  async function readRoomApi(resource, cursor = '') {
+    const roomId = currentRoomId();
+    if (!roomId) throw new Error('대화방 정보를 기다리고 있어요. 잠시 후 다시 눌러 주세요.');
+    if (!inChatFrame) return requestRoomApi(roomId,resource,cursor);
+    return new Promise((resolve,reject) => {
+      const channel = new MessageChannel();
+      const timer = setTimeout(()=>{channel.port1.close();reject(new Error('제타 API 연결 응답이 없어요. 새로고침 후 다시 시도해 주세요.'));},25000);
+      channel.port1.onmessage = event => {
+        clearTimeout(timer);channel.port1.close();
+        if (event.data?.ok) resolve(event.data.data); else reject(new Error(event.data?.error || 'API 요청 실패'));
+      };
+      parent.postMessage({type:'zfce-read-api',roomId,resource,cursor},'https://zeta-ai.io',[channel.port2]);
+    });
+  }
+
+  function apiMessageId(value) {
+    const id = String(value || '').replace(/^message-/, '');
+    if (!/^MESSAGE-\d+-[A-Za-z0-9_-]+$/.test(id)) throw new Error('지원하지 않는 메시지 ID 형식이에요.');
+    return id;
+  }
+
+  function apiMessageNumber(value) { return BigInt(apiMessageId(value).split('-')[1]); }
+
+  async function loadApiBookmarks() {
+    const found = new Map(), seen = new Set(); let cursor = '';
+    do {
+      const data = await readRoomApi('bookmarks',cursor);
+      if (!Array.isArray(data.items)) throw new Error('책갈피 API 응답 형식이 바뀌었어요.');
+      for (const item of data.items) {
+        const bookmark = item.bookmark, message = item.message;
+        if (!bookmark?.id || !bookmark.messageId) throw new Error('책갈피의 메시지 위치가 없어요.');
+        found.set(bookmark.id,{id:bookmark.id,messageId:apiMessageId(bookmark.messageId),
+          date:bookmark.createdAt ? new Date(bookmark.createdAt).toLocaleDateString('ko-KR') : '',
+          preview:bookmark.title || (message?.contents || []).map(part=>part.text || part.body || '').filter(Boolean).join(' ') || '책갈피'});
+      }
+      cursor = data.nextCursor || '';
+      if (cursor && seen.has(cursor)) throw new Error('책갈피 목록의 다음 위치가 반복돼 중단했어요.');
+      seen.add(cursor);
+    } while(cursor);
+    if (!found.size) throw new Error('저장된 책갈피가 없어요.');
+    return [...found.values()];
+  }
+
+  function readApiMessage(message) {
+    const id = 'message-' + apiMessageId(message.id);
+    if (!Array.isArray(message.contents)) throw new Error('메시지 본문 형식을 확인하지 못했어요.');
+    const role = String(message.sender?.type || '').toUpperCase() === 'USER' ? 'user' : 'assistant';
+    const parts = [], images = [];
+    for (const content of message.contents) {
+      const type = String(content.type || '').toUpperCase();
+      if (type === 'IMAGE' && content.url) {images.push({src:content.url});continue;}
+      if (type === 'TEXT') {
+        if (typeof content.text !== 'string') throw new Error('텍스트 메시지의 본문이 없어요.');
+        const position = String(content.position).toUpperCase();
+        const narrator = ['CENTER','NARRATOR'].includes(position);
+        parts.push({type:narrator?'narration':'dialogue',role:narrator?'narrator':position==='RIGHT'?'user':position==='LEFT'?'assistant':role,speaker:content.speakerName || '',text:content.text});
+      } else if(type === 'TOPIC') {
+        parts.push({type:'narration',role:'narrator',text:[content.title,content.body].filter(Boolean).join('\n')});
+      } else {
+        // Preserve structured status/plugin content rather than silently omitting it.
+        parts.push({type:'narration',role:'narrator',text:'['+(type || 'CONTENT')+']\n'+JSON.stringify(content,null,2)});
+      }
+    }
+    return {id,role,speaker:parts.find(part=>part.speaker)?.speaker || '',parts,images};
+  }
+
+  async function collectApiRange(range, request = readRoomApi, progress = updatePanel, isCancelled = () => cancelled) {
+    const ids = [range.start,range.end].filter(p=>!p.special).map(p=>apiMessageId(p.messageId));
+    if (!ids.length) throw new Error('책갈피를 하나 이상 선택해 주세요.');
+    ids.sort((a,b)=>apiMessageNumber(a)<apiMessageNumber(b)?-1:apiMessageNumber(a)>apiMessageNumber(b)?1:0);
+    const toStart = range.start.special === 'chat-start';
+    const toEnd = range.end.special === 'chat-end';
+    const newest = toEnd ? null : ids[0], oldest = toStart ? null : ids[ids.length-1];
+    let cursor = newest ? currentRoomId()+':'+newest : '';
+    const seen = new Set(), found = new Map();
+    for(let page=0;page<10000;page++) {
+      if(isCancelled()) throw new DOMException('Cancelled','AbortError');
+      const data = await request('messages',cursor);
+      if (!Array.isArray(data.messages)) throw new Error('메시지 API 응답 형식이 바뀌었어요.');
+      for(const message of data.messages) {
+        const id = apiMessageId(message.id), num=apiMessageNumber(id);
+        if ((!newest || num>=apiMessageNumber(newest)) && (!oldest || num<=apiMessageNumber(oldest))) found.set(id,message);
+      }
+      progress('책갈피 구간을 API로 가져오는 중…',found.size+'개 메시지 수집');
+      const boundsFound=ids.every(id=>found.has(id));
+      if(oldest && found.has(oldest)) {if(!boundsFound) throw new Error('선택한 책갈피 경계를 API에서 찾지 못했어요.');break;}
+      if(!data.nextCursor) {if(!boundsFound)throw new Error('선택한 책갈피까지 도달하지 못했어요.');break;}
+      if(seen.has(data.nextCursor) || data.nextCursor===cursor) throw new Error('메시지 페이지 위치가 반복돼 중단했어요.');
+      seen.add(cursor);cursor=data.nextCursor;
+      if(page===9999) throw new Error('구간이 너무 길어 중단했어요. 구간을 나눠 주세요.');
+    }
+    if(isCancelled()) throw new DOMException('Cancelled','AbortError');
+    return [...found.values()].sort((a,b)=>apiMessageNumber(a.id)>apiMessageNumber(b.id)?-1:apiMessageNumber(a.id)<apiMessageNumber(b.id)?1:0).map(readApiMessage);
+  }
+
+
 
   function currentRoomId() {
     if (inChatFrame) return frameRoomId;
@@ -135,54 +276,7 @@
     return match ? match[1] : '';
   }
 
-  /*
-   * 대화 검색과 같은 방식으로 첫 메시지 XHR에 정확한 MESSAGE cursor를 넣는다.
-   * 숨은 iframe이 document-start에서 이 코드를 실행해야 앱의 초기 요청보다 빠르다.
-   */
-  function installFrameCursorInterceptor() {
-    if (window.top === window.self || !window.name.startsWith(API_FRAME_PREFIX)) return;
-
-    let pending = null;
-    try {
-      pending = JSON.parse(decodeURIComponent(window.name.slice(API_FRAME_PREFIX.length)));
-    } catch (_) {}
-    if (!pending?.roomId || !pending?.cursor || pending.roomId !== currentRoomId()) return;
-
-    const proto = window.XMLHttpRequest?.prototype;
-    if (!proto || proto.open.__zfceCursorPatched) return;
-    const originalOpen = proto.open;
-
-    function wrappedOpen(method, value, ...rest) {
-      let nextValue = value;
-      try {
-        const url = new URL(String(value), location.href);
-        const expectedPath = '/v1/rooms/' + pending.roomId + '/messages';
-        const initialRequest =
-          String(method || 'GET').toUpperCase() === 'GET' &&
-          url.pathname === expectedPath &&
-          !url.searchParams.has('cursor') &&
-          !url.searchParams.has('prevCursor');
-
-        if (initialRequest) {
-          url.searchParams.set('limit', '10');
-          url.searchParams.set('cursor', pending.roomId + ':' + pending.cursor);
-          nextValue = url.href;
-          window.__zfceCursorInjected = pending.cursor;
-          pending = null;
-          window.name = '';
-        }
-      } catch (_) {}
-      return originalOpen.call(this, method, nextValue, ...rest);
-    }
-
-    Object.defineProperty(wrappedOpen, '__zfceCursorPatched', { value: true });
-    proto.open = wrappedOpen;
-  }
-
-  if (window.top !== window.self && !inChatFrame) {
-    installFrameCursorInterceptor();
-    return;
-  }
+  if (window.top !== window.self && !inChatFrame) return;
 
   const APP = 'zeta-full-chat-export';
   const BUTTON_ID = APP + '-button';
@@ -362,232 +456,7 @@
       .toLowerCase();
   }
 
-  function bookmarkUrl() {
-    return location.pathname.replace(/\/bookmarks\/?$/, '').replace(/\/$/, '') + '/bookmarks';
-  }
-
-  function roomUrl() {
-    const url = new URL(location.href);
-    url.pathname = url.pathname.replace(/\/bookmarks\/?$/, '').replace(/\/$/, '');
-    url.search = '';
-    url.hash = '';
-    return url.href;
-  }
-
-  function readBookmarkButtons(root) {
-    return Array.from(root.querySelectorAll('[data-testid^="bookmark-item-"]')).map(button => ({
-      id: button.dataset.testid.replace('bookmark-item-', ''),
-      date: clean(button.querySelector('.body14')?.textContent || ''),
-      preview: clean(button.querySelector('.body12')?.textContent || '')
-    })).filter(item => item.preview);
-  }
-
-  async function loadBookmarksFromPage() {
-    const frame = document.createElement('iframe');
-    frame.setAttribute('aria-hidden', 'true');
-    frame.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
-    document.body.appendChild(frame);
-
-    try {
-      frame.src = bookmarkUrl();
-
-      let ready = false;
-      for (let attempt = 0; attempt < 100; attempt += 1) {
-        await wait(400);
-        try {
-          ready = !!frame.contentDocument?.querySelector(
-            '[data-sentry-component="BookmarkList"], [data-testid^="bookmark-item-"]'
-          );
-        } catch (_) {}
-        if (ready) break;
-      }
-      if (!ready) throw new Error('책갈피 화면 내용을 불러오지 못했어요.');
-
-      const found = new Map();
-      let stable = 0;
-      let previousSize = -1;
-      for (let attempt = 0; attempt < 30 && stable < 4; attempt += 1) {
-        await wait(attempt ? 350 : 900);
-        const page = frame.contentDocument;
-        if (!page) continue;
-        readBookmarkButtons(page).forEach(item => found.set(item.id, item));
-
-        const scroller = page.querySelector(
-          '[data-sentry-component="BookmarkList"] [data-sentry-component="WrappedDiv"]'
-        );
-        if (scroller) scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' });
-
-        stable = found.size === previousSize ? stable + 1 : 0;
-        previousSize = found.size;
-      }
-      return Array.from(found.values());
-    } finally {
-      frame.remove();
-    }
-  }
-
-  async function loadBookmarks() {
-    const response = await fetch(bookmarkUrl(), {
-      credentials: 'include',
-      headers: { Accept: 'text/html' }
-    });
-    if (!response.ok) throw new Error('책갈피 목록을 불러오지 못했어요.');
-
-    const page = new DOMParser().parseFromString(await response.text(), 'text/html');
-    let bookmarks = readBookmarkButtons(page);
-    /* 제타는 첫 HTML에 일부만 넣고 나머지는 클라이언트에서 가상 스크롤로 불러온다. */
-    if (bookmarks.length < 2) bookmarks = await loadBookmarksFromPage();
-
-    if (bookmarks.length < 2) {
-      throw new Error('구간을 고르려면 책갈피가 2개 이상 필요해요.');
-    }
-    return bookmarks;
-  }
-
-  function messageIdFromCursor(value) {
-    let text = String(value || '');
-    for (let i = 0; i < 3; i += 1) {
-      try { text = decodeURIComponent(text); } catch (_) { break; }
-    }
-    const match = text.match(/(?:^|[:?=&])(MESSAGE-\d+-[A-Za-z0-9_-]+)/);
-    return match ? 'message-' + match[1] : '';
-  }
-
-  function messageCursor(messageId) {
-    const match = String(messageId || '').match(/^message-(MESSAGE-\d+-[A-Za-z0-9_-]+)/);
-    return match ? match[1] : '';
-  }
-
-  async function openMessageAtCursor(messageId) {
-    const roomId = currentRoomId();
-    const cursor = messageCursor(messageId);
-    if (!roomId || !cursor) throw new Error('책갈피 메시지 위치를 확인하지 못했어요.');
-
-    const frame = document.createElement('iframe');
-    frame.setAttribute('aria-hidden', 'true');
-    frame.name = API_FRAME_PREFIX + encodeURIComponent(JSON.stringify({ roomId, cursor }));
-    frame.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
-    document.body.appendChild(frame);
-
-    try {
-      frame.src = roomUrl();
-
-      for (let attempt = 0; attempt < 150; attempt += 1) {
-        await wait(attempt ? 120 : 300);
-        let page = null;
-        let log = null;
-        let target = null;
-        let injected = false;
-        try {
-          page = frame.contentDocument;
-          log = page?.querySelector(CHAT_SELECTOR) || null;
-          target = page?.getElementById(messageId) || null;
-          injected = frame.contentWindow?.__zfceCursorInjected === cursor;
-        } catch (_) {}
-        if (target && log) {
-          /* scrollIntoView 뒤 가상 스크롤이 DOM을 교체하기 전에 경계 메시지를 보존한다. */
-          const message = readMessage(target);
-          target.scrollIntoView({ block: 'center', behavior: 'auto' });
-          await wait(80);
-          return { frame, id: messageId, log, message };
-        }
-        if (attempt >= 25 && log && !injected) {
-          throw new Error('이 화면에서는 빠른 책갈피 이동을 시작하지 못했어요.');
-        }
-      }
-      throw new Error('책갈피 메시지로 바로 이동하지 못했어요.');
-    } catch (error) {
-      frame.remove();
-      throw error;
-    }
-  }
-
-  async function openBookmarkAtMessage(bookmark, requireRenderedMessage = false) {
-    const frame = document.createElement('iframe');
-    frame.setAttribute('aria-hidden', 'true');
-    frame.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:.001;pointer-events:none;z-index:0;';
-    document.body.appendChild(frame);
-
-    try {
-      frame.src = bookmarkUrl();
-
-      let button = null;
-      for (let attempt = 0; attempt < 150 && !button; attempt += 1) {
-        await wait(attempt ? 300 : 500);
-        const page = frame.contentDocument;
-        button = page?.querySelector(`[data-testid="bookmark-item-${CSS.escape(bookmark.id)}"]`) || null;
-        const scroller = page?.querySelector(
-          '[data-sentry-component="BookmarkList"] [data-sentry-component="WrappedDiv"]'
-        );
-        if (!button && scroller) scroller.scrollBy({ top: scroller.clientHeight * .9, behavior: 'auto' });
-      }
-      if (!button) throw new Error('선택한 책갈피 항목을 다시 찾지 못했어요.');
-
-      let navigatedUrl = '';
-      let requestedMessageId = '';
-      const frameWindow = frame.contentWindow;
-      const rememberRequestedMessage = value => {
-        try {
-          const url = new URL(String(value?.url || value || ''), frameWindow.location.href);
-          if (!/\/v1\/rooms\/[^/]+\/messages$/i.test(url.pathname)) return;
-          const id = messageIdFromCursor(
-            url.searchParams.get('cursor') || url.searchParams.get('prevCursor') || ''
-          );
-          if (id) requestedMessageId = id;
-        } catch (_) {}
-      };
-
-      const frameXhr = frameWindow.XMLHttpRequest?.prototype;
-      if (frameXhr) {
-        const originalOpen = frameXhr.open;
-        frameXhr.open = function (method, value, ...rest) {
-          rememberRequestedMessage(value);
-          return originalOpen.call(this, method, value, ...rest);
-        };
-      }
-      if (frameWindow.fetch) {
-        const originalFetch = frameWindow.fetch.bind(frameWindow);
-        frameWindow.fetch = (input, ...rest) => {
-          rememberRequestedMessage(input);
-          return originalFetch(input, ...rest);
-        };
-      }
-      ['pushState', 'replaceState'].forEach(name => {
-        const original = frameWindow.history[name].bind(frameWindow.history);
-        frameWindow.history[name] = (...args) => {
-          navigatedUrl = String(args[2] || navigatedUrl);
-          return original(...args);
-        };
-      });
-      button.click();
-
-      for (let attempt = 0; attempt < 120; attempt += 1) {
-        await wait(80);
-        let currentUrl = '';
-        try {
-          currentUrl = frame.contentWindow.location.href;
-        } catch (_) {}
-        let id = requestedMessageId ||
-          messageIdFromCursor(navigatedUrl) ||
-          messageIdFromCursor(currentUrl);
-        const log = frame.contentDocument?.querySelector(CHAT_SELECTOR);
-        if (log) {
-          const visible = Array.from(frame.contentDocument.querySelectorAll(MESSAGE_SELECTOR)).map(readMessage);
-          const index = bookmarkIndex(visible, bookmark);
-          if (index >= 0 && !id) id = visible[index].id;
-        }
-        if (id && log) {
-          const target = frame.contentDocument?.getElementById(id) || null;
-          if (target) return { frame, id, log, message: readMessage(target) };
-          if (!requireRenderedMessage) return { frame, id, log, message: null };
-        }
-      }
-      throw new Error('책갈피의 정확한 메시지 위치를 읽지 못했어요.');
-    } catch (error) {
-      frame.remove();
-      throw error;
-    }
-  }
+  async function loadBookmarks() { return loadApiBookmarks(); }
 
   function bookmarkIndex(items, bookmark) {
     const needle = comparableText(bookmark.preview);
@@ -871,113 +740,8 @@
     running = true;
     cancelled = false;
     document.getElementById(PANEL_ID).hidden = false;
-    let activeFrame = null;
-
     try {
-      const points = [];
-      for (const entry of [range.start, range.end]) {
-        if (entry.special) {
-          points.push({ entry, id: '', special: entry.special });
-          continue;
-        }
-        updatePanel('책갈피로 이동하는 중…', `${entry.date} · ${entry.preview.slice(0, 28)}`);
-        const opened = await openBookmarkAtMessage(entry);
-        points.push({ entry, id: opened.id, special: '' });
-        opened.frame.remove();
-      }
-
-      let anchorPoint;
-      let targetPoint;
-      let direction;
-      if (points[0].special === 'chat-start') {
-        anchorPoint = points[1];
-        targetPoint = points[0];
-        direction = 'older';
-      } else if (points[1].special === 'chat-end') {
-        anchorPoint = points[0];
-        targetPoint = points[1];
-        direction = 'newer';
-      } else {
-        /* Zeta MESSAGE 번호는 오래된 메시지일수록 크다. */
-        const firstOlder = messageNumber(points[0].id) > messageNumber(points[1].id);
-        anchorPoint = firstOlder ? points[0] : points[1];
-        targetPoint = firstOlder ? points[1] : points[0];
-        direction = 'newer';
-      }
-
-      updatePanel('시작 지점을 여는 중…', anchorPoint.entry.preview.slice(0, 42));
-      let opened;
-      try {
-        opened = await openMessageAtCursor(anchorPoint.id);
-      } catch (jumpError) {
-        console.warn('[Zeta Full Chat Export] 빠른 책갈피 이동 실패, 일반 이동으로 대체합니다.', jumpError);
-        updatePanel('책갈피로 시작 지점을 여는 중…', anchorPoint.entry.preview.slice(0, 42));
-        opened = await openBookmarkAtMessage(anchorPoint.entry, true);
-      }
-      activeFrame = opened.frame;
-      const root = activeFrame.contentDocument;
-      const log = opened.log;
-      const reverse = getComputedStyle(log).flexDirection.includes('reverse');
-      const messages = new Map();
-      let order = [];
-      let stable = 0;
-      let previousCount = -1;
-      if (opened.message?.id === anchorPoint.id) {
-        messages.set(opened.message.id, opened.message);
-        order.push(opened.message.id);
-      }
-      order = capture(messages, order, root, log);
-
-      while (!cancelled) {
-        if (!targetPoint.special && messages.has(targetPoint.id)) break;
-
-        const beforeTop = log.scrollTop;
-        const beforeHeight = log.scrollHeight;
-        const step = Math.max(320, log.clientHeight * .82);
-        const delta = direction === 'older' ? -step : step;
-        log.scrollBy({ top: delta, behavior: 'auto' });
-        await wait(120);
-        order = capture(messages, order, root, log);
-        await wait(40);
-        order = capture(messages, order, root, log);
-
-        const moved = Math.abs(log.scrollTop - beforeTop) > 2;
-        const resized = Math.abs(log.scrollHeight - beforeHeight) > 2;
-        const grew = messages.size > previousCount;
-        stable = !moved && !resized && !grew ? stable + 1 : 0;
-        previousCount = messages.size;
-
-        updatePanel(
-          direction === 'older' ? '대화 시작 방향으로 수집 중…' : '대화 끝 방향으로 수집 중…',
-          `${messages.size}개 수집${targetPoint.special ? ` · 끝 확인 ${stable}/8` : ''}`
-        );
-
-        if (targetPoint.special && stable >= 8) break;
-        if (!targetPoint.special && stable >= 12) {
-          throw new Error('이동한 책갈피에서 다른 책갈피까지 도달하지 못했어요.');
-        }
-        if (!moved) await wait(360);
-      }
-
-      if (cancelled) throw new DOMException('Cancelled', 'AbortError');
-      if (targetPoint.special === 'chat-end') {
-        updatePanel('마지막 대화를 확인 중…', `${messages.size}개 수집`);
-        order = await settleLatestEdge(messages, order, root, log);
-      } else {
-        /* 반복문 종료 직후 붙은 경계 메시지까지 포함한다. */
-        order = capture(messages, order, root, log);
-      }
-      let items = Array.from(messages.values()).sort((a, b) => messageNumber(b.id) - messageNumber(a.id));
-      let firstId = anchorPoint.id;
-      let secondId = targetPoint.id;
-      if (targetPoint.special === 'chat-start') secondId = items[0]?.id || '';
-      if (targetPoint.special === 'chat-end') secondId = items[items.length - 1]?.id || '';
-      const first = items.findIndex(item => item.id === firstId);
-      const second = items.findIndex(item => item.id === secondId);
-      if (first < 0 || second < 0) {
-        throw new Error('선택한 책갈피 메시지를 수집하지 못했어요. 잠시 후 다시 시도해줘.');
-      }
-      items = items.slice(Math.min(first, second), Math.max(first, second) + 1);
+      const items = await collectApiRange(range);
 
       const meta = {
         title: titleFromPage(),
@@ -1000,7 +764,6 @@
         await wait(2400);
       }
     } finally {
-      activeFrame?.remove();
       document.getElementById(PANEL_ID).hidden = true;
       running = false;
       cancelled = false;
