@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.100
+// @version      3.50.101
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -48,7 +48,7 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.100';
+  const version = '3.50.101';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   const recordError = (error, stage) => {
@@ -145,9 +145,13 @@ function installThemeReports() {
       #handle{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
       #trash{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:74px;height:74px;border-radius:50%;display:grid;place-items:center;background:#fff;color:#b42332;border:2px solid #e4bdc2;box-shadow:0 4px 18px #0003;pointer-events:none;transition:background .12s,scale .12s}
       #trash[data-over="true"]{background:#b42332;color:white;scale:1.12}
-      #panel{position:absolute;right:0;bottom:42px;width:250px;max-width:calc(100vw - 32px);box-sizing:border-box;background:white;border:1px solid #dde2e5;border-radius:14px;padding:14px;box-shadow:0 4px 20px #0002;font-size:12px;line-height:1.6}
+      #panel{position:absolute;right:0;bottom:42px;width:300px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 24px);overflow-y:auto;box-sizing:border-box;background:white;border:1px solid #dde2e5;border-radius:14px;padding:14px;box-shadow:0 4px 20px #0002;font-size:12px;line-height:1.6}
+      label{display:block;font-weight:600;margin-bottom:6px}
+      textarea{display:block;box-sizing:border-box;width:100%;min-height:100px;max-height:180px;resize:vertical;padding:9px;border:1px solid #c8d0d5;border-radius:8px;background:#fff;color:#26343c;font:14px/1.5 system-ui}
+      textarea:focus{outline:2px solid #687c8a;outline-offset:1px}
+      #description-count{text-align:right;color:#65737c;font-size:11px}
       p{margin:0 0 10px} .actions{display:flex;gap:8px;justify-content:flex-end} #send{background:#fee500;border-color:#fee500} button:disabled{opacity:.6;cursor:wait}[hidden]{display:none!important}
-    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>테마 버전과 프레임 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 포함하지 않습니다.</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
+    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>작성한 오류 설명과 테마 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 자동으로 수집하지 않습니다.</p><label for="description">어떤 오류가 있나요? (선택)</label><textarea id="description" maxlength="1000" placeholder="예: 문구 반복 버튼을 눌러도 반응이 없어요." aria-describedby="description-count"></textarea><p id="description-count">0 / 1000</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
     const handle = shadow.getElementById('handle'), panel = shadow.getElementById('panel');
     handle.title = '꾹 눌러 이동 · 아래 휴지통에 놓으면 숨김';
     handle.setAttribute('aria-label','오류 제보. 꾹 눌러 이동하고 휴지통에 놓으면 숨기기');
@@ -157,6 +161,9 @@ function installThemeReports() {
     shadow.appendChild(trash);
     const overTrash = (x,y) => { const r=trash.getBoundingClientRect(); return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom; };
     const status = shadow.getElementById('status'), send = shadow.getElementById('send');
+    const description = shadow.getElementById('description');
+    const descriptionCount = shadow.getElementById('description-count');
+    description.addEventListener('input', () => { descriptionCount.textContent = description.value.length + ' / 1000'; });
     let position = null, gesture = null, suppress = false, busy = false;
     const move = (x,y) => {
       x = Math.max(8,Math.min(x,Math.max(8,innerWidth-host.offsetWidth-8)));
@@ -167,10 +174,12 @@ function installThemeReports() {
     };
     const align = () => {
       const rect = host.getBoundingClientRect();
-      panel.style.right = rect.left + 250 > innerWidth - 8 ? '0' : 'auto';
-      panel.style.left = panel.style.right === '0px' ? 'auto' : '0';
-      panel.style.bottom = rect.top > 210 ? '42px' : 'auto';
-      panel.style.top = rect.top > 210 ? 'auto' : '42px';
+      panel.style.position = 'fixed';
+      panel.style.bottom = 'auto'; panel.style.right = 'auto';
+      const width = panel.offsetWidth, height = panel.offsetHeight;
+      panel.style.left = Math.max(8, Math.min(rect.left, innerWidth - width - 8)) + 'px';
+      const preferredTop = rect.top >= height + 8 ? rect.top - height - 8 : rect.bottom + 8;
+      panel.style.top = Math.max(8, Math.min(preferredTop, innerHeight - height - 8)) + 'px';
     };
     handle.addEventListener('pointerdown',event => {
       if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
@@ -205,7 +214,10 @@ function installThemeReports() {
     shadow.getElementById('close').onclick=()=>{panel.hidden=true;handle.focus();};
     shadow.addEventListener('keydown',event=>{if(event.key==='Escape'){panel.hidden=true;handle.focus();}});
     send.onclick = async () => {
-      if (busy) return; busy = true; send.disabled = true;status.textContent='채팅 프레임 확인 중…';
+      if (busy) return;
+      const submittedDescription = description.value.trim();
+      if (submittedDescription.length > 1000) { status.textContent='오류 설명은 1000자 이내로 적어 주세요.'; return; }
+      busy = true; send.disabled = true; description.disabled = true;status.textContent='채팅 프레임 확인 중…';
       try {
         const report = await collect();
         // Whitelist only these diagnostic fields; never forward arbitrary frame data.
@@ -213,6 +225,7 @@ function installThemeReports() {
         for (const key of ["themeVersion","themeKind","frameStatus","styleStatus","backgroundStatus","textStatus","inputStatus","backgroundColor","expectedBackgroundColor","textColor","expectedTextColor","inputTextColor","inputBackgroundColor","inputTextStatus","initializationStatus","applyCount","errorCount","errorType","errorStage","documentState","themeActive","hasSelectorSupport"]) {
           if (typeof report?.[key] === 'string') payload[key] = report[key];
         }
+        if (submittedDescription) payload.description = submittedDescription;
         const ua = navigator.userAgent;
         payload.browserFamily = /Firefox|FxiOS/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome|CriOS/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':'Other';
         payload.osFamily = /iPhone|iPad|iPod/.test(ua)||(/Mac/.test(ua)&&navigator.maxTouchPoints>1)?'iOS':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac/.test(ua)?'macOS':'Other';
@@ -229,9 +242,10 @@ function installThemeReports() {
           const messages={429:'잠시 후 다시 보내 주세요.',503:'제작자의 메일 설정이 아직 완료되지 않았어요.',502:'메일 전송에 실패했어요. 잠시 후 다시 시도해 주세요.'};
           throw new Error(messages[result.status]||'전송하지 못했어요. 다시 시도해 주세요.');
         }
+        description.value=''; descriptionCount.textContent='0 / 1000'; description.disabled=false;
         status.textContent='제보가 접수됐어요.'; send.textContent='전송 완료';
         setTimeout(()=>{busy=false;send.disabled=false;send.textContent='제보 보내기';},60000);
-      } catch(error) { status.textContent=error.name==='AbortError'?'응답 시간이 초과됐어요.':error.message==='Failed to fetch'?'서버 연결에 실패했어요.':error.message;busy=false;send.disabled=false; }
+      } catch(error) { status.textContent=error.name==='AbortError'?'응답 시간이 초과됐어요.':error.message==='Failed to fetch'?'서버 연결에 실패했어요.':error.message;busy=false;send.disabled=false;description.disabled=false; }
     };
     document.documentElement.appendChild(host);
     try { const saved=JSON.parse(localStorage.getItem('kt-report-position'));if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)) move(saved.x,saved.y); } catch {}
