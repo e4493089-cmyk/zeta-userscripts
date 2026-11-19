@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.102
+// @version      3.50.103
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -48,7 +48,7 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.102';
+  const version = '3.50.103';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   const recordError = (error, stage) => {
@@ -3132,19 +3132,19 @@ function installThemeReports() {
     /* 카드 텍스트 */
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) .body1,
+      :is(.body1, .body16, .body14.font-semibold),
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) [class*="text-gray-200"] {
+      [class*="text-gray-200"] {
       color: #26343C !important;
     }
 
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) .caption1,
+      :is(.caption1, .body12),
     html.${ACTIVE} #portal-container
       section[role="dialog"][aria-label="대화 프로필"]
-      :is([data-sentry-component="ChatProfileListItem"], .kt-profile-hub-sheet [role="group"][aria-label="My chat profiles"] > div:has(> button)) [class*="text-white/50"] {
+      [class*="text-white/50"] {
       color: #748188 !important;
     }
 
@@ -9470,8 +9470,18 @@ function installThemeReports() {
       opacity: 1 !important;
     }
 
+    /* Tables and structural markdown inherit their own bubble/narrator palette. */
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"], [data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger) :is(table, thead, tbody, tr, th, td, summary, details) {
+      color: inherit !important;
+      -webkit-text-fill-color: currentColor !important;
+      background: transparent !important;
+      border-color: var(--kt-chat-line) !important;
+    }
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"], [data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger) li::marker {
+      color: inherit !important;
+    }
     /* fenced markdown blocks: keep an opaque light surface and readable ink. */
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] .chat pre.chat[class] {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"], [data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger) pre {
       background: rgb(245,245,245) !important;
       color: rgb(48,52,56) !important;
       -webkit-text-fill-color: rgb(48,52,56) !important;
@@ -9483,7 +9493,7 @@ function installThemeReports() {
       max-width: 100% !important;
       box-sizing: border-box !important;
     }
-    html.${ACTIVE} [data-sentry-component="ChatBubbleContainer"] .chat pre.chat[class] * {
+    html.${ACTIVE} :is([data-sentry-component="ChatBubbleContainer"], [data-sentry-component="NarratorBubble"], .scene-web :is([role="log"], [data-capture-page]) .message-context-menu-trigger) pre * {
       background: transparent !important;
       color: inherit !important;
       -webkit-text-fill-color: inherit !important;
@@ -9501,7 +9511,26 @@ function installThemeReports() {
       color: var(--kt-text) !important;
     }
     html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] :is(h3, .body1, button, button svg),
-    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] .body1 :is(strong, b, em, i, h1, h2, h3, h4, h5, h6) {
+    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] :is(.body1, .chat) :is(p, strong, b, em, i, h1, h2, h3, h4, h5, h6, ul, ol, li, blockquote, del, s, table, thead, tbody, tr, th, td, summary, details) {
+      color: var(--kt-text) !important;
+    }
+    /* Complete profile markdown palette; preserve markup and link behavior. */
+    html.${ACTIVE} #portal-container :is([data-sentry-component="CharacterDescription"], [aria-label="Character images"] ~ [aria-hidden]) :is(strong, b, h1, h2, h3, h4, h5, h6, table, th, td, del, s, summary, details) {
+      color: var(--kt-text) !important;
+      -webkit-text-fill-color: currentColor !important;
+    }
+    html.${ACTIVE} #portal-container :is([data-sentry-component="CharacterDescription"], [aria-label="Character images"] ~ [aria-hidden]) a {
+      color: #355E78 !important;
+      -webkit-text-fill-color: currentColor !important;
+      text-decoration: underline !important;
+    }
+    html.${ACTIVE} #portal-container :is([data-sentry-component="CharacterDescription"], [aria-label="Character images"] ~ [aria-hidden]) :is(hr, blockquote, table, th, td) {
+      border-color: var(--kt-line) !important;
+    }
+    html.${ACTIVE} #portal-container :is([data-sentry-component="CharacterDescription"], [aria-label="Character images"] ~ [aria-hidden]) :is(table, thead, tbody, tr, th, td) {
+      background: transparent !important;
+    }
+    html.${ACTIVE} #portal-container :is([data-sentry-component="CharacterDescription"], [aria-label="Character images"] ~ [aria-hidden]) li::marker {
       color: var(--kt-text) !important;
     }
     /* Profile markdown uses explicit dark-mode ink, including single-backtick code. */
