@@ -3,7 +3,22 @@ const origins = new Set(['https://zeta-ai.io', 'https://frame.pingpong.ai']);
 const fields = {
   themeVersion: 40, themeKind: 30, browserFamily: 30, browserVersion: 40,
   osFamily: 30, osVersion: 40, frameStatus: 60, styleStatus: 60,
-  backgroundStatus: 60, textStatus: 60, inputStatus: 60
+  backgroundStatus: 60, textStatus: 60, inputStatus: 60,
+  backgroundColor: 60,
+  expectedBackgroundColor: 60,
+  textColor: 60,
+  expectedTextColor: 60,
+  inputTextColor: 60,
+  inputBackgroundColor: 60,
+  inputTextStatus: 60,
+  initializationStatus: 60,
+  applyCount: 60,
+  errorCount: 60,
+  errorType: 60,
+  errorStage: 60,
+  documentState: 60,
+  themeActive: 60,
+  hasSelectorSupport: 60
 };
 export default {
   async fetch(request, env) {
