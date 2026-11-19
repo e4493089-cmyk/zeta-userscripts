@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.101
+// @version      3.50.102
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -48,7 +48,7 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.101';
+  const version = '3.50.102';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   const recordError = (error, stage) => {
@@ -9500,8 +9500,23 @@ function installThemeReports() {
       background: var(--kt-white) !important;
       color: var(--kt-text) !important;
     }
-    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] :is(h3, .body1, button, button svg) {
+    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] :is(h3, .body1, button, button svg),
+    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] .body1 :is(strong, b, em, i, h1, h2, h3, h4, h5, h6) {
       color: var(--kt-text) !important;
+    }
+    /* Profile markdown uses explicit dark-mode ink, including single-backtick code. */
+    html.${ACTIVE} #portal-container [data-sentry-component="CharacterDescription"] :is(code, pre),
+    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] :is(code, pre) {
+      background: var(--kt-soft) !important;
+      color: var(--kt-text) !important;
+      -webkit-text-fill-color: var(--kt-text) !important;
+      opacity: 1 !important;
+    }
+    html.${ACTIVE} #portal-container [data-sentry-component="CharacterDescription"] :is(code, pre) *,
+    html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] :is(code, pre) * {
+      color: inherit !important;
+      -webkit-text-fill-color: inherit !important;
+      background: transparent !important;
     }
     html.scene-web.${ACTIVE} [aria-label="Character images"] ~ [aria-hidden] > [style*="linear-gradient"] {
       background: none !important;
