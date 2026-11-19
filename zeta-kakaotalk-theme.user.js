@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.96
+// @version      3.50.97
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -37,8 +37,9 @@
  * - kt-* 클래스의 추가/제거 순서도 화면 상태에 영향을 줄 수 있다.
  */
 
-(() => {
+(function bootTheme() {
   'use strict';
+  if (!document.documentElement) { setTimeout(bootTheme, 10); return; }
 
   const sceneFrame = location.origin === 'https://frame.pingpong.ai';
   if (sceneFrame && new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io') return;
@@ -10658,6 +10659,10 @@
   }
 
   function handleThemeMutations(records) {
+    if (!document.getElementById('zeta-kakaotalk-theme-style') &&
+        !document.getElementById('zeta-custom-theme-style')) {
+      window.__ktRestoreTheme?.();
+    }
     queueSnapshotLoading(records);
     let screenChanged = false;
     for (const record of records) {
@@ -10744,6 +10749,18 @@
   }
 
   function start() {
+    const restoreTheme = () => {
+      if (document.hidden) return;
+      // The latest installed theme owns recovery, including custom palettes.
+      window.__ktRestoreTheme?.();
+      syncRouteState();
+      scheduleApply();
+    };
+    window.addEventListener('pageshow', restoreTheme);
+    window.addEventListener('focus', restoreTheme);
+    window.addEventListener('hashchange', restoreTheme);
+    document.addEventListener('visibilitychange', restoreTheme);
+    document.addEventListener('resume', restoreTheme);
     installBoardReactionProxy();
     patchHistory();
     if (document.readyState === 'loading') {
@@ -10759,6 +10776,10 @@
     });
   }
 
+  window.__ktRestoreTheme = () => {
+    installStyle();
+    setActiveState();
+  };
   installStyle();
 
   /* 기본 테마와 커스텀 테마가 함께 실행되면 마지막으로 실행된 테마만 유지한다. */
