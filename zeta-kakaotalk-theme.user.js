@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.97
+// @version      3.50.98
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -43,6 +43,166 @@
 
   const sceneFrame = location.origin === 'https://frame.pingpong.ai';
   if (sceneFrame && new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io') return;
+
+function installThemeReports() {
+  const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
+  const frameOrigin = 'https://frame.pingpong.ai';
+  const hostOrigin = 'https://zeta-ai.io';
+  const version = '3.50.98';
+  const messageType = 'zeta-theme-report-v1';
+  const sample = () => {
+    const root = document.documentElement;
+    const custom = !!document.getElementById('zeta-custom-theme-style');
+    const style = custom || !!document.getElementById('zeta-kakaotalk-theme-style');
+    const bg = getComputedStyle(document.body || root).backgroundColor;
+    const probe = document.createElement('span');
+    probe.style.cssText = 'position:fixed;visibility:hidden;background:var(--kt-chat);pointer-events:none';
+    root.appendChild(probe);
+    const expected = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const input = document.querySelector('textarea[name="message"],textarea[placeholder="내용 입력하기"]');
+    return {themeVersion:version, themeKind:custom ? 'custom' : 'kakao', frameStatus:'responded',
+      styleStatus:style ? 'present' : 'missing',
+      backgroundStatus:style && root.classList.contains('kt-chat-theme-active') ? (bg === expected ? 'match' : 'mismatch') : 'not-checked',
+      textStatus:'not-checked', inputStatus:input ? 'found-not-checked' : 'not-found'};
+  };
+  window.__ktReportSample = sample;
+  if (window.__ktReportsInstalled) return;
+  window.__ktReportsInstalled = true;
+  if (location.origin === frameOrigin) {
+    window.addEventListener('message', event => {
+      if (event.origin !== hostOrigin || event.source !== parent || event.data?.type !== messageType ||
+          event.data?.action !== 'probe' || typeof event.data.id !== 'string') return;
+      try { parent.postMessage({type:messageType, action:'result', id:event.data.id, report:window.__ktReportSample()}, hostOrigin); }
+      catch { parent.postMessage({type:messageType, action:'result', id:event.data.id,
+        report:{themeVersion:version,frameStatus:'diagnostic-error'}}, hostOrigin); }
+    });
+    return;
+  }
+  if (window !== top || location.origin !== hostOrigin) return;
+  let pending = null;
+  window.addEventListener('message', event => {
+    if (!pending || event.origin !== frameOrigin || event.source !== pending.source ||
+        event.data?.type !== messageType || event.data?.action !== 'result' || event.data.id !== pending.id) return;
+    const current = pending; pending = null;
+    clearTimeout(current.timer); current.resolve(event.data.report);
+  });
+  const collect = () => {
+    const frame = [...document.querySelectorAll('iframe')].find(el => {
+      try { const u = new URL(el.src); return u.origin === frameOrigin && u.pathname === '/v1/index.html' && el.getBoundingClientRect().height > 0; }
+      catch { return false; }
+    });
+    if (!frame) return Promise.resolve({...window.__ktReportSample(),frameStatus:'no-visible-frame'});
+    return new Promise(resolve => {
+      const id = crypto.randomUUID();
+      const timer = setTimeout(() => { if (pending?.id === id) { pending = null; resolve({themeVersion:version,frameStatus:'no-response'}); } }, 5000);
+      pending = {id, source:frame.contentWindow, resolve, timer};
+      frame.contentWindow.postMessage({type:messageType, action:'probe', id}, frameOrigin);
+    });
+  };
+  const mount = () => {
+    if (document.getElementById('kt-report-host')) return;
+    const host = document.createElement('div'); host.id = 'kt-report-host';
+    host.style.cssText = 'all:initial!important;position:fixed!important;right:12px!important;bottom:90px!important;z-index:2147483647!important;max-width:calc(100vw - 16px)!important;';
+    const shadow = host.attachShadow({mode:'open'});
+    shadow.innerHTML = `<style>
+      :host{font-family:system-ui,sans-serif;color:#26343c;color-scheme:light}
+      button{font:600 12px system-ui;cursor:pointer;color:#26343c;background:#fff;border:1px solid #d5dce0;border-radius:18px;padding:8px 12px;box-shadow:0 2px 8px #0002}
+      #handle{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+      #trash{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:74px;height:74px;border-radius:50%;display:grid;place-items:center;background:#fff;color:#b42332;border:2px solid #e4bdc2;box-shadow:0 4px 18px #0003;pointer-events:none;transition:background .12s,scale .12s}
+      #trash[data-over="true"]{background:#b42332;color:white;scale:1.12}
+      #panel{position:absolute;right:0;bottom:42px;width:250px;max-width:calc(100vw - 32px);box-sizing:border-box;background:white;border:1px solid #dde2e5;border-radius:14px;padding:14px;box-shadow:0 4px 20px #0002;font-size:12px;line-height:1.6}
+      p{margin:0 0 10px} .actions{display:flex;gap:8px;justify-content:flex-end} #send{background:#fee500;border-color:#fee500} button:disabled{opacity:.6;cursor:wait}[hidden]{display:none!important}
+    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>테마 버전과 프레임 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 포함하지 않습니다.</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
+    const handle = shadow.getElementById('handle'), panel = shadow.getElementById('panel');
+    handle.title = '꾹 눌러 이동 · 아래 휴지통에 놓으면 숨김';
+    handle.setAttribute('aria-label','오류 제보. 꾹 눌러 이동하고 휴지통에 놓으면 숨기기');
+    const trash = document.createElement('div'); trash.id = 'trash'; trash.hidden = true;
+    trash.setAttribute('aria-label','여기에 놓으면 버튼 숨기기');
+    trash.innerHTML = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>';
+    shadow.appendChild(trash);
+    const overTrash = (x,y) => { const r=trash.getBoundingClientRect(); return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom; };
+    const status = shadow.getElementById('status'), send = shadow.getElementById('send');
+    let position = null, gesture = null, suppress = false, busy = false;
+    const move = (x,y) => {
+      x = Math.max(8,Math.min(x,Math.max(8,innerWidth-host.offsetWidth-8)));
+      y = Math.max(8,Math.min(y,Math.max(8,innerHeight-host.offsetHeight-8)));
+      host.style.setProperty('left',x+'px','important'); host.style.setProperty('top',y+'px','important');
+      host.style.setProperty('right','auto','important');host.style.setProperty('bottom','auto','important');
+      position = {x,y};
+    };
+    const align = () => {
+      const rect = host.getBoundingClientRect();
+      panel.style.right = rect.left + 250 > innerWidth - 8 ? '0' : 'auto';
+      panel.style.left = panel.style.right === '0px' ? 'auto' : '0';
+      panel.style.bottom = rect.top > 210 ? '42px' : 'auto';
+      panel.style.top = rect.top > 210 ? 'auto' : '42px';
+    };
+    handle.addEventListener('pointerdown',event => {
+      if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      suppress = false;
+      const rect = host.getBoundingClientRect();
+      gesture = {id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top,drag:false};
+      handle.setPointerCapture(event.pointerId);
+      gesture.timer = setTimeout(() => { if (gesture) { gesture.armed=true; suppress=true; panel.hidden=true; trash.hidden=false; } }, 500);
+    });
+    handle.addEventListener('pointermove',event => {
+      if (!gesture || gesture.id !== event.pointerId) return;
+      const dx = event.clientX-gesture.x, dy = event.clientY-gesture.y;
+      if (!gesture.armed) { if(Math.hypot(dx,dy)>7){clearTimeout(gesture.timer);suppress=true;} return; }
+      gesture.drag = true; suppress = true; clearTimeout(gesture.timer);panel.hidden = true;
+      move(gesture.left+dx,gesture.top+dy);
+      trash.dataset.over=String(overTrash(event.clientX,event.clientY));
+    });
+    const finish = event => {
+      if (!gesture || gesture.id !== event.pointerId) return;
+      clearTimeout(gesture.timer);
+      const remove = event.type==='pointerup' && gesture.armed && gesture.drag && overTrash(event.clientX,event.clientY);
+      trash.hidden=true; trash.dataset.over='false';
+      if (event.type === 'pointercancel') suppress = true;
+      if (gesture.drag) { try { localStorage.setItem('kt-report-position',JSON.stringify(position)); } catch {} }
+      gesture = null;
+      if(remove) host.remove();
+    };
+    handle.addEventListener('pointerup',finish); handle.addEventListener('pointercancel',finish);
+    handle.addEventListener('lostpointercapture',finish);
+    handle.addEventListener('contextmenu',event=>event.preventDefault());
+    handle.addEventListener('click',event => { if (suppress) {event.preventDefault();suppress=false;return;} panel.hidden=!panel.hidden;align(); });
+    shadow.getElementById('close').onclick=()=>{panel.hidden=true;handle.focus();};
+    shadow.addEventListener('keydown',event=>{if(event.key==='Escape'){panel.hidden=true;handle.focus();}});
+    send.onclick = async () => {
+      if (busy) return; busy = true; send.disabled = true;status.textContent='채팅 프레임 확인 중…';
+      try {
+        const report = await collect();
+        // Whitelist only these diagnostic fields; never forward arbitrary frame data.
+        const payload = {};
+        for (const key of ['themeVersion','themeKind','frameStatus','styleStatus','backgroundStatus','textStatus','inputStatus']) {
+          if (typeof report?.[key] === 'string') payload[key] = report[key];
+        }
+        const ua = navigator.userAgent;
+        payload.browserFamily = /Firefox|FxiOS/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome|CriOS/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':'Other';
+        payload.osFamily = /iPhone|iPad|iPod/.test(ua)||(/Mac/.test(ua)&&navigator.maxTouchPoints>1)?'iOS':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac/.test(ua)?'macOS':'Other';
+        status.textContent='전송 중…';
+        const controller = new AbortController(); const timeout = setTimeout(()=>controller.abort(),20000);
+        let result;
+        try { result=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'omit',body:JSON.stringify(payload),signal:controller.signal}); }
+        finally {clearTimeout(timeout);}
+        if (!result.ok) {
+          const messages={429:'잠시 후 다시 보내 주세요.',503:'제작자의 메일 설정이 아직 완료되지 않았어요.',502:'메일 전송에 실패했어요. 잠시 후 다시 시도해 주세요.'};
+          throw new Error(messages[result.status]||'전송하지 못했어요. 다시 시도해 주세요.');
+        }
+        status.textContent='제보가 접수됐어요.'; send.textContent='전송 완료';
+        setTimeout(()=>{busy=false;send.disabled=false;send.textContent='제보 보내기';},60000);
+      } catch(error) { status.textContent=error.name==='AbortError'?'응답 시간이 초과됐어요.':error.message==='Failed to fetch'?'서버 연결에 실패했어요.':error.message;busy=false;send.disabled=false; }
+    };
+    document.documentElement.appendChild(host);
+    try { const saved=JSON.parse(localStorage.getItem('kt-report-position'));if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)) move(saved.x,saved.y); } catch {}
+    window.addEventListener('resize',()=>{if(position)move(position.x,position.y);if(!panel.hidden)align();});
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',mount,{once:true}); else mount();
+}
+
+  try { installThemeReports(); } catch (error) { console.warn('[ZETA] report UI unavailable'); }
 
   const STYLE_ID = 'zeta-kakaotalk-theme-style';
   const ACTIVE = 'kt-chat-theme-active';
