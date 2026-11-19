@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.104
+// @version      3.50.105
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -48,7 +48,7 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.104';
+  const version = '3.50.105';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   const recordError = (error, stage) => {
@@ -151,7 +151,7 @@ function installThemeReports() {
       textarea:focus{outline:2px solid #687c8a;outline-offset:1px}
       #description-count{text-align:right;color:#65737c;font-size:11px}
       p{margin:0 0 10px} .actions{display:flex;gap:8px;justify-content:flex-end} #send{background:#fee500;border-color:#fee500} button:disabled{opacity:.6;cursor:wait}[hidden]{display:none!important}
-    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>작성한 오류 설명과 테마 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 자동으로 수집하지 않습니다.</p><label for="description">어떤 오류가 있나요? (선택)</label><textarea id="description" maxlength="1000" placeholder="예: 문구 반복 버튼을 눌러도 반응이 없어요." aria-describedby="description-count"></textarea><p id="description-count">0 / 1000</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
+    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>작성한 오류 설명과 테마 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 자동으로 수집하지 않습니다.</p><label for="description">어떤 오류가 있나요? (선택)</label><textarea id="description" maxlength="1000" placeholder="예: 말풍선 글자색이 배경색과 같아서 글자가 안 보여요." aria-describedby="description-count"></textarea><p id="description-count">0 / 1000</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
     const handle = shadow.getElementById('handle'), panel = shadow.getElementById('panel');
     handle.title = '꾹 눌러 이동 · 아래 휴지통에 놓으면 숨김';
     handle.setAttribute('aria-label','오류 제보. 꾹 눌러 이동하고 휴지통에 놓으면 숨기기');
