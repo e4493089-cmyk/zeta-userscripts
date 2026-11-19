@@ -1,6 +1,8 @@
-// Diagnostic relay: no chat text, URLs, cookies or account identifiers accepted.
+// Diagnostic relay: structured diagnostics plus an optional user-written description.
+// Chat content, cookies and account identifiers are never collected automatically.
 const origins = new Set(['https://zeta-ai.io', 'https://frame.pingpong.ai']);
 const fields = {
+  description: 1000,
   themeVersion: 40, themeKind: 30, browserFamily: 30, browserVersion: 40,
   osFamily: 30, osVersion: 40, frameStatus: 60, styleStatus: 60,
   backgroundStatus: 60, textStatus: 60, inputStatus: 60,
@@ -54,7 +56,7 @@ export default {
         const {done, value} = await reader.read();
         if (done) break;
         length += value.length;
-        if (length > 4096) { await reader.cancel(); return reply(413, {error:'report_too_large'}); }
+        if (length > 12288) { await reader.cancel(); return reply(413, {error:'report_too_large'}); }
         chunks.push(value);
       }
       const bytes = new Uint8Array(length); let offset = 0;
@@ -65,8 +67,14 @@ export default {
         Object.keys(data).some(key => !Object.hasOwn(fields, key)) ||
         !data.themeVersion || !data.frameStatus) return reply(400, {error:'invalid_report'});
     const lines = [];
+    let description = '';
     for (const [key, max] of Object.entries(fields)) {
       if (data[key] === undefined) continue;
+      if (key === 'description') {
+        if (typeof data[key] !== 'string' || data[key].length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(data[key])) return reply(400, {error:'invalid_report'});
+        description = data[key].trim();
+        continue;
+      }
       if (typeof data[key] !== 'string' || data[key].length > max ||
           !/^[a-zA-Z0-9 ._:+()/-]+$/.test(data[key])) return reply(400, {error:'invalid_report'});
       lines.push(key + ': ' + data[key]);
@@ -77,7 +85,7 @@ export default {
         headers:{Authorization:'Bearer ' + env.RESEND_API_KEY, 'Content-Type':'application/json'},
         body:JSON.stringify({
           from:env.REPORT_FROM, to:[env.REPORT_TO], subject:'[ZETA] Theme diagnostic report',
-          text:'Received: ' + new Date().toISOString() + '\n\n' + lines.join('\n')
+          text:'Received: ' + new Date().toISOString() + '\n\n' + lines.join('\n') + '\n\n오류 설명:\n' + (description || '(작성하지 않음)')
         }),
         signal:AbortSignal.timeout(15000)
       });
