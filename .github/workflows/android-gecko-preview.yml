@@ -32,7 +32,10 @@ jobs:
       - name: Install Android SDK 37
         run: |
           sdkmanager --list_installed
-          sdkmanager --install 'platforms;android-37'
+          if [ ! -f "$ANDROID_HOME/platforms/android-37.0/android.jar" ]; then
+            sdkmanager --install 'platforms;android-37.0'
+          fi
+          test -f "$ANDROID_HOME/platforms/android-37.0/android.jar"
       - name: Build APK
         run: gradle --no-daemon :app:assembleDebug
       - uses: actions/upload-artifact@v4
