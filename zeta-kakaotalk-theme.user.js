@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.108
+// @version      3.50.109
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -37,9 +37,73 @@
  * - kt-* 클래스의 추가/제거 순서도 화면 상태에 영향을 줄 수 있다.
  */
 
+// Independent of DOM readiness and theme initialization; never reads chat contents.
+(function installEarlyThemeDiagnostics() {
+  'use strict';
+  if (window.__ktEarlyDiagnostics) return;
+  const frameOrigin='https://frame.pingpong.ai', hostOrigin='https://zeta-ai.io';
+  const isFrame=location.origin===frameOrigin, type='zeta-theme-report-v1';
+  const early=window.__ktEarlyDiagnostics={started:performance.now(),rootAtStart:!!document.documentElement,
+    received:0,sent:0,messageErrors:0,themeErrors:0,otherErrors:0,loads:0,self:'pending',lastError:'none'};
+  const state=window.__ktReportState ||= {phase:'script-start',applyCount:0,errorCount:0,errorType:'none',errorStage:'none',stages:['script-start']};
+  const frames=new WeakMap(); early.frames=frames;
+  const tracked=new WeakSet();
+  const watch=()=>document.querySelectorAll('iframe').forEach(frame=>{
+    if(tracked.has(frame))return;tracked.add(frame);
+    frame.addEventListener('load',()=>{early.loads++;if(frame.contentWindow)frames.delete(frame.contentWindow);});
+  });
+  if(!isFrame){watch();new MutationObserver(records=>{
+    if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(node.tagName==='IFRAME'||node.querySelector?.('iframe')))))watch();
+  }).observe(document,{childList:true,subtree:true});}
+  const snapshot=()=>({themeVersion:'3.50.109',diagnosticVersion:'3',executionContext:isFrame?'chat-frame':'host',
+    initializationStatus:state.phase,applyCount:String(state.applyCount),errorCount:String(state.errorCount),
+    errorType:state.errorType,errorStage:state.errorStage,documentState:document.readyState,
+    visibilityState:document.visibilityState,lifecycleStatus:state.lifecycle||'initial',
+    cspScriptCount:String(state.cspScriptCount||0),cspStyleCount:String(state.cspStyleCount||0),
+    styleStatus:document.getElementById('zeta-custom-theme-style')||document.getElementById('zeta-kakaotalk-theme-style')?'present':'missing',
+    themeActive:document.documentElement?.classList.contains('kt-chat-theme-active')?'yes':'no',
+    stageHistory:((state.stages||[]).join('/').slice(-100)+'/root-'+(early.rootAtStart?'present':'waiting')+'/rx-'+early.received+'/tx-'+early.sent+'/msgerr-'+early.messageErrors)});
+  early.snapshot=snapshot;
+  const send=(action,id)=>{
+    try{parent.postMessage({type,action,id,report:snapshot()},hostOrigin);early.sent++;}
+    catch{early.lastError='postMessage-error';}
+  };
+  early.announce=()=>{if(isFrame)send('early');};
+  window.addEventListener('message',event=>{
+    if(event.data?.type!==type)return;
+    if(event.source===window&&event.origin===location.origin&&event.data.action==='self')early.self='received';
+    if(isFrame){
+      if(event.origin===hostOrigin&&event.source===parent&&event.data.action==='probe'&&typeof event.data.id==='string'){
+        early.received++;send('ack',event.data.id);
+      }
+    }else if(event.origin===frameOrigin&&['early','ack'].includes(event.data.action)){
+      const frame=[...document.querySelectorAll('iframe')].find(f=>f.contentWindow===event.source);
+      if(!frame)return;
+      let src;try{src=new URL(frame.src);}catch{return;}
+      if(src.origin!==frameOrigin)return;
+      const previous=frames.get(event.source);
+      frames.set(event.source,{report:event.data.report,at:performance.now(),src:frame.src,
+        count:(previous?.count||0)+1,action:event.data.action,id:event.data.id});
+    }
+  });
+  window.addEventListener('messageerror',()=>{early.messageErrors++;});
+  window.addEventListener('unhandledrejection',()=>{early.otherErrors++;});
+  window.addEventListener('error',event=>{
+    // Attribute only recognizable theme sources; unrelated site failures are counted separately.
+    if(!/zeta-kakaotalk-theme|zeta-custom-theme/.test(event.filename||'')){early.otherErrors++;return;}
+    early.themeErrors++;
+    state.errorCount++;
+    state.errorType=['TypeError','ReferenceError','SyntaxError','RangeError','SecurityError'].includes(event.error?.name)?event.error.name:'Error';
+    state.errorStage='uncaught-'+state.phase;
+    early.announce();
+  });
+  try{window.postMessage({type,action:'self'},location.origin);}catch{early.self='send-error';}
+  early.announce();
+})();
+
 (function bootTheme() {
   'use strict';
-  if (!document.documentElement) { setTimeout(bootTheme, 10); return; }
+  if (!document.documentElement) { window.__ktReportState.phase='waiting-for-root'; setTimeout(bootTheme, 10); return; }
 
   const sceneFrame = location.origin === 'https://frame.pingpong.ai';
 
@@ -63,16 +127,18 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.108';
+  const version = '3.50.109';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   state.stages ||= ['script-start'];
+  const early=window.__ktEarlyDiagnostics;
   state.cspScriptCount ||= 0; state.cspStyleCount ||= 0;
   state.lifecycle ||= 'initial';
   const mark = phase => {
     state.phase = phase;
-    if (state.stages[state.stages.length - 1] !== phase) state.stages.push(phase);
+    if (!state.stages.includes(phase)) state.stages.push(phase);
     if (state.stages.length > 12) state.stages.shift();
+    if(phase!=='applying'&&(phase!=='applied'||!state.applyCount))early?.announce();
   };
   window.__ktReportMark = mark;
   const hostCheck = () => {
@@ -128,9 +194,9 @@ function installThemeReports() {
         errorCount:String(state.errorCount),errorType:state.errorType,errorStage:state.errorStage,
         documentState:document.readyState,themeActive:active?'yes':'no',
         hasSelectorSupport:selectorSupport,
-        diagnosticVersion:'2',executionContext:location.origin===frameOrigin?'chat-frame':'host',
+        diagnosticVersion:'3',executionContext:location.origin===frameOrigin?'chat-frame':'host',
         hostCheck:hostCheck(),visibilityState:document.visibilityState,
-        lifecycleStatus:state.lifecycle,stageHistory:state.stages.join('/').slice(-280),
+        lifecycleStatus:state.lifecycle,stageHistory:early?early.snapshot().stageHistory:state.stages.join('/').slice(-180),
         cspScriptCount:String(state.cspScriptCount),cspStyleCount:String(state.cspStyleCount),
         styleSheetStatus:check('stylesheet',()=> {
           const sheet=document.getElementById(custom?'zeta-custom-theme-style':'zeta-kakaotalk-theme-style')?.sheet;
@@ -153,7 +219,7 @@ function installThemeReports() {
     window.addEventListener('message', event => {
       if (event.origin !== hostOrigin || event.source !== parent || event.data?.type !== messageType ||
           event.data?.action !== 'probe' || typeof event.data.id !== 'string') return;
-      try { parent.postMessage({type:messageType, action:'result', id:event.data.id, report:window.__ktReportSample()}, hostOrigin); }
+      try { parent.postMessage({type:messageType, action:'result', id:event.data.id, report:window.__ktReportSample()}, hostOrigin); if(early)early.sent++; }
       catch(error) { recordError(error, 'diagnostic-sample'); parent.postMessage({type:messageType, action:'result', id:event.data.id,
         report:{themeVersion:version,frameStatus:'diagnostic-error',initializationStatus:state.phase,applyCount:String(state.applyCount),errorCount:String(state.errorCount),errorType:state.errorType,errorStage:state.errorStage}}, hostOrigin); }
     });
@@ -176,7 +242,7 @@ function installThemeReports() {
     const visible=frames.filter(el=>el.getBoundingClientRect().height>0);
     const frame=visible[0];
     const context={
-      diagnosticVersion:'2',hostThemeVersion:host.themeVersion,
+      diagnosticVersion:'3',hostThemeVersion:host.themeVersion,
       hostInitializationStatus:host.initializationStatus,hostStyleStatus:host.styleStatus,
       hostErrorType:host.errorType,hostErrorStage:host.errorStage,
       frameCount:String(frames.length),visibleFrameCount:String(visible.length)
@@ -191,10 +257,21 @@ function installThemeReports() {
       const id=crypto.randomUUID(),source=frame.contentWindow,started=performance.now();
       let attempts=0, timer, retry, done=false;
       const originalSrc=frame.src;
+      const initialLoads=early?.loads||0;
       const finish=report=>{
         if(done)return;done=true;clearTimeout(timer);clearInterval(retry);
         if(pending?.id===id)pending=null;
-        resolve({...report,...context,probeAttempts:String(attempts),
+        const cached=early?.frames.get(source);
+        const fresh=cached&&cached.src===frame.src&&cached.at>=started&&cached.id===id;
+        const h=window.__ktReportState;
+        // Existing relay schema accepts this bounded, structured history even before a server update.
+        const trace=[report.stageHistory||'unobserved',
+          'early-'+(cached?'seen':'unobserved'),'ack-'+(fresh?'received':'unobserved'),
+          'self-'+(early?.self||'unobserved'),'loads-'+((early?.loads||0)-initialLoads),
+          'msgerr-'+(early?.messageErrors||0),'hostCsp-'+(h.cspScriptCount||0)+'-'+(h.cspStyleCount||0),
+          'hostDoc-'+document.readyState+'-'+document.visibilityState,'hostErrors-'+(early?.themeErrors||0)+'-'+(early?.otherErrors||0),
+          'sampleAge-'+(cached?Math.round(performance.now()-cached.at):'unknown')].join('/');
+        resolve({...report,...context,stageHistory:trace.slice(-300),probeAttempts:String(attempts),
           probeElapsedMs:String(Math.round(performance.now()-started)),
           frameChangeStatus:!frame.isConnected?'removed':frame.src!==originalSrc?'navigated':'unchanged'});
       };
@@ -204,8 +281,13 @@ function installThemeReports() {
         try {source.postMessage({type:messageType,action:'probe',id},frameOrigin);}
         catch(error){recordError(error,'probe-send');finish({themeVersion:version,frameStatus:'probe-send-error'});}
       };
-      timer=setTimeout(()=>finish({themeVersion:version,frameStatus:'no-response',
-        initializationStatus:'unobserved',executionContext:'unobserved'}),8000);
+      timer=setTimeout(()=>{
+        const cached=early?.frames.get(source);
+        const valid=cached&&cached.src===frame.src;
+        const ack=valid&&cached.id===id&&cached.at>=started;
+        finish({themeVersion:version,initializationStatus:'unobserved',executionContext:'unobserved',
+          ...(valid?cached.report:{}),frameStatus:ack?'ack-without-result':'no-response'});
+      },8000);
       retry=setInterval(probe,1000);
       probe();
     });
@@ -340,7 +422,7 @@ function installThemeReports() {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',mount,{once:true}); else mount();
 }
 
-  try { installThemeReports(); } catch (error) { console.warn('[ZETA] report UI unavailable'); }
+  try { installThemeReports(); } catch (error) { window.__ktReportState.errorStage='install-reports'; window.__ktReportState.phase='reports-error'; window.__ktEarlyDiagnostics?.announce(); console.warn('[ZETA] report UI unavailable'); }
 
   if (sceneFrame && new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io') {
     window.__ktReportMark?.('host-check-rejected');
