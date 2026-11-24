@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "ZETA Tools theme",
+  "version": "3.50.108",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "theme@zetatools.local"
+    }
+  },
+  "host_permissions": [
+    "https://zeta-ai.io/*",
+    "https://frame.pingpong.ai/v1/index.html*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://zeta-ai.io/*",
+        "https://frame.pingpong.ai/v1/index.html*"
+      ],
+      "js": [
+        "theme.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    }
+  ]
+}
