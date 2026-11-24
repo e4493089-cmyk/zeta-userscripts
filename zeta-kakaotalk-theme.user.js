@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.106
+// @version      3.50.107
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -42,19 +42,34 @@
   if (!document.documentElement) { setTimeout(bootTheme, 10); return; }
 
   const sceneFrame = location.origin === 'https://frame.pingpong.ai';
-  if (sceneFrame && new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io') return;
+
 
 function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.106';
+  const version = '3.50.107';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
+  state.stages ||= ['script-start'];
+  state.cspScriptCount ||= 0; state.cspStyleCount ||= 0;
+  state.lifecycle ||= 'initial';
+  const mark = phase => {
+    state.phase = phase;
+    if (state.stages[state.stages.length - 1] !== phase) state.stages.push(phase);
+    if (state.stages.length > 12) state.stages.shift();
+  };
+  window.__ktReportMark = mark;
+  const hostCheck = () => {
+    if (location.origin !== frameOrigin) return 'not-applicable';
+    const host = new URLSearchParams(location.hash.slice(1)).get('host');
+    return !host ? 'missing' : host === hostOrigin ? 'match' : 'mismatch';
+  };
   const recordError = (error, stage) => {
     state.errorCount++;
     state.errorType = ['TypeError','ReferenceError','SyntaxError','RangeError','SecurityError'].includes(error?.name) ? error.name : 'Error';
     state.errorStage = stage;
+    mark(stage + '-error');
   };
   window.__ktRecordThemeError = recordError;
   const sample = () => {
@@ -97,12 +112,28 @@ function installThemeReports() {
         initializationStatus:state.phase,applyCount:String(state.applyCount),
         errorCount:String(state.errorCount),errorType:state.errorType,errorStage:state.errorStage,
         documentState:document.readyState,themeActive:active?'yes':'no',
-        hasSelectorSupport:selectorSupport};
+        hasSelectorSupport:selectorSupport,
+        diagnosticVersion:'2',executionContext:location.origin===frameOrigin?'chat-frame':'host',
+        hostCheck:hostCheck(),visibilityState:document.visibilityState,
+        lifecycleStatus:state.lifecycle,stageHistory:state.stages.join('/').slice(-280),
+        cspScriptCount:String(state.cspScriptCount),cspStyleCount:String(state.cspStyleCount),
+        styleSheetStatus:check('stylesheet',()=> {
+          const sheet=document.getElementById(custom?'zeta-custom-theme-style':'zeta-kakaotalk-theme-style')?.sheet;
+          return !sheet?'missing':sheet.cssRules.length?'rules-present':'empty';
+        })};
     } finally { check('cleanup', () => probe.remove()); }
   };
   window.__ktReportSample = sample;
   if (window.__ktReportsInstalled) return;
   window.__ktReportsInstalled = true;
+  document.addEventListener('securitypolicyviolation', event => {
+    // Store only directive categories, never URLs, blocked text, or script samples.
+    if (event.effectiveDirective?.startsWith('script-src')) state.cspScriptCount=Math.min(999,state.cspScriptCount+1);
+    if (event.effectiveDirective?.startsWith('style-src')) state.cspStyleCount=Math.min(999,state.cspStyleCount+1);
+  });
+  window.addEventListener('pageshow', event => {state.lifecycle=event.persisted?'bfcache-restored':'pageshow';});
+  window.addEventListener('pagehide', () => {state.lifecycle='pagehide';});
+  document.addEventListener('visibilitychange',()=>{state.lifecycle=document.hidden?'hidden':'visible';});
   if (location.origin === frameOrigin) {
     window.addEventListener('message', event => {
       if (event.origin !== hostOrigin || event.source !== parent || event.data?.type !== messageType ||
@@ -119,19 +150,49 @@ function installThemeReports() {
     if (!pending || event.origin !== frameOrigin || event.source !== pending.source ||
         event.data?.type !== messageType || event.data?.action !== 'result' || event.data.id !== pending.id) return;
     const current = pending; pending = null;
-    clearTimeout(current.timer); current.resolve(event.data.report);
+    current.finish(event.data.report);
   });
   const collect = () => {
-    const frame = [...document.querySelectorAll('iframe')].find(el => {
-      try { const u = new URL(el.src); return u.origin === frameOrigin && u.pathname === '/v1/index.html' && el.getBoundingClientRect().height > 0; }
-      catch { return false; }
+    const host = window.__ktReportSample();
+    const frames = [...document.querySelectorAll('iframe')].filter(el => {
+      try { const u=new URL(el.src);return u.origin===frameOrigin&&u.pathname==='/v1/index.html'; }
+      catch {return false;}
     });
-    if (!frame) return Promise.resolve({...window.__ktReportSample(),frameStatus:'no-visible-frame'});
+    const visible=frames.filter(el=>el.getBoundingClientRect().height>0);
+    const frame=visible[0];
+    const context={
+      diagnosticVersion:'2',hostThemeVersion:host.themeVersion,
+      hostInitializationStatus:host.initializationStatus,hostStyleStatus:host.styleStatus,
+      hostErrorType:host.errorType,hostErrorStage:host.errorStage,
+      frameCount:String(frames.length),visibleFrameCount:String(visible.length)
+    };
+    if (!frame) return Promise.resolve({...host,...context,frameStatus:'no-visible-frame',probeAttempts:'0'});
+    const frameHost=new URL(frame.src).hash;
+    const value=new URLSearchParams(frameHost.slice(1)).get('host');
+    context.frameHostCheck=!value?'missing':value===hostOrigin?'match':'mismatch';
+    context.frameSandboxStatus=!frame.hasAttribute('sandbox')?'absent':
+      frame.sandbox.contains('allow-scripts')?(frame.sandbox.contains('allow-same-origin')?'scripts-and-origin':'scripts-only'):'scripts-blocked';
     return new Promise(resolve => {
-      const id = crypto.randomUUID();
-      const timer = setTimeout(() => { if (pending?.id === id) { pending = null; resolve({themeVersion:version,frameStatus:'no-response'}); } }, 5000);
-      pending = {id, source:frame.contentWindow, resolve, timer};
-      frame.contentWindow.postMessage({type:messageType, action:'probe', id}, frameOrigin);
+      const id=crypto.randomUUID(),source=frame.contentWindow,started=performance.now();
+      let attempts=0, timer, retry, done=false;
+      const originalSrc=frame.src;
+      const finish=report=>{
+        if(done)return;done=true;clearTimeout(timer);clearInterval(retry);
+        if(pending?.id===id)pending=null;
+        resolve({...report,...context,probeAttempts:String(attempts),
+          probeElapsedMs:String(Math.round(performance.now()-started)),
+          frameChangeStatus:!frame.isConnected?'removed':frame.src!==originalSrc?'navigated':'unchanged'});
+      };
+      pending={id,source,finish};
+      const probe=()=>{
+        attempts++;
+        try {source.postMessage({type:messageType,action:'probe',id},frameOrigin);}
+        catch(error){recordError(error,'probe-send');finish({themeVersion:version,frameStatus:'probe-send-error'});}
+      };
+      timer=setTimeout(()=>finish({themeVersion:version,frameStatus:'no-response',
+        initializationStatus:'unobserved',executionContext:'unobserved'}),8000);
+      retry=setInterval(probe,1000);
+      probe();
     });
   };
   const mount = () => {
@@ -148,10 +209,10 @@ function installThemeReports() {
       #panel{position:absolute;right:0;bottom:42px;width:300px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 24px);overflow-y:auto;box-sizing:border-box;background:white;border:1px solid #dde2e5;border-radius:14px;padding:14px;box-shadow:0 4px 20px #0002;font-size:12px;line-height:1.6}
       label{display:block;font-weight:600;margin-bottom:6px}
       textarea{display:block;box-sizing:border-box;width:100%;min-height:100px;max-height:180px;resize:vertical;padding:9px;border:1px solid #c8d0d5;border-radius:8px;background:#fff;color:#26343c;font:14px/1.5 system-ui}
-      textarea:focus{outline:2px solid #687c8a;outline-offset:1px}
+      select{width:100%;margin-bottom:10px;padding:8px;background:#fff;color:#26343c;border:1px solid #c8d0d5;border-radius:8px}\n      textarea:focus{outline:2px solid #687c8a;outline-offset:1px}
       #description-count{text-align:right;color:#65737c;font-size:11px}
       p{margin:0 0 10px} .actions{display:flex;gap:8px;justify-content:flex-end} #send{background:#fee500;border-color:#fee500} button:disabled{opacity:.6;cursor:wait}[hidden]{display:none!important}
-    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>작성한 오류 설명과 테마 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 자동으로 수집하지 않습니다.</p><label for="description">어떤 오류가 있나요? (선택)</label><textarea id="description" maxlength="1000" placeholder="예: 말풍선 글자색이 배경색과 같아서 글자가 안 보여요." aria-describedby="description-count"></textarea><p id="description-count">0 / 1000</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
+    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>작성한 오류 설명과 테마 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 자동으로 수집하지 않습니다.</p><label for="manager">사용 중인 스크립트 앱</label><select id="manager"><option value="unknown">모르겠음</option><option value="Stay">Stay</option><option value="Userscripts">Userscripts</option><option value="Tampermonkey">Tampermonkey</option><option value="Other">기타</option></select><label for="description">어떤 오류가 있나요? (선택)</label><textarea id="description" maxlength="1000" placeholder="예: 말풍선 글자색이 배경색과 같아서 글자가 안 보여요." aria-describedby="description-count"></textarea><p id="description-count">0 / 1000</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
     const handle = shadow.getElementById('handle'), panel = shadow.getElementById('panel');
     handle.title = '꾹 눌러 이동 · 아래 휴지통에 놓으면 숨김';
     handle.setAttribute('aria-label','오류 제보. 꾹 눌러 이동하고 휴지통에 놓으면 숨기기');
@@ -222,9 +283,10 @@ function installThemeReports() {
         const report = await collect();
         // Whitelist only these diagnostic fields; never forward arbitrary frame data.
         const payload = {};
-        for (const key of ["themeVersion","themeKind","frameStatus","styleStatus","backgroundStatus","textStatus","inputStatus","backgroundColor","expectedBackgroundColor","textColor","expectedTextColor","inputTextColor","inputBackgroundColor","inputTextStatus","initializationStatus","applyCount","errorCount","errorType","errorStage","documentState","themeActive","hasSelectorSupport"]) {
+        for (const key of ["themeVersion","themeKind","frameStatus","styleStatus","backgroundStatus","textStatus","inputStatus","backgroundColor","expectedBackgroundColor","textColor","expectedTextColor","inputTextColor","inputBackgroundColor","inputTextStatus","initializationStatus","applyCount","errorCount","errorType","errorStage","documentState","themeActive","hasSelectorSupport","diagnosticVersion","executionContext","hostCheck","styleSheetStatus","visibilityState","lifecycleStatus","cspScriptCount","cspStyleCount","stageHistory","hostThemeVersion","hostInitializationStatus","hostStyleStatus","hostErrorType","hostErrorStage","frameCount","visibleFrameCount","frameHostCheck","frameSandboxStatus","probeAttempts","probeElapsedMs","frameChangeStatus","scriptManager"]) {
           if (typeof report?.[key] === 'string') payload[key] = report[key];
         }
+        payload.scriptManager=shadow.getElementById('manager').value;
         if (submittedDescription) payload.description = submittedDescription;
         const ua = navigator.userAgent;
         payload.browserFamily = /Firefox|FxiOS/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome|CriOS/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':'Other';
@@ -239,7 +301,7 @@ function installThemeReports() {
         try { result=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'omit',body:JSON.stringify(payload),signal:controller.signal}); }
         finally {clearTimeout(timeout);}
         if (!result.ok) {
-          const messages={429:'잠시 후 다시 보내 주세요.',503:'제작자의 메일 설정이 아직 완료되지 않았어요.',502:'메일 전송에 실패했어요. 잠시 후 다시 시도해 주세요.'};
+          const messages={400:'진단 서버 업데이트가 아직 반영되지 않았어요. 잠시 후 다시 보내 주세요.',429:'잠시 후 다시 보내 주세요.',503:'제작자의 메일 설정이 아직 완료되지 않았어요.',502:'메일 전송에 실패했어요. 잠시 후 다시 시도해 주세요.'};
           throw new Error(messages[result.status]||'전송하지 못했어요. 다시 시도해 주세요.');
         }
         description.value=''; descriptionCount.textContent='0 / 1000'; description.disabled=false;
@@ -255,6 +317,12 @@ function installThemeReports() {
 }
 
   try { installThemeReports(); } catch (error) { console.warn('[ZETA] report UI unavailable'); }
+
+  if (sceneFrame && new URLSearchParams(location.hash.slice(1)).get('host') !== 'https://zeta-ai.io') {
+    window.__ktReportMark?.('host-check-rejected');
+    return;
+  }
+  window.__ktReportMark?.('host-check-passed');
 
   const STYLE_ID = 'zeta-kakaotalk-theme-style';
   const ACTIVE = 'kt-chat-theme-active';
@@ -10751,8 +10819,8 @@ function installThemeReports() {
 
   function apply() {
     const state = window.__ktReportState;
-    if (state) state.phase = 'applying';
-    try { applyThemeOnce(); if(state){state.phase='applied';state.applyCount++;} }
+    window.__ktReportMark?.('applying');
+    try { applyThemeOnce(); if(state){window.__ktReportMark?.('applied');state.applyCount++;} }
     catch(error) { if(state)state.phase='apply-error';window.__ktRecordThemeError?.(error,'apply');throw error; }
   }
 
@@ -11047,7 +11115,7 @@ function installThemeReports() {
     installStyle();
     setActiveState();
   };
-  try { installStyle(); } catch(error) { window.__ktRecordThemeError?.(error,'install-style'); throw error; }
+  try { installStyle(); window.__ktReportMark?.('style-installed'); } catch(error) { window.__ktRecordThemeError?.(error,'install-style'); throw error; }
 
   /* 기본 테마와 커스텀 테마가 함께 실행되면 마지막으로 실행된 테마만 유지한다. */
   [
@@ -11063,5 +11131,5 @@ function installThemeReports() {
   if (document.documentElement.dataset.ktThemeRuntime === '1') return;
   document.documentElement.dataset.ktThemeRuntime = '1';
 
-  try { start(); } catch(error) { window.__ktRecordThemeError?.(error,'start'); throw error; }
+  try { start(); if (!window.__ktReportState?.applyCount) window.__ktReportMark?.('waiting-for-dom'); } catch(error) { window.__ktRecordThemeError?.(error,'start'); throw error; }
 })();
