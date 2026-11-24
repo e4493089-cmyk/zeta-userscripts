@@ -20,7 +20,29 @@ const fields = {
   errorStage: 60,
   documentState: 60,
   themeActive: 60,
-  hasSelectorSupport: 60
+  hasSelectorSupport: 60,
+  diagnosticVersion: 60,
+  executionContext: 60,
+  hostCheck: 60,
+  styleSheetStatus: 60,
+  visibilityState: 60,
+  lifecycleStatus: 60,
+  cspScriptCount: 60,
+  cspStyleCount: 60,
+  stageHistory: 300,
+  hostThemeVersion: 60,
+  hostInitializationStatus: 60,
+  hostStyleStatus: 60,
+  hostErrorType: 60,
+  hostErrorStage: 60,
+  frameCount: 60,
+  visibleFrameCount: 60,
+  frameHostCheck: 60,
+  frameSandboxStatus: 60,
+  probeAttempts: 60,
+  probeElapsedMs: 60,
+  frameChangeStatus: 60,
+  scriptManager: 60
 };
 export default {
   async fetch(request, env) {
@@ -34,7 +56,7 @@ export default {
     }
     const reply = (status, data) => new Response(JSON.stringify(data), {status, headers});
     if (request.method === 'GET' && url.pathname === '/') {
-      return reply(200, {service:'zeta-reports', ready: Boolean(env.RESEND_API_KEY && env.REPORT_TO && env.REPORT_FROM && env.REPORT_LIMITER)});
+      return reply(200, {service:'zeta-reports', diagnosticVersion:'2', ready: Boolean(env.RESEND_API_KEY && env.REPORT_TO && env.REPORT_FROM && env.REPORT_LIMITER)});
     }
     if (url.pathname !== '/report') return reply(404, {error:'not_found'});
     if (!origins.has(origin)) return reply(403, {error:'origin_not_allowed'});
