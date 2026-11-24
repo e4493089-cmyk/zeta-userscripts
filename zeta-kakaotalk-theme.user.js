@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.105
+// @version      3.50.106
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -48,7 +48,7 @@ function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.105';
+  const version = '3.50.106';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   const recordError = (error, stage) => {
@@ -2070,7 +2070,10 @@ function installThemeReports() {
       color: #7B6740 !important;
     }
 
-    html.${ACTIVE} [data-sentry-component="DeleteStartNotice"] {
+    /* The scene renderer no longer emits DeleteStartNotice component metadata. */
+    html.${ACTIVE} [data-sentry-component="DeleteStartNotice"],
+    html.scene-web.${ACTIVE} #zeta:has([data-testid="delete-mode-header-back"], [data-testid="delete-mode-header-clear"])
+      div.shrink-0.bg-gray-main.px-4.pb-6.title20:not([role="log"] *) {
       display: none !important;
     }
 
