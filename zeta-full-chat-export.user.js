@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta Full Chat Export
 // @namespace    zeta-personal-tools
-// @version      0.3.21
+// @version      0.3.22
 // @description  Zeta 대화 전체 또는 책갈피 사이 구간을 Markdown/TXT로 저장합니다.
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -1025,7 +1025,6 @@
   }
 
   async function openRangePicker() {
-    if (inChatFrame) { alert('새 채팅 화면에서는 전체 저장을 사용해줘. 책갈피 구간 연결은 아직 지원되지 않아.'); return; }
     const dialog = document.getElementById(RANGE_ID);
     if (!dialog) return;
     dialog.hidden = false;
