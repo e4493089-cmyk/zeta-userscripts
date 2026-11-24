@@ -16,7 +16,7 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: '9.3.1'
       - name: Bundle pinned public theme
         run: |
           python3 - <<'PY'
@@ -26,6 +26,8 @@ jobs:
           guard="(function(){if(location.origin==='https://frame.pingpong.ai' && (location.pathname!=='/v1/index.html'||new URLSearchParams(location.hash.slice(1)).get('host')!=='https://zeta-ai.io'))return;\n"
           Path('app/src/main/assets/theme/theme.js').write_text(guard+src+'\n})();\n')
           PY
+      - name: Install Android SDK 37
+        run: sdkmanager 'platforms;android-37'
       - name: Build APK
         run: gradle --no-daemon :app:assembleDebug
       - uses: actions/upload-artifact@v4
