@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zeta KakaoTalk Theme
 // @namespace    zeta-kakaotalk-theme
-// @version      3.50.107
+// @version      3.50.108
 // @description  Zeta 카카오톡 테마 (일기, 엔딩, 선택지, 신고, 수정 UI, 대화 프로필 및 인스타그램풍 제타그램)
 // @match        https://zeta-ai.io/*
 // @match        https://frame.pingpong.ai/v1/index.html
@@ -44,11 +44,26 @@
   const sceneFrame = location.origin === 'https://frame.pingpong.ai';
 
 
+function detectScriptManager() {
+  const known = {stay:'Stay',userscripts:'Userscripts',tampermonkey:'Tampermonkey',violentmonkey:'Violentmonkey',greasemonkey:'Greasemonkey'};
+  for (const read of [
+    () => typeof GM_info !== 'undefined' ? GM_info.scriptHandler : null,
+    () => typeof GM !== 'undefined' ? GM.info?.scriptHandler : null,
+    () => window.__ktScriptManagerHint
+  ]) {
+    try {
+      const value = read();
+      if (typeof value === 'string' && known[value.trim().toLowerCase()]) return known[value.trim().toLowerCase()];
+    } catch {}
+  }
+  return null;
+}
+
 function installThemeReports() {
   const endpoint = 'https://zeta-reports.softbridge.workers.dev/report';
   const frameOrigin = 'https://frame.pingpong.ai';
   const hostOrigin = 'https://zeta-ai.io';
-  const version = '3.50.107';
+  const version = '3.50.108';
   const messageType = 'zeta-theme-report-v1';
   const state = window.__ktReportState ||= {phase:'booting', applyCount:0, errorCount:0, errorType:'none', errorStage:'none'};
   state.stages ||= ['script-start'];
@@ -212,7 +227,16 @@ function installThemeReports() {
       select{width:100%;margin-bottom:10px;padding:8px;background:#fff;color:#26343c;border:1px solid #c8d0d5;border-radius:8px}\n      textarea:focus{outline:2px solid #687c8a;outline-offset:1px}
       #description-count{text-align:right;color:#65737c;font-size:11px}
       p{margin:0 0 10px} .actions{display:flex;gap:8px;justify-content:flex-end} #send{background:#fee500;border-color:#fee500} button:disabled{opacity:.6;cursor:wait}[hidden]{display:none!important}
-    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>작성한 오류 설명과 테마 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 자동으로 수집하지 않습니다.</p><label for="manager">사용 중인 스크립트 앱</label><select id="manager"><option value="unknown">모르겠음</option><option value="Stay">Stay</option><option value="Userscripts">Userscripts</option><option value="Tampermonkey">Tampermonkey</option><option value="Other">기타</option></select><label for="description">어떤 오류가 있나요? (선택)</label><textarea id="description" maxlength="1000" placeholder="예: 말풍선 글자색이 배경색과 같아서 글자가 안 보여요." aria-describedby="description-count"></textarea><p id="description-count">0 / 1000</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
+    </style><section id="panel" role="dialog" aria-label="테마 오류 제보" hidden><p>작성한 오류 설명과 테마 실행 상태를 제작자에게 보냅니다. 대화 내용·계정 정보는 자동으로 수집하지 않습니다.</p><p id="manager-detected" hidden></p><div id="manager-choice"><label for="manager">사용 중인 스크립트 앱</label><select id="manager"><option value="unknown">모르겠음</option><option value="Stay">Stay</option><option value="Userscripts">Userscripts</option><option value="Tampermonkey">Tampermonkey</option><option value="Violentmonkey">Violentmonkey</option><option value="Greasemonkey">Greasemonkey</option><option value="Other">기타</option></select></div><label for="description">어떤 오류가 있나요? (선택)</label><textarea id="description" maxlength="1000" placeholder="예: 말풍선 글자색이 배경색과 같아서 글자가 안 보여요." aria-describedby="description-count"></textarea><p id="description-count">0 / 1000</p><p id="status" role="status"></p><div class="actions"><button id="close">닫기</button><button id="send">제보 보내기</button></div></section><button id="handle" title="드래그로 이동 · 길게 누르면 새로고침 전까지 숨김" aria-label="오류 제보. 드래그로 이동, 길게 누르면 숨기기">오류 제보</button>`;
+    const detectedManager = detectScriptManager();
+    const managerSelect = shadow.getElementById('manager');
+    if (detectedManager) {
+      managerSelect.value = detectedManager;
+      shadow.getElementById('manager-choice').hidden = true;
+      const label = shadow.getElementById('manager-detected');
+      label.textContent = '사용 앱: ' + detectedManager + ' (자동 감지)';
+      label.hidden = false;
+    }
     const handle = shadow.getElementById('handle'), panel = shadow.getElementById('panel');
     handle.title = '꾹 눌러 이동 · 아래 휴지통에 놓으면 숨김';
     handle.setAttribute('aria-label','오류 제보. 꾹 눌러 이동하고 휴지통에 놓으면 숨기기');
@@ -286,7 +310,7 @@ function installThemeReports() {
         for (const key of ["themeVersion","themeKind","frameStatus","styleStatus","backgroundStatus","textStatus","inputStatus","backgroundColor","expectedBackgroundColor","textColor","expectedTextColor","inputTextColor","inputBackgroundColor","inputTextStatus","initializationStatus","applyCount","errorCount","errorType","errorStage","documentState","themeActive","hasSelectorSupport","diagnosticVersion","executionContext","hostCheck","styleSheetStatus","visibilityState","lifecycleStatus","cspScriptCount","cspStyleCount","stageHistory","hostThemeVersion","hostInitializationStatus","hostStyleStatus","hostErrorType","hostErrorStage","frameCount","visibleFrameCount","frameHostCheck","frameSandboxStatus","probeAttempts","probeElapsedMs","frameChangeStatus","scriptManager"]) {
           if (typeof report?.[key] === 'string') payload[key] = report[key];
         }
-        payload.scriptManager=shadow.getElementById('manager').value;
+        payload.scriptManager=detectedManager || managerSelect.value;
         if (submittedDescription) payload.description = submittedDescription;
         const ua = navigator.userAgent;
         payload.browserFamily = /Firefox|FxiOS/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome|CriOS/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':'Other';
